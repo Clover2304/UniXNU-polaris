@@ -1,0 +1,99 @@
+--- a/bsd/kern/ubc_subr.c
++++ b/bsd/kern/ubc_subr.c
+@@ -82,6 +82,7 @@
+ 
+ /* XXX These should be in a BSD accessible Mach header, but aren't. */
+ extern kern_return_t memory_object_pages_resident(memory_object_control_t,
++#include <pexpert/pexpert.h>
+     boolean_t *);
+ extern kern_return_t    memory_object_signed(memory_object_control_t control,
+     boolean_t is_signed);
+@@ -4348,10 +4349,53 @@
+  * This function must be called when the storage for the code signature can
+  * no longer change.
+  */
++/* Source-only PID 1 diagnostic: the boot owner names one ad-hoc CodeDirectory.
++ * This supplies no entitlements, platform identity or Apple trust. All normal
++ * CodeDirectory parsing and executable-page integrity checks remain active.
++ */
++volatile uint32_t polaris_init_signature_accepted;
++
++static errno_t
++polaris_init_signature_policy(const struct cs_blob *blob)
++{
++	char expected[CS_CDHASH_LEN * 2 + 2] = {0};
++	const unsigned int required = CS_ADHOC | CS_HARD | CS_KILL;
++	if (proc_selfpid() != 1 || (blob->csb_flags & required) != required ||
++	    blob->csb_platform_binary || blob->csb_platform_path ||
++	    blob->csb_entitlements || blob->csb_entitlements_blob ||
++	    blob->csb_der_entitlements_blob ||
++	    !PE_parse_boot_arg_str("polaris-init-cdhash", expected, sizeof(expected)) ||
++	    strnlen(expected, sizeof(expected)) != CS_CDHASH_LEN * 2) {
++		return EPERM;
++	}
++	for (unsigned int i = 0; i < CS_CDHASH_LEN; i++) {
++		unsigned int value = 0;
++		for (unsigned int half = 0; half < 2; half++) {
++			unsigned char c = expected[i * 2 + half];
++			if (c >= '0' && c <= '9') {
++				value = (value << 4) | (c - '0');
++			} else if (c >= 'a' && c <= 'f') {
++				value = (value << 4) | (c - 'a' + 10);
++			} else {
++				return EPERM;
++			}
++		}
++		if (blob->csb_cdhash[i] != value) {
++			return EPERM;
++		}
++	}
++	polaris_init_signature_accepted++;
++	return 0;
++}
++
+ static errno_t
+ accelerate_entitlement_queries(
+ 	struct cs_blob *cs_blob)
+ {
++	if (amfi == NULL) {
++		return polaris_init_signature_policy(cs_blob);
++	}
++
+ 	kern_return_t ret = KERN_NOT_SUPPORTED;
+ 
+ #if CODE_SIGNING_MONITOR
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -1502,6 +1502,10 @@
+ extern "C" boolean_t
+ IOTaskHasStringEntitlement(task_t task, const char *entitlement, const char *value)
+ {
++	if (amfi == NULL) {
++		return false;
++	}
++
+ 	if (task == NULL) {
+ 		task = current_task();
+ 	}
+@@ -1533,6 +1537,10 @@
+ extern "C" boolean_t
+ IOTaskHasEntitlement(task_t task, const char *entitlement)
+ {
++	if (amfi == NULL) {
++		return false;
++	}
++
+ 	if (task == NULL) {
+ 		task = current_task();
+ 	}
+@@ -1563,6 +1571,10 @@
+ extern "C" char*
+ IOTaskGetEntitlement(task_t task, const char *entitlement)
+ {
++	if (amfi == NULL) {
++		return NULL;
++	}
++
+ 	void *entitlement_object = NULL;
+ 	char *return_value = NULL;
+ 

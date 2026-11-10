@@ -84,7 +84,9 @@ jobs:
           name: efi-results
           path: out/efi
       - name: Tools
-        run: sudo apt-get update && sudo apt-get install -y qemu-system-arm qemu-efi-aarch64 clang llvm lld
+        run: |
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --no-install-recommends -y qemu-system-arm qemu-efi-aarch64 clang llvm lld
       - name: QEMU native platform check
         if: env.POLARIS_DEFCONFIG != 'polaris_prelink_defconfig'
         run: python3 scripts/check-platform-kernel.py --kernel out/kernel/kernel.macho --efi out/efi
@@ -100,6 +102,21 @@ jobs:
       - name: Assemble the mockfs root payload ESP
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-root-esp --cpus 1 --ram 6 --initrd out/mockfs-root.img
+      - name: Build the own static PID 1
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/build-polaris-init.py
+      - name: QEMU first user process and real syscalls
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-init.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --init-dir out/polaris-init
+      - name: QEMU refuse an incorrect init CDHash
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-init.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --init-dir out/polaris-init --negative wrong-cdhash --out out/init-wrong-hash-check
+      - name: QEMU reject a damaged executable page
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-init.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --init-dir out/polaris-init --negative damaged-code --out out/init-damaged-code-check
+      - name: Assemble the first-user-process payload ESP
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-init-esp --cpus 1 --ram 6 --user-init out/polaris-init/launchd.macho
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -114,3 +131,14 @@ jobs:
             out/polaris-root-esp/
             out/mockfs-root.img
             out/mockfs-root.json
+            out/polaris-init/
+            out/init-check/report.json
+            out/init-check/serial.log
+            out/init-check/qemu.log
+            out/init-wrong-hash-check/report.json
+            out/init-wrong-hash-check/serial.log
+            out/init-wrong-hash-check/qemu.log
+            out/init-damaged-code-check/report.json
+            out/init-damaged-code-check/serial.log
+            out/init-damaged-code-check/qemu.log
+            out/polaris-init-esp/

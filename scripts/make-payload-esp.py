@@ -44,8 +44,11 @@ def main():
     parser.add_argument('--cpus', type=int, default=1,
                         help='CPUs described by the ADT and requested by the command line (1..8)')
     parser.add_argument('--owned-memory-size', type=lambda v: int(v, 0), default=0x40000000)
-    parser.add_argument('--initrd', type=Path,
+    roots = parser.add_mutually_exclusive_group()
+    roots.add_argument('--initrd', type=Path,
                         help='raw mount-only RAM disk; requires a newly built mockfs/checkpoint kernel')
+    roots.add_argument('--user-init', type=Path,
+                       help='own static PID 1 launchd.macho built by build-polaris-init.py')
     parser.add_argument('--no-probe', action='store_true',
                         help='skip the boot-progress/panic probes on the ESP kernel copy')
     parser.add_argument('--probe-extra', default='',
@@ -62,6 +65,22 @@ def main():
     if report.get('original_components_prelinked') is not False:
         parser.error('route A expects the source kernel without original components')
     initrd = None
+    user_init = None
+    if args.user_init:
+        if (report.get('source_mockfs') is not True or
+                report.get('init_signature_policy') != 'pid1-exact-adhoc-cdhash-v1'):
+            parser.error('user init requires the source-only exact-CDHash policy kernel')
+        checker = load_module('platform_check', ROOT / 'scripts/check-platform-kernel.py')
+        checker.symbols(data, {'_polaris_init_signature_accepted', '_mockfs_mountroot', '_rootvnode'})
+        if b'polaris-init-cdhash\0' not in data:
+            parser.error('kernel is missing its init signature policy')
+        fixture = load_module('init_fixture', ROOT / 'scripts/build-polaris-init.py')
+        image = args.user_init.read_bytes()
+        try:
+            user_init = fixture.inspect(image)
+        except (ValueError, IndexError) as error:
+            parser.error(str(error))
+        initrd = image + bytes((-len(image)) % 4096)
     if args.initrd:
         if report.get('source_mockfs') is not True or report.get('root_checkpoint_available') is not True:
             parser.error('ramdisk mode requires a mockfs/checkpoint kernel build, not the old platform kernel')
@@ -94,8 +113,9 @@ def main():
     else:
         kernel_args.append(f'cpus={args.cpus}')
     if initrd is not None:
-        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check='))]
-        kernel_args += ['rd=md0', 'polaris-root-check=1']
+        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check=', 'polaris-init-cdhash='))]
+        kernel_args += ['rd=md0']
+        kernel_args += [f'polaris-init-cdhash={user_init["cdhash"]}'] if user_init else ['polaris-root-check=1']
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
     prefix = load_module('cpu_prefix', ROOT / 'scripts/check-cpu-prefix.py')
@@ -156,8 +176,9 @@ def main():
         'kernel_args': kernel_args, 'cpu_prefix_checked': True,
         'payload_kernel_sha256': hashlib.sha256((out / 'EFI/UniXNU/Payloads/kernel.macho').read_bytes()).hexdigest(),
         'ramdisk': {'bytes': len(initrd), 'sha256': hashlib.sha256(initrd).hexdigest(),
-                    'expected_checkpoint': 'POLARIS_ROOT_MOUNTED mockfs', 'userland_booted': False}
+                    'expected_checkpoint': user_init['expected_checkpoint'] if user_init else 'POLARIS_ROOT_MOUNTED mockfs', 'userland_booted': False}
                    if initrd is not None else None,
+        'user_init': user_init,
         'sources': report.get('sources', {}),
     }, indent=2) + '\n', encoding='utf-8')
     print(f'{out}: payload ESP assembled; cpus={args.cpus}, ram={args.ram} GiB; host-verified only')
