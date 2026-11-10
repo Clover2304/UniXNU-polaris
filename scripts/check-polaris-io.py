@@ -181,6 +181,13 @@ def main():
                                         last['_polaris_init_signature_accepted']>0 and last['_polaris_init_loader_enforced']>0 and
                                         last['_rootvnode']!=0 and last['_cs_validate_page_bad_hash']==last['_cs_validate_page_no_hash']==last['_kernel_debugger_entry_count']==0)
                                     break
+                                # GDB continue at a hardware breakpoint can stop at the
+                                # same PC without executing it. Step once with it disarmed.
+                                if packet(f'z1,{pc:x},4') != 'OK':
+                                    raise RuntimeError('Cannot disarm resident breakpoint')
+                                packet('s')
+                                if packet(f'Z1,{pc:x},4') != 'OK':
+                                    raise RuntimeError('Cannot rearm resident breakpoint')
                                 continue
                             if pc in (syms['_panic'],syms['_panic_with_options']):
                                 ptr=struct.unpack_from('<Q',regs,24 if pc==syms['_panic_with_options'] else 0)[0]
