@@ -80,7 +80,12 @@ def main():
             user_init = fixture.inspect(image)
         except (ValueError, IndexError) as error:
             parser.error(str(error))
-        initrd = image + bytes((-len(image)) % 4096)
+        if user_init['mode'] == 'io':
+            if report.get('ram_io_available') is not True:
+                parser.error('I/O init requires the bounded RAM-file/console kernel')
+            checker.symbols(data, {'_polaris_io_root_enabled', '_polaris_io_file_reads',
+                                   '_polaris_io_file_writes', '_polaris_console_ready'})
+        initrd = fixture.ramdisk(image)
     if args.initrd:
         if report.get('source_mockfs') is not True or report.get('root_checkpoint_available') is not True:
             parser.error('ramdisk mode requires a mockfs/checkpoint kernel build, not the old platform kernel')
@@ -113,9 +118,11 @@ def main():
     else:
         kernel_args.append(f'cpus={args.cpus}')
     if initrd is not None:
-        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check=', 'polaris-init-cdhash='))]
+        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check=', 'polaris-init-cdhash=', 'polaris-io='))]
         kernel_args += ['rd=md0']
         kernel_args += [f'polaris-init-cdhash={user_init["cdhash"]}'] if user_init else ['polaris-root-check=1']
+        if user_init and user_init['mode'] == 'io':
+            kernel_args += ['polaris-io=1']
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
     prefix = load_module('cpu_prefix', ROOT / 'scripts/check-cpu-prefix.py')

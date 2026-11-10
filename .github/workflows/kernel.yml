@@ -120,6 +120,18 @@ jobs:
       - name: Assemble the first-user-process payload ESP
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-init-esp --cpus 1 --ram 6 --user-init out/polaris-init/launchd.macho
+      - name: Build the resident I/O init
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/build-polaris-init.py --mode io --out out/polaris-io
+      - name: QEMU RAM-file I/O, stdio and resident PID 1
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-io.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --init-dir out/polaris-io
+      - name: QEMU missing RAM file refusal
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-io.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --init-dir out/polaris-io --negative missing-ram-file --out out/io-missing-file-check
+      - name: Assemble the resident I/O payload ESP
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-io-esp --cpus 1 --ram 6 --user-init out/polaris-io/launchd.macho
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -148,3 +160,12 @@ jobs:
             out/init-unsigned-check/serial.log
             out/init-unsigned-check/qemu.log
             out/polaris-init-esp/
+            out/polaris-io/
+            out/io-check/report.json
+            out/io-check/screen.ppm
+            out/io-check/serial.log
+            out/io-check/qemu.log
+            out/io-missing-file-check/report.json
+            out/io-missing-file-check/serial.log
+            out/io-missing-file-check/qemu.log
+            out/polaris-io-esp/

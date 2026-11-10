@@ -5,7 +5,8 @@
     "local_changes": [
       "guard optional legacy display probe in common XNU patch overlay",
       "opt-in mockfs RAM-root mount checkpoint after rootvnode installation",
-      "source-only PID1 exact ad-hoc CDHash diagnostic, entitlement denial when AMFI is absent; normal executable page hashing retained; selected init mode requires signatures without unsigned fallback"
+      "source-only PID1 exact ad-hoc CDHash diagnostic, entitlement denial when AMFI is absent; normal executable page hashing retained; selected init mode requires signatures without unsigned fallback",
+      "opt-in fixed 4K RAM-file I/O and native console activation for resident PID1; ENOENT for absent mockfs aliases"
     ]
   },
   "ArmCpu": {

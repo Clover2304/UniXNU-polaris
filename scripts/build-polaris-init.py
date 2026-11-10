@@ -17,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = b'org.unixnu.polaris.first-user\0'
 SIGNATURE_FLAGS = 0x302  # CS_ADHOC | CS_HARD | CS_KILL; no privilege entitlements.
 WANTED = {'_start', '_checkpoint', '_results', '_user_page_size', '_old_length', '_reboot_return'}
+IO_WANTED = {'_io_checkpoint', '_resident_checkpoint', '_io_failure', '_io_results', '_io_ticks'}
+IO_SEED = b'POLARIS RAM IO SEED\n'
+
 
 
 def load_checker():
@@ -82,10 +85,14 @@ def inspect(data):
     addresses = load_checker().symbols(data, WANTED)
     if entry != addresses['_start'] or not code_offset[0] <= entry < code_offset[0] + code_offset[2]:
         raise ValueError('static entry does not match the source symbol')
-    return {'process_sha256': hashlib.sha256(data).hexdigest(), 'cdhash': hashlib.sha256(cd).hexdigest()[:40],
+    io_symbols = {}
+    if b'_io_ticks\0' in data:
+        io_symbols = load_checker().symbols(data, IO_WANTED)
+    return {'mode': 'io' if io_symbols else 'syscalls', 'io_symbols': io_symbols,
+            'process_sha256': hashlib.sha256(data).hexdigest(), 'cdhash': hashlib.sha256(cd).hexdigest()[:40],
             'code_signature_page_bytes': 4096, 'signature_flags': flags, 'addresses': addresses,
             'code_file_offset': code_offset[1] + entry - code_offset[0], 'userland_booted': False,
-            'expected_checkpoint': 'POLARIS_INIT_OK pid=1 pagesize=4096'}
+            'expected_checkpoint': 'POLARIS_IO_OK pid=1 pagesize=4096' if io_symbols else 'POLARIS_INIT_OK pid=1 pagesize=4096'}
 
 
 def static_and_sign(unsigned):
@@ -139,9 +146,22 @@ def static_and_sign(unsigned):
     return bytes(data) + struct.pack('>5I', 0xfade0cc0, sigsize, 1, 0, 20) + cd
 
 
+def ramdisk(image):
+    identity = inspect(image)
+    if identity['mode'] != 'io':
+        return image + bytes((-len(image)) % 4096)
+    state_offset = (4096 + len(image) + 4095) & ~4095
+    result = bytearray(state_offset + 4096)
+    struct.pack_into('<8sII4Q', result, 0, b'N4KROOT\0', 2, 2, 4096, len(image), state_offset, 4096)
+    result[4096:4096 + len(image)] = image
+    result[state_offset:state_offset + len(IO_SEED)] = IO_SEED
+    return bytes(result)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT / 'out/polaris-init')
+    parser.add_argument('--mode', choices=['syscalls', 'io'], default='syscalls')
     args = parser.parse_args()
     clang = shutil.which('clang')
     linker = shutil.which('ld64.lld') or next((str(p) for p in sorted(Path('/usr/lib').glob('llvm-*/bin/ld64.lld'), reverse=True)), None)
@@ -149,16 +169,18 @@ def main():
         parser.error('requires clang and ld64.lld (LLVM LLD)')
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    subprocess.run([clang, '--target=arm64-apple-ios17.0', '-c', ROOT / 'scripts/fixtures/polaris-init.S', '-o', out / 'init.o'], check=True)
+    source = ROOT / ('scripts/fixtures/polaris-io-init.c' if args.mode == 'io' else 'scripts/fixtures/polaris-init.S')
+    flags = ['-O2', '-ffreestanding', '-fno-builtin', '-fno-stack-protector', '-mgeneral-regs-only'] if args.mode == 'io' else []
+    subprocess.run([clang, '--target=arm64-apple-ios17.0', *flags, '-c', source, '-o', out / 'init.o'], check=True)
     subprocess.run([linker, '-arch', 'arm64', '-e', '_start', '-platform_version', 'ios', '17.0', '17.0',
                     '-no_pie', '-no_adhoc_codesign', '-headerpad', '0x400', '-o', out / 'unsigned.macho', out / 'init.o'], check=True)
     image = static_and_sign((out / 'unsigned.macho').read_bytes())
     report = inspect(image)
     (out / 'launchd.macho').write_bytes(image)
-    ramdisk = image + bytes((-len(image)) % 4096)
-    (out / 'root.img').write_bytes(ramdisk)
-    report.update(ramdisk_sha256=hashlib.sha256(ramdisk).hexdigest(), ramdisk_bytes=len(ramdisk),
-                  source_sha256=hashlib.sha256((ROOT / 'scripts/fixtures/polaris-init.S').read_bytes()).hexdigest())
+    root_image = ramdisk(image)
+    (out / 'root.img').write_bytes(root_image)
+    report.update(ramdisk_sha256=hashlib.sha256(root_image).hexdigest(), ramdisk_bytes=len(root_image),
+                  source_sha256=hashlib.sha256(source.read_bytes()).hexdigest())
     (out / 'init.json').write_text(json.dumps(report, indent=2) + '\n')
     print(f'{out}: signed own static PID 1, native-4K hashes, CDHash {report["cdhash"]}')
 

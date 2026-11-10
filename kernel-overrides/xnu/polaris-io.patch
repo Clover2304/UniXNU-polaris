@@ -1,0 +1,306 @@
+--- a/bsd/miscfs/mockfs/mockfs_fsnode.h
++++ b/bsd/miscfs/mockfs/mockfs_fsnode.h
+@@ -59,6 +59,8 @@
+  *   VREG access).
+  */
+ struct mockfs_fsnode {
++	uint8_t polaris_writable; /* Bounded RAM-only test file, never executable. */
++	uint8_t polaris_bytes[4096];
+ 	uint64_t               backing_offset; /* Offline two-file image only. */
+ 	uint64_t               size;    /* Bytes of data; 0 unless type is MOCKFS_FILE */
+ 	uint8_t                type;    /* Serves as a unique identifier for now */
+--- a/bsd/miscfs/mockfs/mockfs_vfsops.c
++++ b/bsd/miscfs/mockfs/mockfs_vfsops.c
+@@ -37,11 +37,13 @@
+ #include <sys/buf.h>
+ #include <sys/kauth.h>
+ #include <sys/errno.h>
++#include <pexpert/pexpert.h>
+ #include <sys/malloc.h>
+ #include <sys/mount_internal.h>
+ #include <sys/vnode_internal.h>
+ 
+ static LCK_GRP_DECLARE(mockfs_mtx_grp, "mockfs-mutex");
++volatile uint32_t polaris_io_root_enabled;
+ 
+ /* Bounded offline input container, not a deployment filesystem or trust claim.
+  * Two unmodified files: /sbin/launchd and /probe.bin; all offsets native 4K.
+@@ -83,6 +85,7 @@
+ 	struct mockfs_test_header header = {0};
+ 	buf_t header_buf = NULL;
+ 	boolean_t test_image = FALSE;
++	boolean_t polaris_writable = FALSE;
+ 	mockfs_mount_t mockfs_mount_data = NULL;
+ 	dk_memdev_info_t memdev_info;
+ 
+@@ -143,7 +146,7 @@
+ 	}
+ 	if (!memcmp(header.magic, "N4KROOT", 8)) {
+ 		uint64_t bytes = rvp->v_specinfo->si_devsize;
+-		if (header.version != 1 || header.count != 2 || bytes > 32 * 1024 * 1024 ||
++		if ((header.version != 1 && header.version != 2) || header.count != 2 || bytes > 32 * 1024 * 1024 ||
+ 		    header.launch_offset != 4096 || !header.launch_size || !header.test_size ||
+ 		    (header.test_offset & 4095) || header.test_offset < 8192 || header.test_offset > bytes ||
+ 		    header.launch_size > header.test_offset - header.launch_offset ||
+@@ -159,6 +162,29 @@
+ 		file_fsnode->size = header.launch_size;
+ 		test_fsnode->backing_offset = header.test_offset;
+ 		test_fsnode->size = header.test_size;
++		if (header.version == 2) {
++			int enabled = 0;
++			if (header.test_size != 4096 ||
++			    !PE_parse_boot_argn("polaris-io", &enabled, sizeof(enabled)) || enabled != 1) {
++				rvalue = EINVAL;
++				goto done;
++			}
++			header_buf = NULL;
++			rvalue = buf_meta_bread(rvp, header.test_offset / DEV_BSIZE, 4096,
++			    vfs_context_ucred(ctx), &header_buf);
++			if (!rvalue) {
++				memcpy(test_fsnode->polaris_bytes, (void *)buf_dataptr(header_buf), 4096);
++			}
++			if (header_buf) {
++				buf_brelse(header_buf);
++				header_buf = NULL;
++			}
++			if (rvalue) {
++				goto done;
++			}
++			test_fsnode->polaris_writable = 1;
++			polaris_writable = TRUE;
++		}
+ 		mockfs_mount_data->mockfs_memory_backed = FALSE;
+ 		test_image = TRUE;
+ 	}
+@@ -180,6 +206,11 @@
+ 		goto done;
+ 	}
+ 
++	if (polaris_writable) {
++		/* Only the fixed RAM test node accepts writes; launchd remains immutable. */
++		mp->mnt_flag &= ~MNT_RDONLY;
++		polaris_io_root_enabled = 1;
++	}
+ 	mockfs_mount_data->mockfs_root = root_fsnode;
+ 	mp->mnt_data = (typeof(mp->mnt_data))mockfs_mount_data;
+ 
+--- a/bsd/miscfs/mockfs/mockfs_vnops.c
++++ b/bsd/miscfs/mockfs/mockfs_vnops.c
+@@ -30,6 +30,8 @@
+ #include <miscfs/mockfs/mockfs_vnops.h>
+ #include <sys/ubc.h>
+ #include <sys/fcntl.h>
++#include <sys/uio.h>
++#include <kern/kalloc.h>
+ #include <sys/mount_internal.h>
+ #include <sys/vnode_internal.h>
+ #include <vfs/vfs_support.h>
+@@ -49,7 +51,63 @@
+ int mockfs_lookup(struct vnop_lookup_args * ap);
+ static int mockfs_readonly_open(struct vnop_open_args *ap)
+ {
+-	return (ap->a_mode & FWRITE) ? EROFS : 0;
++	mockfs_fsnode_t node = (mockfs_fsnode_t)vnode_fsnode(ap->a_vp);
++	return ((ap->a_mode & FWRITE) && !node->polaris_writable) ? EROFS : 0;
++}
++
++static int mockfs_write(struct vnop_write_args *ap);
++static int mockfs_polaris_mmap(struct vnop_mmap_args *ap)
++{
++	mockfs_fsnode_t node = (mockfs_fsnode_t)vnode_fsnode(ap->a_vp);
++	return node->polaris_writable ? ENOTSUP : 0;
++}
++volatile uint64_t polaris_io_file_reads;
++volatile uint64_t polaris_io_file_writes;
++
++static int
++polaris_mockfs_io(vnode_t vp, struct uio *uio, int writing)
++{
++	mockfs_fsnode_t node = (mockfs_fsnode_t)vnode_fsnode(vp);
++	mockfs_mount_t mount = (mockfs_mount_t)node->mnt->mnt_data;
++	off_t offset = uio_offset(uio);
++	user_ssize_t requested = uio_resid(uio);
++	if (offset < 0 || requested < 0) {
++		return EINVAL;
++	}
++	if (requested == 0) {
++		return 0;
++	}
++	if ((uint64_t)offset >= sizeof(node->polaris_bytes)) {
++		return writing ? ENOSPC : 0;
++	}
++	size_t available = sizeof(node->polaris_bytes) - (size_t)offset;
++	if (writing && (uint64_t)requested > available) {
++		return ENOSPC;
++	}
++	size_t count = (uint64_t)requested < available ? (size_t)requested : available;
++	void *temporary = kalloc_data(count, Z_WAITOK);
++	if (!temporary) {
++		return ENOMEM;
++	}
++	int error;
++	if (writing) {
++		/* Do not hold the filesystem mutex while faulting in a user buffer. */
++		error = uiomove((caddr_t)temporary, (int)count, uio);
++		if (!error) {
++			lck_mtx_lock(&mount->mockfs_mnt_mtx);
++			memcpy(node->polaris_bytes + offset, temporary, count);
++			polaris_io_file_writes++;
++			lck_mtx_unlock(&mount->mockfs_mnt_mtx);
++		}
++	} else {
++		lck_mtx_lock(&mount->mockfs_mnt_mtx);
++		memcpy(temporary, node->polaris_bytes + offset, count);
++		polaris_io_file_reads++;
++		lck_mtx_unlock(&mount->mockfs_mnt_mtx);
++		error = uiomove((caddr_t)temporary, (int)count, uio);
++	}
++	kfree_data(temporary, count);
++	return error;
+ }
+ 
+ int mockfs_getattr(struct vnop_getattr_args * ap);
+@@ -142,6 +200,8 @@
+ 
+ 		if (target_fsnode) {
+ 			rvalue = mockfs_fsnode_vnode(target_fsnode, vpp);
++		} else {
++			rvalue = ENOENT;
+ 		}
+ 	} else {
+ 		/*
+@@ -186,7 +246,7 @@
+ 	vap = ap->a_vap;
+ 	bzero(vap, sizeof(*vap));
+ 	VATTR_RETURN(vap, va_nlink, 1); /* Simply assert that someone has at least one link to us */
+-	VATTR_RETURN(vap, va_mode, VREAD | VWRITE | VEXEC);
++	VATTR_RETURN(vap, va_mode, fsnode->polaris_writable ? (VREAD | VWRITE) : (VREAD | VWRITE | VEXEC));
+ 	VATTR_RETURN(vap, va_fileid, fsnode->type);
+ 	VATTR_RETURN(vap, va_total_size, fsnode->size);
+ 	VATTR_RETURN(vap, va_total_alloc, fsnode->size);
+@@ -229,6 +289,10 @@
+ 	 * We're just an ugly frontend for the devnode, so we shouldn't need to do much for reads;
+ 	 *   pass the work to cluster_read.
+ 	 */
++	if (fsnode->polaris_writable) {
++		return polaris_mockfs_io(vp, ap->a_uio, 0);
++	}
++
+ 	if (vp->v_type == VREG) {
+ 		rvalue = cluster_read(vp, ap->a_uio, fsnode->size, ap->a_ioflag);
+ 	} else {
+@@ -239,6 +303,19 @@
+ 	}
+ 
+ 	return rvalue;
++}
++
++static int
++mockfs_write(struct vnop_write_args *ap)
++{
++	mockfs_fsnode_t node = (mockfs_fsnode_t)vnode_fsnode(ap->a_vp);
++	if (!node->polaris_writable) {
++		return EROFS;
++	}
++	if (ap->a_ioflag & IO_APPEND) {
++		uio_setoffset(ap->a_uio, sizeof(node->polaris_bytes));
++	}
++	return polaris_mockfs_io(ap->a_vp, ap->a_uio, 1);
+ }
+ 
+ /*
+@@ -433,10 +510,10 @@
+ 	{ .opve_op = &vnop_getattr_desc, .opve_impl = (VOPFUNC) mockfs_getattr }, /* getattr */
+ 	{ .opve_op = &vnop_setattr_desc, .opve_impl = (VOPFUNC) err_setattr }, /* setattr */
+ 	{ .opve_op = &vnop_read_desc, .opve_impl = (VOPFUNC) mockfs_read }, /* read */
+-	{ .opve_op = &vnop_write_desc, .opve_impl = (VOPFUNC) err_write }, /* write */
++	{ .opve_op = &vnop_write_desc, .opve_impl = (VOPFUNC) mockfs_write }, /* write */
+ 	{ .opve_op = &vnop_ioctl_desc, .opve_impl = (VOPFUNC) err_ioctl }, /* ioctl */
+ 	{ .opve_op = &vnop_select_desc, .opve_impl = (VOPFUNC) err_select }, /* select */
+-	{ .opve_op = &vnop_mmap_desc, .opve_impl = (VOPFUNC) nop_mmap }, /* mmap */
++	{ .opve_op = &vnop_mmap_desc, .opve_impl = (VOPFUNC) mockfs_polaris_mmap }, /* mmap */
+ 	{ .opve_op = &vnop_fsync_desc, .opve_impl = (VOPFUNC) nop_fsync }, /* fsync */
+ 	{ .opve_op = &vnop_remove_desc, .opve_impl = (VOPFUNC) err_remove }, /* remove */
+ 	{ .opve_op = &vnop_link_desc, .opve_impl = (VOPFUNC) err_link }, /* link */
+--- a/bsd/dev/arm/km.c
++++ b/bsd/dev/arm/km.c
+@@ -23,11 +23,13 @@
+ #include <dev/kmreg_com.h>
+ #include <pexpert/pexpert.h>
+ #include <console/serial_protos.h>
++#include <console/video_console.h>
+ 
+ extern int      hz;
+ 
+ extern void     console_write_char(char);
+ extern void     console_write(char *, int);
++extern void vcputc(char);
+ 
+ 
+ void    kminit(void);
+@@ -45,6 +47,30 @@
+ 
+ static int      kmoutput(struct tty * tp);
+ static void     kmstart(struct tty * tp);
++
++volatile uint32_t polaris_console_ready;
++extern struct vc_info vinfo;
++
++static void
++polaris_console_prepare(void)
++{
++	int enabled = 0;
++	if (polaris_console_ready || !PE_parse_boot_argn("polaris-io", &enabled, sizeof(enabled)) || enabled != 1) {
++		return;
++	}
++	/* Reuse the already established console mapping; no GPU registers touched. */
++	if (!vinfo.v_baseaddr || vinfo.v_depth != 32 || !vinfo.v_width || !vinfo.v_height ||
++	    vinfo.v_width > 8192 || vinfo.v_height > 8192 ||
++	    vinfo.v_rowbytes < vinfo.v_width * 4 || vinfo.v_rowbytes > 8192 * 4 ||
++	    (uint64_t)vinfo.v_rowbytes * vinfo.v_height > 64 * 1024 * 1024) {
++		return;
++	}
++	initialize_screen(NULL, kPETextMode);
++	initialize_screen(NULL, kPEReleaseScreen);
++	initialize_screen(NULL, kPEAcquireScreen);
++	polaris_console_ready = 1;
++}
++
+ 
+ extern void     KeyboardOpen(void);
+ 
+@@ -73,6 +99,8 @@
+ 	}
+ 
+ 	tp = km_tty[unit];
++
++	polaris_console_prepare();
+ 
+ 	tty_lock(tp);
+ 
+@@ -249,7 +277,10 @@
+ int
+ kmputc(__unused dev_t dev, char c)
+ {
+-	if (initialized) {
++	if (polaris_console_ready) {
++		if (c == '\n') { vcputc('\r'); }
++		vcputc(c);
++	} else if (initialized) {
+ 		/* OCRNL */
+ 		if (c == '\n') {
+ 			console_write_char('\r');
+@@ -358,7 +389,12 @@
+ 			/* output the buffer one charatcer at a time */
+ 			*cp = *cp & 0x7f;
+ 		}
+-		if (cc > 1) {
++		if (polaris_console_ready) {
++			for (cp = buf; cp < &buf[cc]; cp++) {
++				if (*cp == '\n') { vcputc('\r'); }
++				vcputc(*cp);
++			}
++		} else if (cc > 1) {
+ 			console_write((char *)buf, cc);
+ 		} else {
+ 			kmputc(tp->t_dev, *buf);

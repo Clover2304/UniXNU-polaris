@@ -138,6 +138,7 @@ def main():
     root_checkpoint = check.root_checkpoint_present(data)
     mockfs_symbols = {}
     init_signature_policy = None
+    ram_io_available = False
     if source_mockfs:
         mockfs_symbols = check.symbols(data, {'_mockfs_mountroot', '_rootvnode'})
         if not root_checkpoint:
@@ -146,6 +147,9 @@ def main():
         if b'polaris-init-cdhash\0' not in data:
             raise SystemExit('Missing the explicit boot-owner init signature policy')
         init_signature_policy = 'pid1-exact-adhoc-cdhash-v2'
+        check.symbols(data, {'_polaris_io_root_enabled', '_polaris_io_file_reads',
+                             '_polaris_io_file_writes', '_polaris_console_ready'})
+        ram_io_available = True
     prelinked = None
     if do_prelink:
         print('Prelink pass: composing with the original iPadOS 17 kernelcache', flush=True)
@@ -156,6 +160,7 @@ def main():
               'defconfig': args.defconfig, 'crypto_bootstrap': ctx.config.get('XNU_CRYPTO_BOOTSTRAP'),
               'source_mockfs': source_mockfs, 'mockfs_symbols': mockfs_symbols,
               'init_signature_policy': init_signature_policy,
+              'ram_io_available': ram_io_available,
               'root_checkpoint_available': root_checkpoint,
               'unixnu_revision': revision, 'bootstrap_link_failed': bootstrap_failed,
               'final_configured_link_passed': True,
