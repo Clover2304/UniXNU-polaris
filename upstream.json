@@ -2,7 +2,10 @@
   "UniXNU": {
     "url": "https://github.com/UniXNU/UniXNU",
     "commit": "37987aea410691df3c1e0e146a1bfd6127932149",
-    "local_changes": ["guard optional legacy display probe in common XNU patch overlay"]
+    "local_changes": [
+      "guard optional legacy display probe in common XNU patch overlay",
+      "opt-in mockfs RAM-root mount checkpoint after rootvnode installation"
+    ]
   },
   "ArmCpu": {
     "url": "https://github.com/UniXNU/ArmCpu",
