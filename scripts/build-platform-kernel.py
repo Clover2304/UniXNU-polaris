@@ -10,6 +10,7 @@ artifact for polaris, not an iOS image.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -22,13 +23,21 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def prelink_requested(config, board):
+    """The selected kernel configuration decides whether to use Apple inputs."""
+    requested = config.get('XNU_CRYPTO_BOOTSTRAP') == 'prelinked'
+    if requested and not board.get('kernel', {}).get('prelink'):
+        raise ValueError('prelinked bootstrap requires [kernel.prelink] in board.toml')
+    return requested
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', type=Path, required=True)
     parser.add_argument('--out', type=Path, default=ROOT / 'out/native')
     parser.add_argument('-j', '--jobs', type=int, default=4)
     parser.add_argument('--defconfig', default='polaris_defconfig',
-                        help='configs/ name; a [kernel.prelink] section additionally prelinks against the IPSW kernelcache')
+                        help='configs/ name; the prelinked crypto bootstrap additionally uses the IPSW kernelcache')
     args = parser.parse_args()
     if platform.system() != 'Darwin' or not shutil.which('xcodebuild'):
         parser.error('this step requires macOS with Xcode and the iPhoneOS SDK')
@@ -49,6 +58,10 @@ def main():
     ctx.work.mkdir(parents=True, exist_ok=True)
     config = ROOT / 'configs' / args.defconfig
     ctx.config = parse_config(config.read_text())
+    try:
+        do_prelink = prelink_requested(ctx.config, ctx.board)
+    except ValueError as error:
+        parser.error(str(error))
     shutil.copyfile(config, ctx.config_path)
     modules = feeds.resolve(ctx)
     references = set(cli.REFERENCES['kernel'])
@@ -112,16 +125,29 @@ def main():
     data = source.read_bytes()
     if struct.unpack_from('<4I', data) != (0xfeedfacf, 0x100000c, 0, 2):
         raise SystemExit('Expected an ordinary plain ARM64 source kernel')
+    source_mockfs = ctx.config.get('XNU_SOURCE_MOCKFS') is True
+    root_checkpoint = b'POLARIS_ROOT_MOUNTED mockfs\0' in data
+    mockfs_symbols = {}
+    if source_mockfs:
+        spec = importlib.util.spec_from_file_location('platform_check', ROOT / 'scripts/check-platform-kernel.py')
+        check = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(check)
+        mockfs_symbols = check.symbols(data, {'_mockfs_mountroot', '_rootvnode'})
+        if not root_checkpoint:
+            raise SystemExit('Mockfs milestone kernel is missing its root-mount checkpoint')
     destination = ctx.work / 'kernel/kernel.macho'
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
     prelinked = None
-    if ctx.board.get('kernel', {}).get('prelink'):
+    if do_prelink:
         print('Prelink pass: composing with the original iPadOS 17 kernelcache', flush=True)
         prelinked = kernel.prelink(ctx)
         print(f'PASS: prelinked kernel {prelinked} sha256 '
               f'{hashlib.sha256(prelinked.read_bytes()).hexdigest()}', flush=True)
     report = {'kernel_sha256': hashlib.sha256(data).hexdigest(), 'kernel_bytes': len(data),
+              'defconfig': args.defconfig, 'crypto_bootstrap': ctx.config.get('XNU_CRYPTO_BOOTSTRAP'),
+              'source_mockfs': source_mockfs, 'mockfs_symbols': mockfs_symbols,
+              'root_checkpoint_available': root_checkpoint,
               'unixnu_revision': revision, 'bootstrap_link_failed': bootstrap_failed,
               'final_configured_link_passed': True,
               'original_components_prelinked': prelinked is not None,

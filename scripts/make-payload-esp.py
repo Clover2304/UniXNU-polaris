@@ -44,6 +44,8 @@ def main():
     parser.add_argument('--cpus', type=int, default=1,
                         help='CPUs described by the ADT and requested by the command line (1..8)')
     parser.add_argument('--owned-memory-size', type=lambda v: int(v, 0), default=0x40000000)
+    parser.add_argument('--initrd', type=Path,
+                        help='raw mount-only RAM disk; requires a newly built mockfs/checkpoint kernel')
     parser.add_argument('--no-probe', action='store_true',
                         help='skip the boot-progress/panic probes on the ESP kernel copy')
     parser.add_argument('--probe-extra', default='',
@@ -59,6 +61,20 @@ def main():
         parser.error('kernel.macho does not match its build report')
     if report.get('original_components_prelinked') is not False:
         parser.error('route A expects the source kernel without original components')
+    initrd = None
+    if args.initrd:
+        if report.get('source_mockfs') is not True or report.get('root_checkpoint_available') is not True:
+            parser.error('ramdisk mode requires a mockfs/checkpoint kernel build, not the old platform kernel')
+        checker = load_module('platform_check', ROOT / 'scripts/check-platform-kernel.py')
+        try:
+            checker.symbols(data, {'_mockfs_mountroot', '_rootvnode'})
+        except ValueError as error:
+            parser.error(str(error))
+        if b'POLARIS_ROOT_MOUNTED mockfs\0' not in data:
+            parser.error('kernel is missing the actual root checkpoint')
+        if not 4096 <= args.initrd.stat().st_size <= 256 * 1024 * 1024:
+            parser.error('raw RAM disk must be 4096 bytes to 256 MiB')
+        initrd = args.initrd.read_bytes()
 
     efi = args.efi.resolve()
     binaries = [(efi / 'efi/Build/Out/AARCH64-DEBUG/UniXNU.efi', 'EFI/BOOT/BOOTAA64.EFI'),
@@ -77,12 +93,15 @@ def main():
                        for value in kernel_args]
     else:
         kernel_args.append(f'cpus={args.cpus}')
+    if initrd is not None:
+        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check='))]
+        kernel_args += ['rd=md0', 'polaris-root-check=1']
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
     prefix = load_module('cpu_prefix', ROOT / 'scripts/check-cpu-prefix.py')
     adt = adt_tool.build(cpu_count=args.cpus,
                          dram_size=adt_tool.DRAM_SIZE_6 if args.ram == 6 else adt_tool.DRAM_SIZE_8,
-                         owned_memory_size=args.owned_memory_size)
+                         owned_memory_size=args.owned_memory_size, ramdisk=initrd is not None)
     try:
         prefix.validate(adt, ' '.join(kernel_args))
     except ValueError as error:
@@ -112,6 +131,9 @@ def main():
         sp.run([sys.executable, str(ROOT / 'scripts/seal-source-crypto-kernel.py'),
                 out / 'EFI/UniXNU/Payloads/kernel.macho'], check=True)
     (out / 'EFI/UniXNU/Payloads/kernel.macho.adt').write_bytes(adt)
+    if initrd is not None:
+        (out / 'EFI/UniXNU/Payloads/root.img').write_bytes(initrd)
+    initrd_line = 'initrd = "Payloads/root.img"\n' if initrd is not None else ''
     (out / 'EFI/UniXNU/unixnu.toml').write_text(
         'version = 1\n'
         '[boot]\n'
@@ -125,12 +147,17 @@ def main():
         f'title = "{payload["title"]}"\n'
         'type = "xnu"\n'
         'path = "Payloads/kernel.macho"\n'
+        f'{initrd_line}'
         f'args = "{" ".join(kernel_args)}"\n', encoding='utf-8')
     (out / 'esp.json').write_text(json.dumps({
         'kernel_sha256': report['kernel_sha256'],
         'kernel_bytes': len(data), 'cpus': args.cpus, 'ram_gib': args.ram,
         'owned_memory_size': args.owned_memory_size,
         'kernel_args': kernel_args, 'cpu_prefix_checked': True,
+        'payload_kernel_sha256': hashlib.sha256((out / 'EFI/UniXNU/Payloads/kernel.macho').read_bytes()).hexdigest(),
+        'ramdisk': {'bytes': len(initrd), 'sha256': hashlib.sha256(initrd).hexdigest(),
+                    'expected_checkpoint': 'POLARIS_ROOT_MOUNTED mockfs', 'userland_booted': False}
+                   if initrd is not None else None,
         'sources': report.get('sources', {}),
     }, indent=2) + '\n', encoding='utf-8')
     print(f'{out}: payload ESP assembled; cpus={args.cpus}, ram={args.ram} GiB; host-verified only')

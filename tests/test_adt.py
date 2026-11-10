@@ -82,6 +82,13 @@ class AdtTests(unittest.TestCase):
         tree = self.tree(dram_size=polaris.DRAM_SIZE_8)
         self.assertEqual(struct.unpack('<Q', tree['/chosen']['dram-size'])[0], 0xfcc00000)
 
+    def test_ramdisk_reserves_loader_filled_address_and_size(self):
+        tree = self.tree(ramdisk=True)
+        self.assertEqual(tree['/chosen/memory-map']['RAMDisk'], bytes(16))
+        self.assertNotIn('RAMDisk', self.tree()['/chosen/memory-map'])
+        self.assertEqual(struct.unpack('<2Q', tree['/chosen']['darwinboot-memory-range']),
+                         (0x100000000, 0x7cc00000))
+
     def test_cpu_prefix_keeps_silver_gold_boundary_at_core_four(self):
         tree = self.tree(cpu_count=8)
         for core in range(8):

@@ -1,0 +1,17 @@
+# Source-only mockfs root-mount milestone, based on the proven platform config.
+# The ESP supplies a small RAM disk and polaris-root-check=1. A diagnostic
+# panic confirms a mounted mockfs root before any user process is executed.
+CONFIG_XNU_SOURCE_CORECRYPTO14=y
+CONFIG_XNU_SOURCE_PTHREAD=y
+CONFIG_XNU_ARM_DT_PLATFORM=y
+CONFIG_XNU_ARMCPU=y
+CONFIG_XNU_NATIVE_ARCH_TIMER=y
+CONFIG_XNU_NATIVE_PAN=y
+CONFIG_XNU_CRYPTO_BOOTSTRAP="source"
+CONFIG_XNU_SOURCE_MOCKFS=y
+CONFIG_XNU_DT_PANIC_REGION=y
+# CONFIG_XNU_ARMVIRT_PLATFORM is not set
+# CONFIG_XNU_SHENG_PMGR is not set
+# CONFIG_XNU_NATIVE_UFS is not set
+# CONFIG_XNU_NATIVE_ADRENO is not set
+# CONFIG_XNU_NATIVE_LEGACY_DISPLAY is not set

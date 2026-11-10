@@ -1,0 +1,23 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -924,6 +924,20 @@
+ 	set_rootvnode(init_rootvnode);
+ 	lck_rw_unlock_exclusive(&rootvnode_rw_lock);
+ 	init_rootvnode = NULLVP;  /* use rootvnode after this point */
++
++	/* Opt-in mount-only diagnostic; normal boots do not stop here. */
++	{
++		int polaris_root_check = 0;
++		if (PE_parse_boot_argn("polaris-root-check", &polaris_root_check,
++		    sizeof(polaris_root_check)) && polaris_root_check == 1) {
++			mount_t mounted_root = rootvnode ? vnode_mount(rootvnode) : NULL;
++			if (!bsd_rooted_ramdisk() || !mounted_root ||
++			    strcmp(vfs_statfs(mounted_root)->f_fstypename, "mockfs")) {
++				panic("POLARIS_ROOT_CHECK_FAILED: expected mockfs ramdisk");
++			}
++			panic("POLARIS_ROOT_MOUNTED mockfs");
++		}
++	}
+ 
+ 
+ 	if (!bsd_rooted_ramdisk()) {

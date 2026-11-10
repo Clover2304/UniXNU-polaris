@@ -61,6 +61,8 @@ def main():
     parser.add_argument('--kernel', type=Path, required=True)
     parser.add_argument('--efi', type=Path, default=ROOT / 'out/efi-check')
     parser.add_argument('--out', type=Path, default=ROOT / 'out/platform-check')
+    parser.add_argument('--initrd', type=Path,
+                        help='mount-only RAM disk: require the positive mockfs root checkpoint')
     args = parser.parse_args()
     out, efi = args.out.resolve(), args.efi.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -74,7 +76,17 @@ def main():
                 '_armcpu_timer_interrupts': 8, '_armcpu_ipi_interrupts': 8, '_armcpu_ipi_sent': 8,
                 '_kernel_debugger_entry_count': 4, '_debugger_panic_str': 8,
                 '_debugger_panic_caller': 8, '_debugger_panic_args': 8}
-    addresses = symbols(data, counters.keys())
+    wanted = set(counters)
+    if args.initrd:
+        if build.get('source_mockfs') is not True or build.get('root_checkpoint_available') is not True:
+            parser.error('root check requires a mockfs/checkpoint kernel build')
+        if not 4096 <= args.initrd.stat().st_size <= 256 * 1024 * 1024:
+            parser.error('raw RAM disk must be 4096 bytes to 256 MiB')
+        if b'POLARIS_ROOT_MOUNTED mockfs\0' not in data:
+            parser.error('kernel is missing its root checkpoint')
+        counters['_rootvnode'] = 8
+        wanted |= {'_mockfs_mountroot', '_rootvnode'}
+    addresses = symbols(data, wanted)
     binary = efi / 'efi/Build/Out/AARCH64-DEBUG/UniXNU.efi'
     loader = efi / 'loader/build/DarwinBoot/DEBUG_GCC/AARCH64/DarwinBoot.efi'
     esp = out / 'esp'
@@ -84,6 +96,8 @@ def main():
         target = esp / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
+    if args.initrd:
+        shutil.copyfile(args.initrd, esp / 'EFI/UniXNU/Payloads/root.img')
     # Reuse only the ADT serialization and volatile NVRAM format. All
     # resources below describe QEMU virt, never the sweet board.
     spec = importlib.util.spec_from_file_location('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
@@ -95,7 +109,8 @@ def main():
         n('chosen', [('random-seed', os.urandom(64)),
                      ('dram-base', u64(0x40000000)), ('dram-size', u64(0x80000000)),
                      ('darwinboot-memory-size', u64(0x40000000)),
-                     *adt.empty_nvram_proxy()], [n('memory-map'), n('manifest-properties')]),
+                     *adt.empty_nvram_proxy()], [n('memory-map', [('RAMDisk', u64(0, 0))] if args.initrd else []),
+                                                  n('manifest-properties')]),
         n('cpus', children=[n('cpu0', [('device_type', b'cpu\0'),
             ('compatible', b'arm,cortex-a76\0'), ('reg', u32(0)),
             ('state', b'running\0'), ('timebase-frequency', u32(62500000))])]),
@@ -108,12 +123,15 @@ def main():
                        ('redistributor-stride', u64(0x20000)),
                        ('virtual-timer-intid', u32(27))])])])
     (esp / 'EFI/UniXNU/Payloads/kernel.macho.adt').write_bytes(tree)
+    initrd_line = 'initrd = "Payloads/root.img"\n' if args.initrd else ''
+    root_args = 'rd=md0 polaris-root-check=1 ' if args.initrd else ''
     (esp / 'EFI/UniXNU/unixnu.toml').write_text(
         'version = 1\n[boot]\ntimeout = 0\n[kits]\nautoload = false\n'
         '[[driver]]\npath = "Payloads/DarwinBoot.efi"\n'
         '[[entry]]\nid = "platform"\ntitle = "QEMU source kernel"\ntype = "xnu"\n'
         'path = "Payloads/kernel.macho"\n'
-        'args = "-v serial=0 debug=0x14e kt_fixed_zones=120 cpus=1 armcpu-self-ipi=1 -enable_kprintf_spam -noprogress keepsyms=1"\n')
+        f'{initrd_line}'
+        f'args = "{root_args}-v serial=0 debug=0x14e kt_fixed_zones=120 cpus=1 armcpu-self-ipi=1 -enable_kprintf_spam -noprogress keepsyms=1"\n')
     firmware = [(Path(c), Path(v)) for c, v in [
         ('/usr/share/edk2/aarch64/QEMU_EFI.fd', '/usr/share/edk2/aarch64/QEMU_VARS.fd'),
         ('/usr/share/AAVMF/AAVMF_CODE.fd', '/usr/share/AAVMF/AAVMF_VARS.fd')]
@@ -123,7 +141,7 @@ def main():
     code, variables = firmware[0]
     log = out / 'serial.log'
     log.unlink(missing_ok=True)
-    snapshots, passed = [], False
+    snapshots, passed, panic_format = [], False, None
     with tempfile.TemporaryDirectory(prefix='polaris-platform-') as temporary:
         work = Path(temporary)
         shutil.copyfile(variables, work / 'vars.fd')
@@ -139,7 +157,7 @@ def main():
         with (out / 'qemu.log').open('w') as output:
             process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
             try:
-                deadline = time.monotonic() + 90
+                deadline = time.monotonic() + (180 if args.initrd else 90)
                 sock = socket.socket(socket.AF_UNIX)
                 sock.settimeout(10)
                 while True:
@@ -183,7 +201,8 @@ def main():
                                 if va <= pointer < va + 0x40000000 - 1024:
                                     dump = out / 'panic-format.bin'
                                     qmp('pmemsave', val=pa + pointer - va, size=1024, filename=str(dump))
-                                    (out / 'panic-format.txt').write_text(dump.read_bytes().split(b'\0')[0].decode(errors='replace'))
+                                    panic_format = dump.read_bytes().split(b'\0')[0].decode(errors='replace')
+                                    (out / 'panic-format.txt').write_text(panic_format)
                                 # Darwin ARM64 va_list is a pointer. Preserve
                                 # both the list pointer and bounded argument
                                 # storage for diagnosing an early assertion.
@@ -199,8 +218,14 @@ def main():
                                             if va <= value < va + 0x40000000 - 512:
                                                 target = out / f'panic-arg-{index}.bin'
                                                 qmp('pmemsave', val=pa + value - va, size=512, filename=str(target))
+                                if args.initrd:
+                                    passed = (sample['_rootvnode'] != 0 and
+                                              sample['_armcpu_registered'] == 1 and
+                                              sample['_armcpu_gic_ready'] == 1 and
+                                              sample['_armcpu_timer_interrupts'] > 0 and
+                                              panic_format == 'POLARIS_ROOT_MOUNTED mockfs')
                                 break
-                            if (len(snapshots) > 1 and sample['_armcpu_registered'] == 1 and
+                            if (not args.initrd and len(snapshots) > 1 and sample['_armcpu_registered'] == 1 and
                                     sample['_armcpu_gic_ready'] == 1 and
                                     sample['_armcpu_timer_interrupts'] > snapshots[-2]['_armcpu_timer_interrupts'] > 0):
                                 passed = True
@@ -215,7 +240,8 @@ def main():
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
-    report = {'passed': passed, 'milestone': 'single-cpu registration and advancing timer IRQs',
+    report = {'passed': passed, 'milestone': 'mockfs RAM root mount checkpoint' if args.initrd else 'single-cpu registration and advancing timer IRQs',
+              'root_mounted': bool(args.initrd and passed), 'panic_format': panic_format,
               'self_ipi_received': bool(snapshots and snapshots[-1]['_armcpu_ipi_interrupts']),
               'smp_qualified': False, 'kernel_sha256': hashlib.sha256(data).hexdigest(),
               'source_kernel_build': build,
@@ -224,7 +250,8 @@ def main():
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     if not passed:
         raise SystemExit(f'FAIL: native platform check; inspect {out}')
-    print('PASS: actual XNU registered ArmCpu, enabled GIC and advanced timer IRQs in QEMU')
+    print('PASS: actual XNU mounted a mockfs RAM root and reached its diagnostic checkpoint in QEMU'
+          if args.initrd else 'PASS: actual XNU registered ArmCpu, enabled GIC and advanced timer IRQs in QEMU')
     print('Self-IPI receipt:', report['self_ipi_received'], '; SMP remains unqualified')
     print('Emulated platform only; no physical polaris or userland boot claimed')
 

@@ -1,10 +1,12 @@
 name: host and EFI checks
 on:
   push:
+    branches-ignore: ['work/polaris-ramdisk']
     paths: ['.github/workflows/checks.yml', 'scripts/**', 'drivers/**', 'kernel-overrides/**', 'tests/**', 'board.toml', 'configs/**', 'upstream.json']
   pull_request:
     paths: ['.github/workflows/checks.yml', 'scripts/**', 'drivers/**', 'kernel-overrides/**', 'tests/**', 'board.toml', 'configs/**', 'upstream.json']
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -27,6 +29,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: host-reports
+          retention-days: 7
           path: |
             out/host-tests/report.json
             out/polaris.adt
@@ -57,6 +60,7 @@ jobs:
         if: always()
         with:
           name: efi-results
+          retention-days: 7
           path: |
             out/efi-check/*.log
             out/efi-check/report.json

@@ -75,7 +75,7 @@ def empty_nvram_proxy():
             ('nvram-proxy-data', bytes(image))]
 
 
-def build(*, cpu_count=1, dram_size=DRAM_SIZE_6, owned_memory_size=0x40000000, seed=None):
+def build(*, cpu_count=1, dram_size=DRAM_SIZE_6, owned_memory_size=0x40000000, seed=None, ramdisk=False):
     if cpu_count not in range(1, 9):
         raise ValueError('cpu count must be 1..8')
     if dram_size not in (DRAM_SIZE_6, DRAM_SIZE_8):
@@ -109,7 +109,8 @@ def build(*, cpu_count=1, dram_size=DRAM_SIZE_6, owned_memory_size=0x40000000, s
             ('darwinboot-memory-range', u64(DRAM_BASE, dram_size)),
             ('crypto-hash-method', b'sha2-384\0'),
             *empty_nvram_proxy(),
-        ], [node('memory-map'), node('manifest-properties')]),
+        ], [node('memory-map', [('RAMDisk', u64(0, 0))] if ramdisk else []),
+            node('manifest-properties')]),
         node('cpus', [('#address-cells', u32(1)), ('#size-cells', u32(0))], cpus),
         node('psci', [('compatible', b'arm,psci-1.0\0'), ('method', b'smc\0')]),
         node('defaults', [('sleep-disabled', u32(1))]), node('options'),
@@ -137,13 +138,15 @@ def main():
     parser.add_argument('--cpu-regs', default='0',
                         help='Initial prefix of polaris affinities: 0,0x100,...,0x700')
     parser.add_argument('--psci-method', choices=['smc'], default='smc')
+    parser.add_argument('--ramdisk', action='store_true',
+                        help='reserve a zero RAMDisk address/size pair for DarwinBoot to fill')
     args = parser.parse_args()
     try:
         regs = [int(value, 0) for value in args.cpu_regs.split(',')]
         if not regs or regs != [core << 8 for core in range(len(regs))]:
             raise ValueError('--cpu-regs must be the initial polaris affinity prefix')
         blob = build(cpu_count=len(regs), dram_size=DRAM_SIZE_6 if args.ram == 6 else DRAM_SIZE_8,
-                     owned_memory_size=args.owned_memory_size)
+                     owned_memory_size=args.owned_memory_size, ramdisk=args.ramdisk)
     except ValueError as error:
         parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)
