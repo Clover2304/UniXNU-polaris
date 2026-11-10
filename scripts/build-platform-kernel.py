@@ -142,10 +142,10 @@ def main():
         mockfs_symbols = check.symbols(data, {'_mockfs_mountroot', '_rootvnode'})
         if not root_checkpoint:
             raise SystemExit('Mockfs milestone kernel is missing its root-mount checkpoint')
-        check.symbols(data, {'_polaris_init_signature_accepted'})
+        check.symbols(data, {'_polaris_init_signature_accepted', '_polaris_init_loader_enforced', '_polaris_init_unsigned_rejected', '_polaris_init_signature_rejected'})
         if b'polaris-init-cdhash\0' not in data:
             raise SystemExit('Missing the explicit boot-owner init signature policy')
-        init_signature_policy = 'pid1-exact-adhoc-cdhash-v1'
+        init_signature_policy = 'pid1-exact-adhoc-cdhash-v2'
     prelinked = None
     if do_prelink:
         print('Prelink pass: composing with the original iPadOS 17 kernelcache', flush=True)

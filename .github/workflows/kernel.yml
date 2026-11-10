@@ -114,6 +114,9 @@ jobs:
       - name: QEMU reject a damaged executable page
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/check-polaris-init.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --init-dir out/polaris-init --negative damaged-code --out out/init-damaged-code-check
+      - name: QEMU refuse an unsigned init
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-init.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --init-dir out/polaris-init --negative missing-signature --out out/init-unsigned-check
       - name: Assemble the first-user-process payload ESP
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-init-esp --cpus 1 --ram 6 --user-init out/polaris-init/launchd.macho
@@ -141,4 +144,7 @@ jobs:
             out/init-damaged-code-check/report.json
             out/init-damaged-code-check/serial.log
             out/init-damaged-code-check/qemu.log
+            out/init-unsigned-check/report.json
+            out/init-unsigned-check/serial.log
+            out/init-unsigned-check/qemu.log
             out/polaris-init-esp/

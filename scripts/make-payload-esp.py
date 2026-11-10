@@ -68,10 +68,10 @@ def main():
     user_init = None
     if args.user_init:
         if (report.get('source_mockfs') is not True or
-                report.get('init_signature_policy') != 'pid1-exact-adhoc-cdhash-v1'):
+                report.get('init_signature_policy') != 'pid1-exact-adhoc-cdhash-v2'):
             parser.error('user init requires the source-only exact-CDHash policy kernel')
         checker = load_module('platform_check', ROOT / 'scripts/check-platform-kernel.py')
-        checker.symbols(data, {'_polaris_init_signature_accepted', '_mockfs_mountroot', '_rootvnode'})
+        checker.symbols(data, {'_polaris_init_signature_accepted', '_polaris_init_loader_enforced', '_mockfs_mountroot', '_rootvnode'})
         if b'polaris-init-cdhash\0' not in data:
             parser.error('kernel is missing its init signature policy')
         fixture = load_module('init_fixture', ROOT / 'scripts/build-polaris-init.py')

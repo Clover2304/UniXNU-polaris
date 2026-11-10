@@ -8,7 +8,7 @@
  
  #include <mach/mach_types.h>
  #include <mach/memory_object_types.h>
-@@ -4348,10 +4349,53 @@
+@@ -4348,10 +4349,58 @@
   * This function must be called when the storage for the code signature can
   * no longer change.
   */
@@ -17,6 +17,7 @@
 + * CodeDirectory parsing and executable-page integrity checks remain active.
 + */
 +volatile uint32_t polaris_init_signature_accepted;
++volatile uint32_t polaris_init_signature_rejected;
 +
 +static errno_t
 +polaris_init_signature_policy(const struct cs_blob *blob)
@@ -56,7 +57,11 @@
  	struct cs_blob *cs_blob)
  {
 +	if (amfi == NULL) {
-+		return polaris_init_signature_policy(cs_blob);
++		errno_t policy_result = polaris_init_signature_policy(cs_blob);
++		if (policy_result != 0) {
++			polaris_init_signature_rejected++;
++		}
++		return policy_result;
 +	}
 +
  	kern_return_t ret = KERN_NOT_SUPPORTED;
@@ -96,4 +101,75 @@
 +
  	void *entitlement_object = NULL;
  	char *return_value = NULL;
+ 
+--- a/bsd/kern/mach_loader.c
++++ b/bsd/kern/mach_loader.c
+@@ -51,6 +51,7 @@
+ #include <sys/ubc_internal.h>
+ #include <sys/imgact.h>
+ #include <sys/codesign.h>
++#include <pexpert/pexpert.h>
+ #include <sys/proc_uuid_policy.h>
+ #include <sys/reason.h>
+ #include <sys/kdebug.h>
+@@ -185,6 +186,9 @@
+ 	struct image_params             *imgp,
+ 	load_result_t           *result
+ 	);
++
++volatile uint32_t polaris_init_loader_enforced;
++volatile uint32_t polaris_init_unsigned_rejected;
+ 
+ static load_return_t
+ load_code_signature(
+@@ -801,6 +805,9 @@
+ 	size_t                  mach_header_sz = sizeof(struct mach_header);
+ 	boolean_t               abi64;
+ 	boolean_t               got_code_signatures = FALSE;
++	char polaris_init_hash[CS_CDHASH_LEN * 2 + 2] = {0};
++	boolean_t polaris_init_enforced = PE_parse_boot_arg_str(
++	    "polaris-init-cdhash", polaris_init_hash, sizeof(polaris_init_hash));
+ 	boolean_t               found_header_segment = FALSE;
+ 	boolean_t               found_xhdr = FALSE;
+ 	boolean_t               found_version_cmd = FALSE;
+@@ -817,6 +824,10 @@
+ 	effective_page_mask = vm_map_page_mask(map);
+ 	effective_page_size = vm_map_page_size(map);
+ #endif /* __arm64__ */
++
++	if (polaris_init_enforced) {
++		polaris_init_loader_enforced++;
++	}
+ 
+ 	if (header->magic == MH_MAGIC_64 ||
+ 	    header->magic == MH_CIGAM_64) {
+@@ -1308,7 +1319,7 @@
+ 					/*
+ 					 * Allow injections to be ignored on devices w/o enforcement enabled
+ 					 */
+-					if (!cs_process_global_enforcement()) {
++					if (!cs_process_global_enforcement() && !polaris_init_enforced) {
+ 						ret = LOAD_SUCCESS; /* ignore error */
+ 					}
+ 				} else {
+@@ -1339,7 +1350,7 @@
+ 								printf("CODE SIGNING: %s[%d]: invalid initial page at offset %lld validated:%d tainted:%d csflags:0x%x\n",
+ 								    vp->v_name, proc_getpid(p), (long long)(file_offset + off), valid, tainted, result->csflags);
+ 							}
+-							if (cs_process_global_enforcement() ||
++							if (cs_process_global_enforcement() || polaris_init_enforced ||
+ 							    (result->csflags & (CS_HARD | CS_KILL | CS_ENFORCEMENT))) {
+ 								ret = LOAD_FAILURE;
+ 							}
+@@ -1466,7 +1477,10 @@
+ 	}
+ 
+ 	if (ret == LOAD_SUCCESS) {
+-		if (!got_code_signatures && cs_process_global_enforcement()) {
++		if (!got_code_signatures && (cs_process_global_enforcement() || polaris_init_enforced)) {
++			if (polaris_init_enforced) {
++				polaris_init_unsigned_rejected++;
++			}
+ 			ret = LOAD_FAILURE;
+ 		}
  

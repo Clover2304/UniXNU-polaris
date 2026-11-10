@@ -70,7 +70,7 @@ def main():
     parser.add_argument('--platform-esp', type=Path, required=True, help='QEMU root-check/esp, never a Polaris phone ESP')
     parser.add_argument('--init-dir', type=Path, required=True)
     parser.add_argument('--out', type=Path, default=ROOT / 'out/init-check')
-    parser.add_argument('--negative', choices=['wrong-cdhash', 'damaged-code'])
+    parser.add_argument('--negative', choices=['wrong-cdhash', 'damaged-code', 'missing-signature'])
     parser.add_argument('--cpu', default='cortex-a76')
     args = parser.parse_args()
     fixture = module('init_fixture', ROOT / 'scripts/build-polaris-init.py')
@@ -79,12 +79,12 @@ def main():
     data = args.kernel.read_bytes()
     build = json.loads(args.kernel.with_suffix('.json').read_text())
     if (build.get('kernel_sha256') != hashlib.sha256(data).hexdigest() or
-            build.get('source_mockfs') is not True or build.get('init_signature_policy') != 'pid1-exact-adhoc-cdhash-v1' or
+            build.get('source_mockfs') is not True or build.get('init_signature_policy') != 'pid1-exact-adhoc-cdhash-v2' or
             build.get('original_components_prelinked') is not False):
         parser.error('requires a matching source-only init-policy kernel build')
     checker = module('platform_check', ROOT / 'scripts/check-platform-kernel.py')
     names = {'_panic', '_panic_with_options', '_panic_trap_to_debugger', '_rootvnode',
-             '_polaris_init_signature_accepted', '_cs_validate_page_bad_hash', '_cs_validate_page_no_hash'}
+             '_polaris_init_signature_accepted', '_polaris_init_loader_enforced', '_polaris_init_unsigned_rejected', '_polaris_init_signature_rejected', '_cs_validate_page_bad_hash', '_cs_validate_page_no_hash'}
     addresses = checker.symbols(data, names)
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -104,6 +104,12 @@ def main():
         image = bytearray(image)
         image[own['code_file_offset']] ^= 1
         image = bytes(image)
+    if args.negative == 'missing-signature':
+        unsigned = bytearray(image)
+        for kind, at, raw in fixture.commands(unsigned):
+            if kind == 0x1d:
+                struct.pack_into('<I', unsigned, at, 0x2b)  # Optional data command; no LC_CODE_SIGNATURE.
+        image = bytes(unsigned)
     ramdisk = image + bytes((-len(image)) % 4096)
     (esp / 'EFI/UniXNU/Payloads/root.img').write_bytes(ramdisk)
     config = esp / 'EFI/UniXNU/unixnu.toml'
@@ -188,18 +194,21 @@ def main():
                                 report['panic_message'] = string(pointer)
                         elif pc == addresses['_panic']:
                             report['panic_format'] = string(struct.unpack_from('<Q', regs)[0])
-                        for name, size in [('_rootvnode', 8), ('_polaris_init_signature_accepted', 4), ('_cs_validate_page_bad_hash', 8), ('_cs_validate_page_no_hash', 8)]:
+                        for name, size in [('_rootvnode', 8), ('_polaris_init_signature_accepted', 4), ('_polaris_init_loader_enforced', 4), ('_polaris_init_unsigned_rejected', 4), ('_polaris_init_signature_rejected', 4), ('_cs_validate_page_bad_hash', 8), ('_cs_validate_page_no_hash', 8)]:
                             report[name] = int.from_bytes(memory(addresses[name], size), 'little')
                         if args.negative == 'wrong-cdhash':
                             report['passed'] = (not report['el0_observed'] and report['_rootvnode'] != 0 and
-                                                report['_polaris_init_signature_accepted'] == 0 and
-                                                'exec' in report.get('panic_format', '').lower())
+                                                report['_polaris_init_signature_accepted'] == 0 and report['_polaris_init_loader_enforced'] > 0 and
+                                                report['_polaris_init_signature_rejected'] > 0)
+                        elif args.negative == 'missing-signature':
+                            report['passed'] = (not report['el0_observed'] and report['_rootvnode'] != 0 and
+                                                report['_polaris_init_signature_accepted'] == 0 and report['_polaris_init_unsigned_rejected'] > 0)
                         elif args.negative == 'damaged-code':
                             report['passed'] = (not report['el0_observed'] and report['_rootvnode'] != 0 and
-                                                report['_polaris_init_signature_accepted'] > 0 and report['_cs_validate_page_bad_hash'] > 0)
+                                                report['_polaris_init_signature_accepted'] > 0 and report['_polaris_init_loader_enforced'] > 0 and report['_cs_validate_page_bad_hash'] > 0)
                         else:
                             report['passed'] = (report['userland_booted'] and report.get('panic_message') == SUCCESS and
-                                                report['_polaris_init_signature_accepted'] > 0 and report['_rootvnode'] != 0 and
+                                                report['_polaris_init_signature_accepted'] > 0 and report['_polaris_init_loader_enforced'] > 0 and report['_rootvnode'] != 0 and
                                                 report['_cs_validate_page_bad_hash'] == 0 and report['_cs_validate_page_no_hash'] == 0)
                         break
             finally:
