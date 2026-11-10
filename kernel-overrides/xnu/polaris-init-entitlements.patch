@@ -1,13 +1,13 @@
 --- a/bsd/kern/ubc_subr.c
 +++ b/bsd/kern/ubc_subr.c
-@@ -82,6 +82,7 @@
- 
- /* XXX These should be in a BSD accessible Mach header, but aren't. */
- extern kern_return_t memory_object_pages_resident(memory_object_control_t,
+@@ -55,6 +55,7 @@
+ #include <sys/fcntl.h>
+ #include <sys/reboot.h>
+ #include <sys/code_signing.h>
 +#include <pexpert/pexpert.h>
-     boolean_t *);
- extern kern_return_t    memory_object_signed(memory_object_control_t control,
-     boolean_t is_signed);
+ 
+ #include <mach/mach_types.h>
+ #include <mach/memory_object_types.h>
 @@ -4348,10 +4349,53 @@
   * This function must be called when the storage for the code signature can
   * no longer change.
