@@ -26,3 +26,14 @@ class RootCheckpointTests(unittest.TestCase):
                     'Failed to mount root device @%s:%d'):
             self.assertFalse(CHECK.root_checkpoint_present(fmt.encode() + b'\0'))
             self.assertFalse(CHECK.root_checkpoint_matches(fmt))
+
+    def test_mount_checkpoint_can_precede_first_timer_interrupt(self):
+        sample = {'_rootvnode': 0xfffffff000001000, '_armcpu_registered': 1,
+                  '_armcpu_gic_ready': 1, '_kernel_debugger_entry_count': 1,
+                  '_armcpu_timer_interrupts': 0}
+        self.assertTrue(CHECK.root_checkpoint_reached(sample, CHECK.ROOT_PANIC_FORMATS[1]))
+        for key in ('_rootvnode', '_armcpu_registered', '_armcpu_gic_ready',
+                    '_kernel_debugger_entry_count'):
+            self.assertFalse(CHECK.root_checkpoint_reached(dict(sample, **{key: 0}),
+                                                          CHECK.ROOT_PANIC_FORMATS[1]))
+        self.assertFalse(CHECK.root_checkpoint_reached(sample, 'Failed to mount root device @%s:%d'))

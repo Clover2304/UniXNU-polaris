@@ -37,6 +37,16 @@ def root_checkpoint_matches(panic_format):
     return panic_format in ROOT_PANIC_FORMATS
 
 
+def root_checkpoint_reached(sample, panic_format):
+    # The mount-only panic can beat the first timer IRQ. Advancing IRQs are
+    # qualified by the separate platform boot, which does not stop at mount.
+    return (sample['_rootvnode'] != 0 and
+            sample['_armcpu_registered'] == 1 and
+            sample['_armcpu_gic_ready'] == 1 and
+            sample['_kernel_debugger_entry_count'] > 0 and
+            root_checkpoint_matches(panic_format))
+
+
 def symbols(data, wanted):
     if struct.unpack_from('<4I', data) != (0xfeedfacf, 0x100000c, 0, 2):
         raise ValueError('expected a plain ARM64 executable Mach-O')
@@ -232,11 +242,7 @@ def main():
                                                 target = out / f'panic-arg-{index}.bin'
                                                 qmp('pmemsave', val=pa + value - va, size=512, filename=str(target))
                                 if args.initrd:
-                                    passed = (sample['_rootvnode'] != 0 and
-                                              sample['_armcpu_registered'] == 1 and
-                                              sample['_armcpu_gic_ready'] == 1 and
-                                              sample['_armcpu_timer_interrupts'] > 0 and
-                                              root_checkpoint_matches(panic_format))
+                                    passed = root_checkpoint_reached(sample, panic_format)
                                 break
                             if (not args.initrd and len(snapshots) > 1 and sample['_armcpu_registered'] == 1 and
                                     sample['_armcpu_gic_ready'] == 1 and
@@ -255,6 +261,7 @@ def main():
                     process.wait()
     report = {'passed': passed, 'milestone': 'mockfs RAM root mount checkpoint' if args.initrd else 'single-cpu registration and advancing timer IRQs',
               'root_mounted': bool(args.initrd and passed), 'panic_format': panic_format,
+              'timer_interrupt_observed': bool(snapshots and snapshots[-1]['_armcpu_timer_interrupts']),
               'self_ipi_received': bool(snapshots and snapshots[-1]['_armcpu_ipi_interrupts']),
               'smp_qualified': False, 'kernel_sha256': hashlib.sha256(data).hexdigest(),
               'source_kernel_build': build,
