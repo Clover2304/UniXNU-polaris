@@ -397,10 +397,22 @@ def main():
         # This kernel's padding does not sit at the recorded offsets (different
         # link layout). Relocate every cave into verified zero windows in the
         # entry segment instead of guessing at occupied padding.
-        base = find_zero_window(data, AFTER_MMU_VA + 0x400, 4 * CAVE_SIZE, 0xFFFFFFF00E000000)   # within B/BL range of the entry
+        # Reserve probes and renderer together. Measure the actual renderer
+        # rather than assuming a spare 4K follows the first small zero run.
+        panic_capacity = 0
+        if args.panic_screen:
+            with tempfile.TemporaryDirectory() as tmp:
+                preview, _, _ = assemble_c(ROOT / 'scripts/xnu-panic-screen.c',
+                    AFTER_MMU_VA + 0x400, Path(tmp), kernel_names)
+            panic_capacity = (len(preview) + 15) & ~15
+        # Stay in the retained executable segment containing the entry;
+        # padding in __KLD or writable data has a different lifetime/protection.
+        entry_end = next(va + size for va, _, _, size in SEGMENTS
+                         if va <= ENTRY_VA < va + size)
+        base = find_zero_window(data, AFTER_MMU_VA + 0x400,
+                               4 * CAVE_SIZE + panic_capacity, entry_end)
         CAVES.update({stage: base + index * CAVE_SIZE for index, stage in enumerate((1, 2, 3, 4))})
-        PANIC_CAVE_END = base + 4 * CAVE_SIZE + 0x1000
-        find_zero_window(data, base + 4 * CAVE_SIZE, 0x1000, PANIC_CAVE_END + 1)  # verify
+        PANIC_CAVE_END = base + 4 * CAVE_SIZE + panic_capacity
 
     # (site, cave stage, symbols the cave is linked with)
     sites = [(ENTRY_VA, 1, {'target': START_FIRST_CPU}),
