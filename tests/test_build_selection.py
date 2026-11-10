@@ -2,6 +2,8 @@
 import importlib.util
 from pathlib import Path
 import re
+import subprocess
+import tempfile
 import tomllib
 import unittest
 
@@ -12,6 +14,45 @@ SPEC.loader.exec_module(BUILD)
 
 
 class BuildSelectionTests(unittest.TestCase):
+    def test_overlapping_io_overlay_survives_two_baseline_passes(self):
+        # Earlier patches cannot reverse-check while a later overlay changes
+        # their context. Exercise the baseline loop with real overlapping diffs.
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            (work / 'patches/xnu').mkdir(parents=True)
+            source = work / '.cache/xnu-work'
+            source.mkdir(parents=True)
+            (source / 'node.c').write_text('int state = 0;\n')
+            for name, old, new in [('mockfs-test.patch', 0, 1), ('polaris-io.patch', 1, 2)]:
+                (work / 'patches/xnu' / name).write_text(
+                    '--- a/node.c\n+++ b/node.c\n@@ -1 +1 @@\n'
+                    f'-int state = {old};\n+int state = {new};\n')
+            script = work / 'baseline.sh'
+            script.write_text('''#!/usr/bin/env bash
+set -euo pipefail
+ROOT=$(cd "$(dirname "$0")" && pwd)
+cd "$ROOT"
+for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu/zzy-native-gpu-addon-mount.patch"; do
+  if git -C .cache/xnu-work apply --reverse --check "$LATE_PATCH" >/dev/null 2>&1; then
+    git -C .cache/xnu-work apply --reverse "$LATE_PATCH"
+  fi
+done
+for PATCH in "$ROOT"/patches/xnu/*.patch; do
+  if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
+    git -C .cache/xnu-work apply --check "$PATCH"
+    git -C .cache/xnu-work apply "$PATCH"
+  fi
+done
+''')
+            BUILD.install_late_io_patch_hook(script)
+            once = script.read_text()
+            BUILD.install_late_io_patch_hook(script)
+            self.assertEqual(script.read_text(), once)
+            for _ in range(2):
+                result = subprocess.run(['bash', script], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual((source / 'node.c').read_text(), 'int state = 2;\n')
+
     def selection(self, filename):
         text = (ROOT / 'configs' / filename).read_text()
         # The pinned UniXNU parser removes CONFIG_ and unquotes string values.

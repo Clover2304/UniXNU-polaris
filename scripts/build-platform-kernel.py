@@ -31,6 +31,19 @@ def prelink_requested(config, board):
     return requested
 
 
+def install_late_io_patch_hook(script):
+    """Remove our overlapping mockfs overlay before common idempotency checks."""
+    text = script.read_text()
+    marker = 'for LATE_PATCH in '
+    lines = [line for line in text.splitlines() if line.startswith(marker)]
+    if len(lines) != 1 or not lines[0].endswith('; do'):
+        raise ValueError('Pinned baseline late-patch loop changed')
+    line = lines[0]
+    addition = '"$ROOT/patches/xnu/polaris-io.patch" '
+    if addition not in line:
+        script.write_text(text.replace(line, marker + addition + line[len(marker):], 1))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', type=Path, required=True)
@@ -91,6 +104,7 @@ def main():
     env.update(kernel.version_env(modules))
     env.update(JOBS=str(args.jobs), PATH=kernel.toolchain_path(), MAKEFLAGS='-k')
     script = ctx.tree / 'scripts/build-xnu-4k-baseline.sh'
+    install_late_io_patch_hook(script)
     obj = ctx.tree / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837'
     bootstrap = dict(env, XNU_SOURCE_CORECRYPTO14='0', XNU_SOURCE_PTHREAD='0',
                      XNU_ARM_DT_PLATFORM='0', XNU_ARMCPU='0', XNU_NATIVE_ARCH_TIMER='0',
