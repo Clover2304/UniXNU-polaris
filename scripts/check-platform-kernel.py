@@ -24,6 +24,19 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 
 
+ROOT_CHECKPOINT = 'POLARIS_ROOT_MOUNTED mockfs'
+# XNU's kernel-private panic() macro appends the source-location format.
+ROOT_PANIC_FORMATS = (ROOT_CHECKPOINT, ROOT_CHECKPOINT + ' @%s:%d')
+
+
+def root_checkpoint_present(data):
+    return any(value.encode() + b'\0' in data for value in ROOT_PANIC_FORMATS)
+
+
+def root_checkpoint_matches(panic_format):
+    return panic_format in ROOT_PANIC_FORMATS
+
+
 def symbols(data, wanted):
     if struct.unpack_from('<4I', data) != (0xfeedfacf, 0x100000c, 0, 2):
         raise ValueError('expected a plain ARM64 executable Mach-O')
@@ -82,7 +95,7 @@ def main():
             parser.error('root check requires a mockfs/checkpoint kernel build')
         if not 4096 <= args.initrd.stat().st_size <= 256 * 1024 * 1024:
             parser.error('raw RAM disk must be 4096 bytes to 256 MiB')
-        if b'POLARIS_ROOT_MOUNTED mockfs\0' not in data:
+        if not root_checkpoint_present(data):
             parser.error('kernel is missing its root checkpoint')
         counters['_rootvnode'] = 8
         wanted |= {'_mockfs_mountroot', '_rootvnode'}
@@ -223,7 +236,7 @@ def main():
                                               sample['_armcpu_registered'] == 1 and
                                               sample['_armcpu_gic_ready'] == 1 and
                                               sample['_armcpu_timer_interrupts'] > 0 and
-                                              panic_format == 'POLARIS_ROOT_MOUNTED mockfs')
+                                              root_checkpoint_matches(panic_format))
                                 break
                             if (not args.initrd and len(snapshots) > 1 and sample['_armcpu_registered'] == 1 and
                                     sample['_armcpu_gic_ready'] == 1 and

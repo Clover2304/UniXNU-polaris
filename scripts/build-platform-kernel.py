@@ -125,19 +125,22 @@ def main():
     data = source.read_bytes()
     if struct.unpack_from('<4I', data) != (0xfeedfacf, 0x100000c, 0, 2):
         raise SystemExit('Expected an ordinary plain ARM64 source kernel')
-    source_mockfs = ctx.config.get('XNU_SOURCE_MOCKFS') is True
-    root_checkpoint = b'POLARIS_ROOT_MOUNTED mockfs\0' in data
-    mockfs_symbols = {}
-    if source_mockfs:
-        spec = importlib.util.spec_from_file_location('platform_check', ROOT / 'scripts/check-platform-kernel.py')
-        check = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(check)
-        mockfs_symbols = check.symbols(data, {'_mockfs_mountroot', '_rootvnode'})
-        if not root_checkpoint:
-            raise SystemExit('Mockfs milestone kernel is missing its root-mount checkpoint')
+    # Preserve the linked image on validation failure, without a qualifying
+    # kernel.json. Payload assembly requires that report and cannot use it.
     destination = ctx.work / 'kernel/kernel.macho'
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
+    destination.with_suffix('.json').unlink(missing_ok=True)
+    spec = importlib.util.spec_from_file_location('platform_check', ROOT / 'scripts/check-platform-kernel.py')
+    check = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(check)
+    source_mockfs = ctx.config.get('XNU_SOURCE_MOCKFS') is True
+    root_checkpoint = check.root_checkpoint_present(data)
+    mockfs_symbols = {}
+    if source_mockfs:
+        mockfs_symbols = check.symbols(data, {'_mockfs_mountroot', '_rootvnode'})
+        if not root_checkpoint:
+            raise SystemExit('Mockfs milestone kernel is missing its root-mount checkpoint')
     prelinked = None
     if do_prelink:
         print('Prelink pass: composing with the original iPadOS 17 kernelcache', flush=True)

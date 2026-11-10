@@ -70,7 +70,7 @@ def main():
             checker.symbols(data, {'_mockfs_mountroot', '_rootvnode'})
         except ValueError as error:
             parser.error(str(error))
-        if b'POLARIS_ROOT_MOUNTED mockfs\0' not in data:
+        if not checker.root_checkpoint_present(data):
             parser.error('kernel is missing the actual root checkpoint')
         if not 4096 <= args.initrd.stat().st_size <= 256 * 1024 * 1024:
             parser.error('raw RAM disk must be 4096 bytes to 256 MiB')

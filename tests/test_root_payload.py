@@ -25,7 +25,7 @@ def symbol_fixture(mockfs=True):
         strings += name + b'\0'
     header = struct.pack('<8I', 0xfeedfacf, 0x100000c, 0, 2, 1, 24, 0, 0)
     command = struct.pack('<6I', 2, 24, 56, len(entries), 56 + 16 * len(entries), len(strings))
-    return header + command + b''.join(entries) + strings + b'POLARIS_ROOT_MOUNTED mockfs\0'
+    return header + command + b''.join(entries) + strings + b'POLARIS_ROOT_MOUNTED mockfs @%s:%d\0'
 
 
 class RootPayloadTests(unittest.TestCase):
