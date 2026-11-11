@@ -169,3 +169,19 @@ CPU/device DMA 模型核对字节级 UTRD/CDB/PRDT，模拟数据页未 invalida
 
 真机部署沿用 [默认 edk2 与 USB 文件更新](uefi-usb-update.md)，保留当前成功
 `9feeaca` 镜像，通过 Mass Storage 更新 EFI 文件后普通重启，不再依赖每轮 fastboot。
+
+
+### 第五轮首个真机候选：INQUIRY 填充误拦
+
+源码 `a05b083` 的完整 Intel Mac/Xcode 26.2 CI 与本地打包画面检查通过，
+通过 USB 更新文件后普通重启。实际 INQUIRY 已返回 36 字节，OCS=0、
+SCSI GOOD、residual=0，PRDT/保护区与停止状态通过，SMMU 未变化且无新增故障位。
+设备返回 `SKhynix` / `H28U74301AMR` / `D003`，vendor/product 使用尾随 NUL。
+首版把字段限定为纯可打印 ASCII，因此误判 payload-error，按设计停止，
+没有发出 READ CAPACITY。原有自检、心跳、NOP/QUERY 与 USB 仍通过。
+[记录](ufs-scsi-inquiry-rejected.json)保留此失败，不把容量或完整 PRDT 阶段记为通过。
+
+修正版逐字段允许 ASCII 前缀及仅由 NUL/空格构成的尾部；拒绝 NUL 后再次出现
+非空格文本及其他控制/非 ASCII 字节。数据区初始化改为非 ASCII 哨兵，确保
+仅部分更新文本字段尾部也被拒绝。实测字节已加入主机和实际 C++ 传输模型回归。
+仍需重编译和新一轮真机验收，容量与扇区读取资格未改变。

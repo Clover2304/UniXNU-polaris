@@ -58,7 +58,8 @@ static inline void polaris_ufs_scsi_prepare(uint8_t *p,uint64_t pa,PolarisUfsScs
     polaris_ufs_nop_prepare(p,pa);
     polaris_ufs_scsi_descriptor(p,pa);polaris_ufs_scsi_request(p+UFS_NOP_UCD,kind);
     polaris_ufs_scsi_prdt(p+UFS_SCSI_PRDT,pa,polaris_ufs_scsi_bytes(kind));
-    for(unsigned i=0;i<polaris_ufs_scsi_bytes(kind);i++)p[UFS_SCSI_DATA+i]=0x5a;
+    // A non-ASCII sentinel also detects missing DMA into a text-field tail.
+    for(unsigned i=0;i<polaris_ufs_scsi_bytes(kind);i++)p[UFS_SCSI_DATA+i]=0xd3;
 }
 static inline bool polaris_ufs_scsi_guards(const uint8_t *p,uint64_t pa,PolarisUfsScsiKind kind) {
     uint8_t descriptor[32],request[32],prdt[16];unsigned bytes=polaris_ufs_scsi_bytes(kind);
@@ -70,6 +71,15 @@ static inline bool polaris_ufs_scsi_guards(const uint8_t *p,uint64_t pa,PolarisU
             (i>=UFS_NOP_UCD && i<UFS_NOP_UCD+512)?0:
             (i>=UFS_SCSI_PRDT && i<UFS_SCSI_PRDT+16)?prdt[i-UFS_SCSI_PRDT]:0xa5;
         if(p[i]!=expected)return false;
+    }
+    return true;
+}
+static inline bool polaris_ufs_scsi_text(const uint8_t *data,unsigned length) {
+    bool padded=false;
+    for(unsigned i=0;i<length;i++) {
+        uint8_t c=data[i];
+        if(!c){padded=true;continue;}
+        if(c<0x20 || c>0x7e || (padded && c!=0x20))return false;
     }
     return true;
 }
@@ -93,7 +103,8 @@ static inline PolarisUfsScsiResult::State polaris_ufs_scsi_parse(PolarisUfsScsiR
     if((r.flags&0x60) || r.residual || r.senseLength)return PolarisUfsScsiResult::ResponseError;
     if(r.kind==PolarisUfsScsiKind::Inquiry) {
         if(r.data[0] || (r.data[3]&15u)!=2 || r.data[4]<31)return PolarisUfsScsiResult::PayloadError;
-        for(unsigned i=8;i<36;i++)if(r.data[i]<0x20 || r.data[i]>0x7e)return PolarisUfsScsiResult::PayloadError;
+        if(!polaris_ufs_scsi_text(r.data+8,8) || !polaris_ufs_scsi_text(r.data+16,16) ||
+           !polaris_ufs_scsi_text(r.data+32,4))return PolarisUfsScsiResult::PayloadError;
     } else {
         r.lastLba=polaris_ufs_be32(r.data);r.blockBytes=polaris_ufs_be32(r.data+4);
         if(unit.data[10]<9 || unit.data[10]>16 || r.lastLba==0xffffffffu || r.blockBytes!=(1u<<unit.data[10]) ||

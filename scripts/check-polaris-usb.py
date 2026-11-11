@@ -39,8 +39,14 @@ def verify_ufs_scsi(build,raw,prior):
         record=dict(kind=kind,opcode=opcode,bytes=length,polls=polls,flags=flags,segment=segment,data_pa=data_pa,
                     prdt_hex=prdt.hex(),upiu_hex=upiu.hex(),data_hex=data.hex(),sha256=hashlib.sha256(data).hexdigest())
         if n==0:
-            if data[0] or data[3]&15!=2 or data[4]<31 or any(c<0x20 or c>0x7e for c in data[8:36]):raise ValueError('invalid standard direct-access INQUIRY payload')
-            record.update(vendor=data[8:16].decode().strip(),product=data[16:32].decode().strip(),revision=data[32:36].decode().strip())
+            if data[0] or data[3]&15!=2 or data[4]<31:raise ValueError('invalid standard direct-access INQUIRY payload')
+            def field(raw):
+                padded=False
+                for c in raw:
+                    if c==0:padded=True;continue
+                    if c<0x20 or c>0x7e or (padded and c!=0x20):raise ValueError('invalid INQUIRY text padding')
+                return bytes(raw).rstrip(b'\0 ').decode()
+            record.update(vendor=field(data[8:16]),product=field(data[16:32]),revision=field(data[32:36]))
         else:
             last,block=struct.unpack('>II',data)
             if last==0xffffffff or block!=1<<unit['block_shift'] or last+1!=unit['logical_blocks']:raise ValueError('SCSI capacity differs from unit descriptor')

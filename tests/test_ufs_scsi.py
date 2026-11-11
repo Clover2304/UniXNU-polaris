@@ -42,6 +42,13 @@ class UfsScsiTests(unittest.TestCase):
                        raw.replace(b'bank_after=00000400',b'bank_after=00000402'),raw[:-20],
                        raw.replace(capacity.hex().encode(),struct.pack('>II',last-1,block).hex().encode())):
             with self.assertRaises(ValueError):m.verify_ufs_scsi(build,broken,prior)
+        real=bytes.fromhex('000006021f000002534b68796e697800483238553734333031414d520000000044303033')
+        nul_raw=raw.replace(inquiry[:32].hex().encode(),real[:32].hex().encode()).replace(inquiry[32:].hex().encode(),real[32:].hex().encode())
+        decoded=m.verify_ufs_scsi(build,nul_raw,prior)['ufs_scsi_results'][0]
+        self.assertEqual((decoded['vendor'],decoded['product'],decoded['revision']),('SKhynix','H28U74301AMR','D003'))
+        broken=bytearray(real);broken[15]=0;broken[14]=0;broken[15]=ord('X')
+        malformed=nul_raw.replace(real[:32].hex().encode(),broken[:32].hex().encode())
+        with self.assertRaises(ValueError):m.verify_ufs_scsi(build,malformed,prior)
         prior['ufs_descriptor_queries_verified']=False
         with self.assertRaises(ValueError):m.verify_ufs_scsi(build,raw,prior)
 
@@ -53,9 +60,9 @@ class UfsScsiTests(unittest.TestCase):
 #include <map>
 #include <vector>
 struct Fake {
- enum Mode {Good,EmptySenseHeader,Timeout,WrongType,WrongTag,WrongLun,ResponseFailure,CheckCondition,
+ enum Mode {Good,EmptySenseHeader,NullPadded,Timeout,WrongType,WrongTag,WrongLun,ResponseFailure,CheckCondition,
   BadSenseLength,Underflow,Overflow,Residual,BadInquiry,BadAscii,BadCapacity,BadBlock,Capacity16Sentinel,
-  DataMissing,RspOnlyInvalidate,NoInvalidate,PrdtCorrupt,RequestCorrupt,DataOverrun,GuardBefore,GuardTail,
+  PartialData,DataMissing,RspOnlyInvalidate,NoInvalidate,PrdtCorrupt,RequestCorrupt,DataOverrun,GuardBefore,GuardTail,
   BadOcs,NoStart,NoStop,BaseChanged,ReadFailure};
  Mode mode=Good;uint64_t pa=0x102000000ULL;PolarisUfsNopResult owned;PolarisUfsDescriptor unit;
  alignas(4096) uint8_t cpu[UFS_NOP_BYTES]{},device[UFS_NOP_BYTES]{};
@@ -73,7 +80,8 @@ struct Fake {
   if(mode==BadSenseLength){p[11]=20;p[32]=0;p[33]=19;}
   auto *d=device+UFS_SCSI_DATA;
   if(mode!=DataMissing){
-   if(device[UFS_NOP_UCD+16]==0x12){const uint8_t inq[]={0,0,6,2,31,0,0,0};std::memcpy(d,inq,8);std::memcpy(d+8,"VENDOR  MODEL           0001",28);
+   if(device[UFS_NOP_UCD+16]==0x12){const uint8_t inq[]={0,0,6,2,31,0,0,0};std::memcpy(d,inq,8);std::memcpy(d+8,"VENDOR  MODEL           0001",mode==PartialData?27:28);
+    if(mode==NullPadded){const uint8_t real[]={0,0,6,2,31,0,0,2,0x53,0x4b,0x68,0x79,0x6e,0x69,0x78,0,0x48,0x32,0x38,0x55,0x37,0x34,0x33,0x30,0x31,0x41,0x4d,0x52,0,0,0,0,0x44,0x30,0x30,0x33};std::memcpy(d,real,36);}
     if(mode==BadInquiry)d[0]=0x1f;if(mode==BadAscii)d[8]=0;}
    else {const uint8_t cap[]={0,0xff,0xff,0xff,0,0,0x10,0};std::memcpy(d,cap,8);
     if(mode==BadCapacity)d[3]--;if(mode==BadBlock)d[6]=2;if(mode==Capacity16Sentinel)std::memset(d,0xff,4);}
@@ -112,7 +120,7 @@ struct Fake {
  PolarisUfsScsiResult run(PolarisUfsScsiKind kind=PolarisUfsScsiKind::Inquiry,bool enabled=true){return polaris_ufs_scsi_read({this,read,write,delay,cache},owned,unit,cpu,pa,kind,enabled);}
 };
 int main(){
- for(auto kind:{PolarisUfsScsiKind::Inquiry,PolarisUfsScsiKind::Capacity10})for(auto mode:{Fake::Good,Fake::EmptySenseHeader}){
+ for(auto kind:{PolarisUfsScsiKind::Inquiry,PolarisUfsScsiKind::Capacity10})for(auto mode:{Fake::Good,Fake::EmptySenseHeader,Fake::NullPadded}){
   Fake f;f.mode=mode;auto r=f.run(kind);assert(r.state==PolarisUfsScsiResult::Success&&r.guards&&r.stopped&&r.ocs==0&&r.bytes==(kind==PolarisUfsScsiKind::Inquiry?36u:8u));
   assert(r.writes==3&&r.doorbells==1&&r.polls==2&&r.dataPa==f.pa+0x2000&&f.cacheOps==2);
   assert((f.writes==std::vector<std::pair<unsigned,uint32_t>>{{0x60,1},{0x58,1},{0x60,0}}));
@@ -133,7 +141,7 @@ int main(){
   if(mode==Fake::NoStart||mode==Fake::ReadFailure)assert(!f.doorbells);
   if(mode==Fake::NoStop||mode==Fake::BaseChanged)assert(r.state==PolarisUfsScsiResult::CleanupFailed);
   if(mode==Fake::CheckCondition)assert(r.state==PolarisUfsScsiResult::ScsiStatus&&r.status==2&&r.senseLength==18&&r.sense[2]==6&&r.sense[12]==0x29);
-  if(mode==Fake::RspOnlyInvalidate||mode==Fake::DataMissing)assert(r.state==PolarisUfsScsiResult::PayloadError);
+  if(mode==Fake::PartialData||mode==Fake::RspOnlyInvalidate||mode==Fake::DataMissing)assert(r.state==PolarisUfsScsiResult::PayloadError);
  }
 }
 '''
