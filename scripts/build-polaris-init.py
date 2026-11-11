@@ -90,6 +90,7 @@ def inspect(data):
     io_symbols = {}
     process_symbols = {}
     probe_symbols = {}
+    tmp_symbols = load_checker().symbols(data, {'_tmp_results','_tmp_checkpoint'}) if b'_tmp_results\0' in data else {}
     c_stack_entry_aligned = False
     if b'_io_ticks\0' in data:
         io_symbols = load_checker().symbols(data, IO_WANTED)
@@ -109,6 +110,7 @@ def inspect(data):
             c_stack_entry_aligned = entry + 12 + immediate * 4 == target
     return {'mode': 'process' if process_symbols else 'probe' if probe_symbols else 'io' if io_symbols else 'syscalls',
             'io_symbols': io_symbols, 'process_symbols': process_symbols, 'probe_symbols': probe_symbols,
+            'tmp_symbols':tmp_symbols,
             'c_stack_entry_aligned': c_stack_entry_aligned,
             'process_sha256': hashlib.sha256(data).hexdigest(), 'cdhash': hashlib.sha256(cd).hexdigest()[:40],
             'code_signature_page_bytes': 4096, 'signature_flags': flags, 'addresses': addresses,

@@ -12,6 +12,9 @@ static void process_require(int condition,u64 stage,u64 detail)
 {
  if(!condition)process_failure(stage,detail);
 }
+#ifdef POLARIS_TMP_TEST
+#include "polaris-tmp-parent.h"
+#endif
 static void process_run(s64 state_fd)
 {
  static const char message[]=PROBE_MESSAGE;
@@ -29,6 +32,9 @@ static void process_run(s64 state_fd)
  process_require(count>0&&count<(s64)sizeof(exec_path),41,2);
  if(exec_path[count-1]=='\n')exec_path[count-1]=0;
  process_require(same(exec_path,"/bin/probe",11)||same(exec_path,"/sbin/launchd",14),41,3);
+#ifdef POLARIS_TMP_TEST
+ tmp_before_child();
+#endif
  struct reply forked=CALL(2,0,0,0,0);
  if(ERROR(forked))process_failure(42,(u64)forked.value);
  if(forked.second) {
@@ -54,10 +60,19 @@ static void process_run(s64 state_fd)
  process_results[8]=sizeof(child);process_results[9]=child.pid;process_results[10]=child.ppid;
  process_results[11]=child.initial_sp;process_results[12]=child.c_stack_sp;process_results[13]=child.checks;
  process_require(child.magic==CHILD_REPORT_MAGIC && child.pid==(u64)forked.value && child.ppid==1 &&
-                 child.initial_sp && child.c_stack_sp && child.c_stack_sp%16==0 && child.checks==4,47,1);
+                 child.initial_sp && child.c_stack_sp && child.c_stack_sp%16==0 && child.checks==
+#ifdef POLARIS_TMP_TEST
+                 5,
+#else
+                 4,
+#endif
+                 47,1);
  process_results[0]=100;process_checkpoint();
  static const char prefix[]="POLARIS_PROC_OK child=";
  (void)CALL(4,1,prefix,sizeof(prefix)-1,0);print_number(child.pid);
  static const char suffix[]=" exit=42 reaped=1 cow=OK\n";
  (void)CALL(4,1,suffix,sizeof(suffix)-1,0);
+#ifdef POLARIS_TMP_TEST
+ tmp_after_child();
+#endif
 }

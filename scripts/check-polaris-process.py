@@ -49,6 +49,8 @@ def main():
     platform = module('platform', ROOT / 'scripts/check-platform-kernel.py')
     bundle_module = module('bundle', ROOT / 'scripts/build-polaris-process.py')
     bundle = bundle_module.inspect_bundle(a.process_dir)
+    tmp_enabled=bundle['tmp_enabled']
+    child_checks=5 if tmp_enabled else 4
     image = (a.process_dir / 'launchd.macho').read_bytes()
     child = bundle['child']
     identity = fixture.inspect(image)
@@ -72,6 +74,9 @@ def main():
                 '_polaris_child_signature_rejected':4, '_polaris_process_exec_checks':4,
                 '_polaris_process_exec_rejected':4, '_polaris_init_unsigned_rejected':4,
                 '_polaris_tree_enabled':4, '_polaris_tree_nodes':4}
+    if tmp_enabled:
+        if build.get('ram_tmp_available') is not True:p.error('tmp fixture requires the bounded writable tmp kernel')
+        counters.update({name:8 for name in ['_polaris_tmp_ready','_polaris_tmp_creates','_polaris_tmp_unlinks','_polaris_tmp_reads','_polaris_tmp_writes','_polaris_tmp_reuses']})
     names = set(counters) | {'_panic', '_panic_with_options', '_panic_trap_to_debugger'}
     syms = platform.symbols(data, names)
     out = a.out.resolve();out.mkdir(parents=True, exist_ok=True)
@@ -106,7 +111,7 @@ def main():
     config = esp / 'EFI/UniXNU/unixnu.toml';text = config.read_text()
     if 'polaris-root-check=1' not in text:
         p.error('missing root-check boot contract')
-    config.write_text(text.replace('polaris-root-check=1', f'polaris-init-cdhash={identity["cdhash"]} polaris-child-cdhash={child_hash} polaris-io=1 polaris-process=1'))
+    config.write_text(text.replace('polaris-root-check=1', f'polaris-init-cdhash={identity["cdhash"]} polaris-child-cdhash={child_hash} polaris-io=1 polaris-process=1'+(' polaris-tmp=1' if tmp_enabled else '')))
     report = dict(passed=False, milestone='resident PID 1 with bounded RAM-file I/O and stdio',
                   process_verified=False, child_el0_observed=False, child_cdhash=child['cdhash'], tree_entries=bundle['entries'],
                   negative_control=a.negative, kernel_sha256=hashlib.sha256(data).hexdigest(), process_sha256=identity['process_sha256'],
@@ -114,7 +119,8 @@ def main():
                   source_kernel_build=build, cpu=a.cpu, el0_observed=False, io_verified=False,
                   resident_verified=False, physical_polaris_booted=False, apple_userland_booted=False,
                   interactive_input_qualified=False, stdin_source='self-fed pipe', snapshots=[])
-    user = identity['addresses'];user.update(identity['io_symbols']);user.update(identity['process_symbols'])
+    report.update(tmp_enabled=tmp_enabled,tmp_verified=False)
+    user = identity['addresses'];user.update(identity['io_symbols']);user.update(identity['process_symbols']);user.update(identity['tmp_symbols'])
     child_user=child['probe_symbols']
     with tempfile.TemporaryDirectory(prefix='polaris-io-') as temporary:
         work = Path(temporary);qmp_path = work / 'qmp'
@@ -170,6 +176,7 @@ def main():
                         stops=[user['_checkpoint'],user['_io_checkpoint'],user['_resident_checkpoint'],user['_io_failure'],
                                user['_process_checkpoint'],user['_process_failure'],child_user['_probe_checkpoint'],
                                syms['_panic'],syms['_panic_with_options'],syms['_panic_trap_to_debugger']]
+                        if tmp_enabled:stops.append(user['_tmp_checkpoint'])
                         for address in stops:
                             if packet(f'Z1,{address:x},4')!='OK':raise RuntimeError('Cannot set observation breakpoint')
                         while time.monotonic()<deadline:
@@ -187,7 +194,7 @@ def main():
                             if pc==child_user['_probe_checkpoint']:
                                 actual=struct.unpack('<6Q',memory(child_user['_probe_report'],48))
                                 report['child_report']=dict(zip(['magic','pid','ppid','initial_sp','c_stack_sp','checks'],actual))
-                                report['child_el0_observed']=((psr&15)==0 and actual[0]==0x504f4c4152495333 and actual[1]>1 and actual[2]==1 and actual[4]>0 and actual[4]%16==0 and actual[5]==4)
+                                report['child_el0_observed']=((psr&15)==0 and actual[0]==0x504f4c4152495333 and actual[1]>1 and actual[2]==1 and actual[4]>0 and actual[4]%16==0 and actual[5]==child_checks)
                                 if not report['child_el0_observed']:break
                                 packet(f'z1,{pc:x},4');continue
                             if pc==user['_process_failure']:
@@ -205,13 +212,21 @@ def main():
                                 report['process_verified']=(report['child_el0_observed'] and (psr&15)==0 and state['stage']==100 and state['failure_detail']==0 and
                                     state['child_pid']==state['wait_pid']==state['reported_pid']>1 and state['reported_ppid']==1 and
                                     state['exit_code']==42 and state['wait_status']==42<<8 and state['reaped']==state['cow_verified']==state['forks']==1 and
-                                    state['report_bytes']==48 and state['child_checks']==4 and state['child_c_stack_sp']%16==0 and state['missing_paths']==2 and state['message_bytes']>0)
+                                    state['report_bytes']==48 and state['child_checks']==child_checks and state['child_c_stack_sp']%16==0 and state['missing_paths']==2 and state['message_bytes']>0)
                                 if not report['process_verified']:break
                                 packet(f'z1,{pc:x},4');continue
                             if pc==user['_io_failure']:
                                 report['failure_stage']=struct.unpack_from('<Q',regs,0)[0]
                                 report['failure_errno']=struct.unpack_from('<Q',regs,8)[0]
                                 break
+                            if tmp_enabled and pc==user['_tmp_checkpoint']:
+                                values=struct.unpack('<16Q',memory(user['_tmp_results'],128));report['tmp_results']=list(values)
+                                actual=kernel_counters();report['tmp_counters']=actual
+                                report['tmp_verified']=((psr&15)==0 and list(values[:10])==[100,1,1,7,1,1,1,16,32,64] and
+                                    actual['_polaris_tmp_ready']==1 and actual['_polaris_tmp_creates']==actual['_polaris_tmp_unlinks']==114 and
+                                    actual['_polaris_tmp_reuses']>=82 and actual['_polaris_tmp_reads']>32 and actual['_polaris_tmp_writes']>96)
+                                if not report['tmp_verified']:break
+                                packet(f'z1,{pc:x},4');continue
                             if pc in [user['_io_checkpoint'],user['_resident_checkpoint']]:
                                 values=struct.unpack('<32Q',memory(user['_io_results'],256));state=dict(zip(FIELDS,values));report['io_results']=state
                                 report['io_verified']=((psr&15)==0 and state['stage']==100 and state['failure_errno']==0 and
@@ -229,7 +244,7 @@ def main():
                                     first,last=report['snapshots'][0],sample
                                     report['resident_verified']=(last['ticks']>first['ticks']>=1 and last['select_returns']>=2 and state['select_result']==0 and
                                         last['elapsed']-first['elapsed']>=1.5 and last['_armcpu_timer_interrupts']>first['_armcpu_timer_interrupts']>0)
-                                    report['passed']=(not a.negative and report['el0_observed'] and report['io_verified'] and report['resident_verified'] and report['process_verified'] and
+                                    report['passed']=(not a.negative and (not tmp_enabled or report['tmp_verified']) and report['el0_observed'] and report['io_verified'] and report['resident_verified'] and report['process_verified'] and
                                         last['_polaris_tree_enabled']==1 and last['_polaris_tree_nodes']==len(bundle['entries'])+1 and
                                         last['_polaris_child_signature_accepted']>0 and last['_polaris_process_exec_checks']>=2 and
                                         last['_polaris_process_exec_rejected']==last['_polaris_child_signature_rejected']==0 and

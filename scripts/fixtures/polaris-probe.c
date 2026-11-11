@@ -33,6 +33,19 @@ __attribute__((noreturn,used)) void polaris_probe_start(u64 initial_sp)
  probe_report.magic=CHILD_REPORT_MAGIC;probe_report.checks=4;
  r=CALL(154,state_fd,&probe_report,sizeof(probe_report),2048);require(!ERROR(r)&&r.value==sizeof(probe_report),9);
  require(!ERROR(CALL(6,state_fd,0,0,0)),10);
+#ifdef POLARIS_TMP_TEST
+ r=CALL(5,"/tmp/shared",0,0,0);require(!ERROR(r),11);s64 tmp_fd=r.value;
+ static const char shared[]="POLARIS TMP SHARED\n";
+ r=CALL(3,tmp_fd,data,sizeof(shared)-1,0);
+ require(!ERROR(r)&&r.value==sizeof(shared)-1&&same(data,shared,sizeof(shared)-1),12);
+ require(!ERROR(CALL(6,tmp_fd,0,0,0)),13);
+ probe_report.checks=5;
+ r=CALL(5,"/probe.bin",2,0,0);require(!ERROR(r),14);s64 report_fd=r.value;
+ r=CALL(154,report_fd,&probe_report,sizeof(probe_report),2048);require(!ERROR(r)&&r.value==sizeof(probe_report),15);
+ require(!ERROR(CALL(6,report_fd,0,0,0)),16);
+ static const char tmp_ok[]="POLARIS_TMP_CHILD_OK shared=OK\n";
+ (void)CALL(4,1,tmp_ok,sizeof(tmp_ok)-1,0);
+#endif
  static const char prefix[]="POLARIS_CHILD_OK pid=";
  (void)CALL(4,1,prefix,sizeof(prefix)-1,0);print_number(probe_report.pid);
  static const char suffix[]=" ppid=1 file=OK\n";(void)CALL(4,1,suffix,sizeof(suffix)-1,0);

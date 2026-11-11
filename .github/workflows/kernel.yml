@@ -153,6 +153,40 @@ jobs:
       - name: Assemble the multi-program payload ESP
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-process-esp --cpus 1 --ram 6 --process-dir out/polaris-process
+      - name: Build writable tmp acceptance programs
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/build-polaris-process.py --tmp --out out/polaris-tmp
+      - name: QEMU writable tmp lifecycle and capacity
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-process.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --process-dir out/polaris-tmp --out out/tmp-check
+      - name: Assemble the writable tmp payload ESP
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-tmp-esp --cpus 1 --ram 6 --process-dir out/polaris-tmp
+      - uses: actions/upload-artifact@v4
+        if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        with:
+          name: tmp-stage-results
+          retention-days: 7
+          path: |
+            out/polaris-tmp/
+            out/polaris-tmp-esp/
+            out/tmp-check/report.json
+            out/tmp-check/serial.log
+            out/tmp-check/qemu.log
+            out/tmp-check/screen.ppm
+            out/process-check/report.json
+            out/process-wrong-hash-check/report.json
+            out/process-damaged-check/report.json
+            out/process-unsigned-check/report.json
+            out/process-cached-init-check/report.json
+            out/io-check/report.json
+            out/io-missing-file-check/report.json
+            out/init-check/report.json
+            out/init-wrong-hash-check/report.json
+            out/init-damaged-code-check/report.json
+            out/init-unsigned-check/report.json
+            out/root-check/report.json
+            out/platform-check/report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

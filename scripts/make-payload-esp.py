@@ -82,6 +82,8 @@ def main():
         checker.symbols(data, {'_polaris_tree_enabled', '_polaris_tree_nodes', '_polaris_child_signature_accepted',
                                '_polaris_child_signature_rejected', '_polaris_process_exec_checks', '_polaris_process_exec_rejected'})
         user_init = process_bundle['init']
+        if process_bundle['tmp_enabled'] and report.get('ram_tmp_available') is not True:
+            parser.error('writable tmp fixture requires its source kernel')
         initrd = (args.process_dir / 'root.img').read_bytes()
     if args.user_init:
         if (report.get('source_mockfs') is not True or
@@ -139,13 +141,14 @@ def main():
     else:
         kernel_args.append(f'cpus={args.cpus}')
     if initrd is not None:
-        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check=', 'polaris-init-cdhash=', 'polaris-io=', 'polaris-process=', 'polaris-child-cdhash='))]
+        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check=', 'polaris-init-cdhash=', 'polaris-io=', 'polaris-process=', 'polaris-child-cdhash=', 'polaris-tmp='))]
         kernel_args += ['rd=md0']
         kernel_args += [f'polaris-init-cdhash={user_init["cdhash"]}'] if user_init else ['polaris-root-check=1']
         if user_init and user_init['mode'] in ('io', 'process'):
             kernel_args += ['polaris-io=1']
         if process_bundle:
             kernel_args += ['polaris-process=1', 'polaris-child-cdhash=' + process_bundle['child']['cdhash']]
+            if process_bundle['tmp_enabled']:kernel_args += ['polaris-tmp=1']
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
     prefix = load_module('cpu_prefix', ROOT / 'scripts/check-cpu-prefix.py')
