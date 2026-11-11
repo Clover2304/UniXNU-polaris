@@ -1,0 +1,383 @@
+--- /dev/null
++++ b/bsd/miscfs/mockfs/mockfs_polaris_tree.h
+@@ -0,0 +1,62 @@
++/* Bounded N4KROOT v3 directory table. Native little endian; all extents 4K.
++ * No runtime namespace mutation. The same validator is exercised on the host.
++ */
++#ifndef MOCKFS_POLARIS_TREE_H
++#define MOCKFS_POLARIS_TREE_H
++#define POLARIS_TREE_MAX 16
++#define POLARIS_TREE_DIR 1
++#define POLARIS_TREE_EXEC 2
++#define POLARIS_TREE_RAM 4
++struct polaris_tree_entry {
++ uint32_t parent, flags;
++ uint64_t offset, size;
++ char name[32];
++ uint64_t reserved;
++};
++struct polaris_tree_header {
++ char magic[8];
++ uint32_t version, count;
++ uint64_t image_bytes, reserved[3];
++ uint8_t padding[16];
++ struct polaris_tree_entry entries[POLARIS_TREE_MAX];
++};
++_Static_assert(sizeof(struct polaris_tree_entry)==64, "tree entry ABI");
++_Static_assert(__builtin_offsetof(struct polaris_tree_header,entries)==64, "tree table ABI");
++static inline int
++polaris_tree_validate(const struct polaris_tree_header *h, uint64_t bytes)
++{
++ const char magic[8]={'N','4','K','R','O','O','T',0};
++ for (unsigned j=0;j<8;j++) if(h->magic[j]!=magic[j])return -1;
++ if(h->version!=3 || !h->count || h->count>POLARIS_TREE_MAX ||
++    bytes<4096 || bytes>32*1024*1024 || (bytes&4095) || h->image_bytes!=bytes)return -1;
++ for(unsigned j=0;j<3;j++)if(h->reserved[j])return -1;
++ for(unsigned j=0;j<16;j++)if(h->padding[j])return -1;
++ uint64_t end=4096;
++ for(unsigned i=0;i<h->count;i++) {
++  const struct polaris_tree_entry *e=&h->entries[i];
++  if(e->parent>i || e->reserved || (e->flags&~7U))return -1;
++  if(e->parent && h->entries[e->parent-1].flags!=POLARIS_TREE_DIR)return -1;
++  unsigned n=0;
++  while(n<32 && e->name[n]) {
++   unsigned char c=e->name[n++];
++   if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='.'||c=='_'||c=='-'))return -1;
++  }
++  if(!n || n==32 || (n==1&&e->name[0]=='.') || (n==2&&e->name[0]=='.'&&e->name[1]=='.'))return -1;
++  for(unsigned j=n;j<32;j++)if(e->name[j])return -1;
++  for(unsigned j=0;j<i;j++)if(e->parent==h->entries[j].parent) {
++   unsigned k=0;while(k<32&&e->name[k]==h->entries[j].name[k])k++;
++   if(k==32)return -1;
++  }
++  if(e->flags&POLARIS_TREE_DIR) {
++   if(e->flags!=POLARIS_TREE_DIR || e->offset || e->size)return -1;
++  } else {
++   if((e->flags&(POLARIS_TREE_EXEC|POLARIS_TREE_RAM))==(POLARIS_TREE_EXEC|POLARIS_TREE_RAM) ||
++      !e->size || (e->offset&4095) || e->offset<end || e->offset>bytes || e->size>bytes-e->offset)return -1;
++   uint64_t padded=(e->size+4095)&~4095ULL;
++   if(padded>bytes-e->offset || ((e->flags&POLARIS_TREE_RAM)&&e->size!=4096))return -1;
++   end=e->offset+padded;
++  }
++ }
++ return 0;
++}
++#endif
+--- a/bsd/miscfs/mockfs/mockfs_fsnode.h
++++ b/bsd/miscfs/mockfs/mockfs_fsnode.h
+@@ -32,6 +32,7 @@
+ #if MOCKFS
+ 
+ #include <sys/kernel_types.h>
++#include <miscfs/mockfs/mockfs_polaris_tree.h>
+ 
+ /*
+  * Types for the filesystem nodes; for the moment, these will effectively serve as unique
+@@ -59,6 +60,10 @@
+  *   VREG access).
+  */
+ struct mockfs_fsnode {
++	uint8_t polaris_named, polaris_exec;
++	uint64_t polaris_id;
++	char polaris_name[32];
++	struct mockfs_fsnode *polaris_children[POLARIS_TREE_MAX];
+ 	uint8_t polaris_writable; /* Bounded RAM-only test file, never executable. */
+ 	uint8_t polaris_bytes[4096];
+ 	uint64_t               backing_offset; /* Offline two-file image only. */
+--- a/bsd/miscfs/mockfs/mockfs_fsnode.c
++++ b/bsd/miscfs/mockfs/mockfs_fsnode.c
+@@ -134,6 +134,11 @@
+ 	 *   we've failed to destroy the subtree, which means someone called destroy when they should
+ 	 *   not have done so).
+ 	 */
++	for (unsigned i=0;i<POLARIS_TREE_MAX;i++) {
++		if (fsnp->polaris_children[i] && mockfs_fsnode_destroy(fsnp->polaris_children[i])) {
++			panic("mockfs: named child destruction failed");
++		}
++	}
+ 	if (fsnp->child_a) {
+ 		if ((rvalue = mockfs_fsnode_destroy(fsnp->child_a))) {
+ 			panic("mockfs_fsnode_destroy failed on child_a; fsnp = %p (in case gdb is screwing with you), rvalue = %d", fsnp, rvalue);
+@@ -203,6 +208,15 @@
+ 	 *
+ 	 * Can the parent support another child (food, shelter, unused pointers)?
+ 	 */
++	if (parent->polaris_named) {
++		for (unsigned i=0;i<POLARIS_TREE_MAX;i++) if (!parent->polaris_children[i]) {
++			parent->polaris_children[i]=child;
++			child->parent=parent;
++			goto done;
++		}
++		rvalue=ENOSPC;
++		goto done;
++	}
+ 	if (!parent->child_a) {
+ 		parent->child_a = child;
+ 		child->parent = parent;
+@@ -247,6 +261,15 @@
+ 
+ 	parent = fsnp->parent;
+ 
++	if (parent->polaris_named) {
++		for (unsigned i=0;i<POLARIS_TREE_MAX;i++) if (parent->polaris_children[i]==fsnp) {
++			parent->polaris_children[i]=NULL;
++			fsnp->parent=NULL;
++			goto done;
++		}
++		rvalue=EINVAL;
++		goto done;
++	}
+ 	if (parent->child_a == fsnp) {
+ 		parent->child_a = NULL;
+ 		fsnp->parent = NULL;
+--- a/bsd/miscfs/mockfs/mockfs_vfsops.c
++++ b/bsd/miscfs/mockfs/mockfs_vfsops.c
+@@ -54,6 +54,41 @@
+ 	uint64_t launch_offset, launch_size, test_offset, test_size;
+ };
+ 
++
++volatile uint32_t polaris_tree_enabled, polaris_tree_nodes;
++static int
++polaris_tree_build(mount_t mp, vnode_t rvp, vfs_context_t ctx,
++    const struct polaris_tree_header *h, mockfs_fsnode_t root, boolean_t *writable)
++{
++ int enabled=0;
++ if(!PE_parse_boot_argn("polaris-process",&enabled,sizeof(enabled)) || enabled!=1 ||
++    polaris_tree_validate(h,rvp->v_specinfo->si_devsize))return EINVAL;
++ mockfs_fsnode_t nodes[POLARIS_TREE_MAX+1]={0};
++ nodes[0]=root;root->polaris_named=1;root->polaris_id=1;
++ for(unsigned i=0;i<h->count;i++) {
++  const struct polaris_tree_entry *e=&h->entries[i];
++  mockfs_fsnode_t node=NULL;
++  int error=mockfs_fsnode_create(mp,(e->flags&POLARIS_TREE_DIR)?MOCKFS_DEV:MOCKFS_FILE,&node);
++  if(error)return error;
++  node->polaris_named=1;node->polaris_exec=(e->flags&POLARIS_TREE_EXEC)!=0;
++  node->polaris_id=i+2;node->backing_offset=e->offset;node->size=e->size;
++  memcpy(node->polaris_name,e->name,sizeof(node->polaris_name));
++  error=mockfs_fsnode_adopt(nodes[e->parent],node);
++  if(error){mockfs_fsnode_destroy(node);return error;}
++  nodes[i+1]=node;
++  if(e->flags&POLARIS_TREE_RAM) {
++   buf_t data=NULL;
++   error=buf_meta_bread(rvp,e->offset/DEV_BSIZE,4096,vfs_context_ucred(ctx),&data);
++   if(!error)memcpy(node->polaris_bytes,(void *)buf_dataptr(data),4096);
++   if(data)buf_brelse(data);
++   if(error)return error;
++   node->polaris_writable=1;*writable=TRUE;
++  }
++ }
++ polaris_tree_nodes=h->count+1;
++ return 0;
++}
++
+ int mockfs_mountroot(mount_t mp, vnode_t rvp, __unused vfs_context_t ctx);
+ 
+ /*
+@@ -85,6 +120,7 @@
+ 	struct mockfs_test_header header = {0};
+ 	buf_t header_buf = NULL;
+ 	boolean_t test_image = FALSE;
++	boolean_t process_tree = FALSE;
+ 	boolean_t polaris_writable = FALSE;
+ 	mockfs_mount_t mockfs_mount_data = NULL;
+ 	dk_memdev_info_t memdev_info;
+@@ -137,6 +173,13 @@
+ 	rvalue = buf_meta_bread(rvp, 0, 4096, vfs_context_ucred(ctx), &header_buf);
+ 	if (!rvalue) {
+ 		memcpy(&header, (void *)buf_dataptr(header_buf), sizeof(header));
++		if (!memcmp(header.magic,"N4KROOT",8) && header.version==3) {
++			mockfs_fsnode_destroy(dev_fsnode);dev_fsnode=NULL;
++			mockfs_fsnode_destroy(file_fsnode);file_fsnode=NULL;
++			rvalue=polaris_tree_build(mp,rvp,ctx,(void *)buf_dataptr(header_buf),root_fsnode,&polaris_writable);
++			process_tree=TRUE;
++			mockfs_mount_data->mockfs_memory_backed=FALSE;
++		}
+ 	}
+ 	if (header_buf) {
+ 		buf_brelse(header_buf);
+@@ -144,6 +187,7 @@
+ 	if (rvalue) {
+ 		goto done;
+ 	}
++	if (process_tree) { goto root_ready; }
+ 	if (!memcmp(header.magic, "N4KROOT", 8)) {
+ 		uint64_t bytes = rvp->v_specinfo->si_devsize;
+ 		if ((header.version != 1 && header.version != 2) || header.count != 2 || bytes > 32 * 1024 * 1024 ||
+@@ -206,6 +250,8 @@
+ 		goto done;
+ 	}
+ 
++root_ready:
++	if (process_tree) { polaris_tree_enabled=1; }
+ 	if (polaris_writable) {
+ 		/* Only the fixed RAM test node accepts writes; launchd remains immutable. */
+ 		mp->mnt_flag &= ~MNT_RDONLY;
+--- a/bsd/miscfs/mockfs/mockfs_vnops.c
++++ b/bsd/miscfs/mockfs/mockfs_vnops.c
+@@ -59,7 +59,7 @@
+ static int mockfs_polaris_mmap(struct vnop_mmap_args *ap)
+ {
+ 	mockfs_fsnode_t node = (mockfs_fsnode_t)vnode_fsnode(ap->a_vp);
+-	return node->polaris_writable ? ENOTSUP : 0;
++	return (node->polaris_writable || (node->polaris_named && !node->polaris_exec)) ? ENOTSUP : 0;
+ }
+ volatile uint64_t polaris_io_file_reads;
+ volatile uint64_t polaris_io_file_writes;
+@@ -166,6 +166,26 @@
+ 	op = cnp->cn_nameiop;
+ 	fsnode = (mockfs_fsnode_t) dvp->v_data;
+ 	target_fsnode = NULL;
++	if (fsnode->polaris_named) {
++		*vpp=NULL;
++		if (dvp->v_type!=VDIR) { return ENOTDIR; }
++		if (op!=LOOKUP && (cnp->cn_flags&ISLASTCN)) { return EROFS; }
++		if (cnp->cn_namelen==1 && cnp->cn_nameptr[0]=='.') {
++			target_fsnode=fsnode;
++		} else if (cnp->cn_namelen==2 && !memcmp(cnp->cn_nameptr,"..",2)) {
++			target_fsnode=fsnode->parent?fsnode->parent:fsnode;
++		} else if (cnp->cn_namelen>0 && cnp->cn_namelen<32) {
++			for (unsigned i=0;i<POLARIS_TREE_MAX;i++) {
++				mockfs_fsnode_t node=fsnode->polaris_children[i];
++				if (node && strlen(node->polaris_name)==(size_t)cnp->cn_namelen &&
++				    !memcmp(node->polaris_name,cnp->cn_nameptr,cnp->cn_namelen)) {
++					target_fsnode=node;break;
++				}
++			}
++		}
++		return target_fsnode?mockfs_fsnode_vnode(target_fsnode,vpp):ENOENT;
++	}
++
+ 
+ 	if ((op == LOOKUP || !(cnp->cn_flags & ISLASTCN)) && (fsnode->type == MOCKFS_ROOT)) {
+ 		/*
+@@ -246,8 +266,10 @@
+ 	vap = ap->a_vap;
+ 	bzero(vap, sizeof(*vap));
+ 	VATTR_RETURN(vap, va_nlink, 1); /* Simply assert that someone has at least one link to us */
+-	VATTR_RETURN(vap, va_mode, fsnode->polaris_writable ? (VREAD | VWRITE) : (VREAD | VWRITE | VEXEC));
+-	VATTR_RETURN(vap, va_fileid, fsnode->type);
++	VATTR_RETURN(vap, va_mode, fsnode->polaris_named ?
++	    (fsnode->polaris_writable?(VREAD|VWRITE):(VREAD|((vp->v_type==VDIR||fsnode->polaris_exec)?VEXEC:0))):
++	    (fsnode->polaris_writable?(VREAD|VWRITE):(VREAD|VWRITE|VEXEC)));
++	VATTR_RETURN(vap, va_fileid, fsnode->polaris_named?fsnode->polaris_id:fsnode->type);
+ 	VATTR_RETURN(vap, va_total_size, fsnode->size);
+ 	VATTR_RETURN(vap, va_total_alloc, fsnode->size);
+ 	VATTR_RETURN(vap, va_data_size, fsnode->size);
+--- /dev/null
++++ b/bsd/kern/polaris_process_policy.h
+@@ -0,0 +1,25 @@
++/* Boot-owner identities only; no platform or entitlement privileges. */
++#ifndef POLARIS_PROCESS_POLICY_H
++#define POLARIS_PROCESS_POLICY_H
++static inline errno_t
++polaris_process_blob_policy(const struct cs_blob *blob, int pid, int ppid,
++    int enabled, const char *expected)
++{
++ const unsigned required=CS_ADHOC|CS_HARD|CS_KILL;
++ if(pid!=1 && !(pid>1 && ppid==1 && enabled==1))return EPERM;
++ if(!blob || (blob->csb_flags&required)!=required || blob->csb_platform_binary || blob->csb_platform_path ||
++    blob->csb_entitlements || blob->csb_entitlements_blob || blob->csb_der_entitlements_blob ||
++    !expected || strnlen(expected,CS_CDHASH_LEN*2+2)!=CS_CDHASH_LEN*2)return EPERM;
++ for(unsigned i=0;i<CS_CDHASH_LEN;i++) {
++  unsigned value=0;
++  for(unsigned half=0;half<2;half++) {
++   unsigned char c=expected[i*2+half];
++   if(c>='0'&&c<='9')value=(value<<4)|(c-'0');
++   else if(c>='a'&&c<='f')value=(value<<4)|(c-'a'+10);
++   else return EPERM;
++  }
++  if(blob->csb_cdhash[i]!=value)return EPERM;
++ }
++ return 0;
++}
++#endif
+--- a/bsd/kern/ubc_subr.c
++++ b/bsd/kern/ubc_subr.c
+@@ -4370,38 +4370,23 @@
+  */
+ volatile uint32_t polaris_init_signature_accepted;
+ volatile uint32_t polaris_init_signature_rejected;
+-
+-static errno_t
++volatile uint32_t polaris_child_signature_accepted, polaris_child_signature_rejected;
++
++#include "polaris_process_policy.h"
++errno_t
+ polaris_init_signature_policy(const struct cs_blob *blob)
+ {
+-	char expected[CS_CDHASH_LEN * 2 + 2] = {0};
+-	const unsigned int required = CS_ADHOC | CS_HARD | CS_KILL;
+-	if (proc_selfpid() != 1 || (blob->csb_flags & required) != required ||
+-	    blob->csb_platform_binary || blob->csb_platform_path ||
+-	    blob->csb_entitlements || blob->csb_entitlements_blob ||
+-	    blob->csb_der_entitlements_blob ||
+-	    !PE_parse_boot_arg_str("polaris-init-cdhash", expected, sizeof(expected)) ||
+-	    strnlen(expected, sizeof(expected)) != CS_CDHASH_LEN * 2) {
+-		return EPERM;
+-	}
+-	for (unsigned int i = 0; i < CS_CDHASH_LEN; i++) {
+-		unsigned int value = 0;
+-		for (unsigned int half = 0; half < 2; half++) {
+-			unsigned char c = expected[i * 2 + half];
+-			if (c >= '0' && c <= '9') {
+-				value = (value << 4) | (c - '0');
+-			} else if (c >= 'a' && c <= 'f') {
+-				value = (value << 4) | (c - 'a' + 10);
+-			} else {
+-				return EPERM;
+-			}
+-		}
+-		if (blob->csb_cdhash[i] != value) {
+-			return EPERM;
+-		}
+-	}
+-	polaris_init_signature_accepted++;
+-	return 0;
++	char expected[CS_CDHASH_LEN*2+2]={0};
++	int pid=proc_selfpid(),enabled=0;
++	(void)PE_parse_boot_argn("polaris-process",&enabled,sizeof(enabled));
++	const char *argument=pid==1?"polaris-init-cdhash":"polaris-child-cdhash";
++	if(!PE_parse_boot_arg_str(argument,expected,sizeof(expected)))return EPERM;
++	errno_t error=polaris_process_blob_policy(blob,pid,proc_selfppid(),enabled,expected);
++	if(!error) {
++		if(pid==1)polaris_init_signature_accepted++;
++		else polaris_child_signature_accepted++;
++	}
++	return error;
+ }
+ 
+ static errno_t
+@@ -4411,7 +4396,8 @@
+ 	if (amfi == NULL) {
+ 		errno_t policy_result = polaris_init_signature_policy(cs_blob);
+ 		if (policy_result != 0) {
+-			polaris_init_signature_rejected++;
++			if(proc_selfpid()==1)polaris_init_signature_rejected++;
++			else polaris_child_signature_rejected++;
+ 		}
+ 		return policy_result;
+ 	}
+--- a/bsd/kern/mach_loader.c
++++ b/bsd/kern/mach_loader.c
+@@ -189,6 +189,8 @@
+ 
+ volatile uint32_t polaris_init_loader_enforced;
+ volatile uint32_t polaris_init_unsigned_rejected;
++volatile uint32_t polaris_process_exec_checks, polaris_process_exec_rejected;
++extern errno_t polaris_init_signature_policy(const struct cs_blob *blob);
+ 
+ static load_return_t
+ load_code_signature(
+@@ -3582,6 +3584,11 @@
+ 			panic("success, but no blob!");
+ 		}
+ 
++		int polaris_process=0;
++		if(PE_parse_boot_argn("polaris-process",&polaris_process,sizeof(polaris_process)) && polaris_process==1) {
++			polaris_process_exec_checks++;
++			if(polaris_init_signature_policy(blob)!=0) { polaris_process_exec_rejected++;return LOAD_FAILURE; }
++		}
+ 		result->csflags |= blob->csb_flags;
+ 		result->platform_binary = blob->csb_platform_binary;
+ 		result->cs_end_offset = blob->csb_end_offset;

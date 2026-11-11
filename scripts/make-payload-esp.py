@@ -49,6 +49,8 @@ def main():
                         help='raw mount-only RAM disk; requires a newly built mockfs/checkpoint kernel')
     roots.add_argument('--user-init', type=Path,
                        help='own static PID 1 launchd.macho built by build-polaris-init.py')
+    roots.add_argument('--process-dir', type=Path,
+                       help='verified PID 1/probe/multi-file bundle from build-polaris-process.py')
     parser.add_argument('--no-probe', action='store_true',
                         help='skip the boot-progress/panic probes on the ESP kernel copy')
     parser.add_argument('--probe-extra', default='',
@@ -66,6 +68,21 @@ def main():
         parser.error('route A expects the source kernel without original components')
     initrd = None
     user_init = None
+    process_bundle = None
+    if args.process_dir:
+        if (report.get('ram_tree_available') is not True or
+                report.get('process_signature_policy') != 'pid1-and-direct-child-exact-cdhash-v1'):
+            parser.error('process stage requires the named-root/direct-child source kernel')
+        bundle_tool = load_module('process_bundle', ROOT / 'scripts/build-polaris-process.py')
+        try:
+            process_bundle = bundle_tool.inspect_bundle(args.process_dir)
+        except (ValueError, OSError) as error:
+            parser.error(str(error))
+        checker = load_module('process_platform', ROOT / 'scripts/check-platform-kernel.py')
+        checker.symbols(data, {'_polaris_tree_enabled', '_polaris_tree_nodes', '_polaris_child_signature_accepted',
+                               '_polaris_child_signature_rejected', '_polaris_process_exec_checks', '_polaris_process_exec_rejected'})
+        user_init = process_bundle['init']
+        initrd = (args.process_dir / 'root.img').read_bytes()
     if args.user_init:
         if (report.get('source_mockfs') is not True or
                 report.get('init_signature_policy') != 'pid1-exact-adhoc-cdhash-v2'):
@@ -80,6 +97,8 @@ def main():
             user_init = fixture.inspect(image)
         except (ValueError, IndexError) as error:
             parser.error(str(error))
+        if user_init['mode'] not in ('syscalls', 'io'):
+            parser.error('use --process-dir for multi-program fixtures')
         if user_init['mode'] == 'io':
             if not user_init.get('c_stack_entry_aligned'):
                 parser.error('I/O init must align the process stack before entering C')
@@ -120,11 +139,13 @@ def main():
     else:
         kernel_args.append(f'cpus={args.cpus}')
     if initrd is not None:
-        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check=', 'polaris-init-cdhash=', 'polaris-io='))]
+        kernel_args = [arg for arg in kernel_args if not arg.startswith(('rd=', 'polaris-root-check=', 'polaris-init-cdhash=', 'polaris-io=', 'polaris-process=', 'polaris-child-cdhash='))]
         kernel_args += ['rd=md0']
         kernel_args += [f'polaris-init-cdhash={user_init["cdhash"]}'] if user_init else ['polaris-root-check=1']
-        if user_init and user_init['mode'] == 'io':
+        if user_init and user_init['mode'] in ('io', 'process'):
             kernel_args += ['polaris-io=1']
+        if process_bundle:
+            kernel_args += ['polaris-process=1', 'polaris-child-cdhash=' + process_bundle['child']['cdhash']]
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
     prefix = load_module('cpu_prefix', ROOT / 'scripts/check-cpu-prefix.py')
@@ -152,7 +173,7 @@ def main():
         import subprocess as sp
         probe = ROOT / 'scripts/patch-xnu-entry-probe.py'
         sp.run([sys.executable, str(probe), out / 'EFI/UniXNU/Payloads/kernel.macho',
-                '--panic-screen', *shlex.split(args.probe_extra or '--no-reset')], check=True)
+                '--panic-screen', *shlex.split(args.probe_extra or ('--no-reset --user-state' if process_bundle else '--no-reset'))], check=True)
         # The probes rewrite __text, which invalidates the sealed FIPS POST
         # integrity HMAC the base build wrote into __fips_hmacs. Re-run the
         # seal over the patched copy so corecrypto's integrity POST sees the
@@ -188,6 +209,7 @@ def main():
                     'expected_checkpoint': user_init['expected_checkpoint'] if user_init else 'POLARIS_ROOT_MOUNTED mockfs', 'userland_booted': False}
                    if initrd is not None else None,
         'user_init': user_init,
+        'process_bundle': process_bundle,
         'sources': report.get('sources', {}),
     }, indent=2) + '\n', encoding='utf-8')
     print(f'{out}: payload ESP assembled; cpus={args.cpus}, ram={args.ram} GiB; host-verified only')

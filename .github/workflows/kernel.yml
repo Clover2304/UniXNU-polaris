@@ -132,6 +132,27 @@ jobs:
       - name: Assemble the resident I/O payload ESP
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-io-esp --cpus 1 --ram 6 --user-init out/polaris-io/launchd.macho
+      - name: Build our multi-file root and child executable
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/build-polaris-process.py
+      - name: QEMU fork exec wait and named RAM root
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-process.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --process-dir out/polaris-process
+      - name: QEMU refuse an incorrect child CDHash
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-process.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --process-dir out/polaris-process --negative wrong-child-cdhash --out out/process-wrong-hash-check
+      - name: QEMU refuse damaged child code
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-process.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --process-dir out/polaris-process --negative damaged-child --out out/process-damaged-check
+      - name: QEMU refuse unsigned child code
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-process.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --process-dir out/polaris-process --negative unsigned-child --out out/process-unsigned-check
+      - name: QEMU enforce child identity on a cached PID 1 signature
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-process.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --process-dir out/polaris-process --negative cached-init --out out/process-cached-init-check
+      - name: Assemble the multi-program payload ESP
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-process-esp --cpus 1 --ram 6 --process-dir out/polaris-process
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -169,3 +190,35 @@ jobs:
             out/io-missing-file-check/serial.log
             out/io-missing-file-check/qemu.log
             out/polaris-io-esp/
+      - uses: actions/upload-artifact@v4
+        if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        with:
+          name: process-stage-results
+          retention-days: 7
+          path: |
+            out/polaris-process/
+            out/polaris-process-esp/
+            out/process-check/report.json
+            out/process-check/serial.log
+            out/process-check/qemu.log
+            out/process-check/screen.ppm
+            out/process-wrong-hash-check/report.json
+            out/process-wrong-hash-check/serial.log
+            out/process-wrong-hash-check/qemu.log
+            out/process-damaged-check/report.json
+            out/process-damaged-check/serial.log
+            out/process-damaged-check/qemu.log
+            out/process-unsigned-check/report.json
+            out/process-unsigned-check/serial.log
+            out/process-unsigned-check/qemu.log
+            out/process-cached-init-check/report.json
+            out/process-cached-init-check/serial.log
+            out/process-cached-init-check/qemu.log
+            out/platform-check/report.json
+            out/root-check/report.json
+            out/init-check/report.json
+            out/init-wrong-hash-check/report.json
+            out/init-damaged-code-check/report.json
+            out/init-unsigned-check/report.json
+            out/io-check/report.json
+            out/io-missing-file-check/report.json

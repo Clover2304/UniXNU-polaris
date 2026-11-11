@@ -1,6 +1,6 @@
-# Source-only mockfs root-mount milestone, based on the proven platform config.
-# The ESP supplies a small RAM disk and polaris-root-check=1. A diagnostic
-# panic confirms a mounted mockfs root before any user process is executed.
+# Source-only mockfs RAM-root milestone, based on the proven platform config.
+# The supplied image and opt-in arguments select mount-only, own resident PID 1,
+# or the named-root/direct-child process stage. No persistent storage is enabled.
 CONFIG_XNU_SOURCE_CORECRYPTO14=y
 CONFIG_XNU_SOURCE_PTHREAD=y
 CONFIG_XNU_ARM_DT_PLATFORM=y

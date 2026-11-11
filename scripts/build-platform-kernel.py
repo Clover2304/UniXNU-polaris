@@ -39,9 +39,13 @@ def install_late_io_patch_hook(script):
     if len(lines) != 1 or not lines[0].endswith('; do'):
         raise ValueError('Pinned baseline late-patch loop changed')
     line = lines[0]
-    addition = '"$ROOT/patches/xnu/polaris-io.patch" '
-    if addition not in line:
-        script.write_text(text.replace(line, marker + addition + line[len(marker):], 1))
+    suffix = line[len(marker):]
+    additions = ['"$ROOT/patches/xnu/polaris-process.patch" ', '"$ROOT/patches/xnu/polaris-io.patch" ']
+    for token in additions:
+        suffix = suffix.replace(token, '')
+    replacement = marker + ''.join(additions) + suffix
+    if replacement != line:
+        script.write_text(text.replace(line, replacement, 1))
 
 
 def main():
@@ -153,6 +157,7 @@ def main():
     mockfs_symbols = {}
     init_signature_policy = None
     ram_io_available = False
+    ram_tree_available = False
     if source_mockfs:
         mockfs_symbols = check.symbols(data, {'_mockfs_mountroot', '_rootvnode'})
         if not root_checkpoint:
@@ -164,6 +169,10 @@ def main():
         check.symbols(data, {'_polaris_io_root_enabled', '_polaris_io_file_reads',
                              '_polaris_io_file_writes', '_polaris_console_ready'})
         ram_io_available = True
+        check.symbols(data, {'_polaris_tree_enabled', '_polaris_tree_nodes',
+                             '_polaris_child_signature_accepted', '_polaris_child_signature_rejected',
+                             '_polaris_process_exec_checks'})
+        ram_tree_available = True
     prelinked = None
     if do_prelink:
         print('Prelink pass: composing with the original iPadOS 17 kernelcache', flush=True)
@@ -175,6 +184,8 @@ def main():
               'source_mockfs': source_mockfs, 'mockfs_symbols': mockfs_symbols,
               'init_signature_policy': init_signature_policy,
               'ram_io_available': ram_io_available,
+              'ram_tree_available': ram_tree_available,
+              'process_signature_policy': 'pid1-and-direct-child-exact-cdhash-v1' if ram_tree_available else None,
               'root_checkpoint_available': root_checkpoint,
               'unixnu_revision': revision, 'bootstrap_link_failed': bootstrap_failed,
               'final_configured_link_passed': True,

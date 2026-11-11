@@ -18,6 +18,8 @@ IDENTIFIER = b'org.unixnu.polaris.first-user\0'
 SIGNATURE_FLAGS = 0x302  # CS_ADHOC | CS_HARD | CS_KILL; no privilege entitlements.
 WANTED = {'_start', '_checkpoint', '_results', '_user_page_size', '_old_length', '_reboot_return'}
 IO_WANTED = {'_io_checkpoint', '_resident_checkpoint', '_io_failure', '_io_results', '_io_ticks'}
+PROCESS_WANTED = {'_process_checkpoint', '_process_failure', '_process_results'}
+PROBE_WANTED = {'_probe_checkpoint', '_probe_report'}
 IO_SEED = b'POLARIS RAM IO SEED\n'
 
 
@@ -86,23 +88,32 @@ def inspect(data):
     if entry != addresses['_start'] or not code_offset[0] <= entry < code_offset[0] + code_offset[2]:
         raise ValueError('static entry does not match the source symbol')
     io_symbols = {}
+    process_symbols = {}
+    probe_symbols = {}
     c_stack_entry_aligned = False
     if b'_io_ticks\0' in data:
         io_symbols = load_checker().symbols(data, IO_WANTED)
+    if b'_process_results\0' in data:
+        process_symbols = load_checker().symbols(data, PROCESS_WANTED)
+    if b'_probe_report\0' in data:
+        probe_symbols = load_checker().symbols(data, PROBE_WANTED)
+    if io_symbols or probe_symbols:
         entry_offset = code_offset[1] + entry - code_offset[0]
         words = struct.unpack_from('<4I', data, entry_offset)
         if words[:3] == (0x910003e0, 0x927cec09, 0x9100013f) and words[3] & 0xfc000000 == 0x14000000:
             immediate = words[3] & 0x3ffffff
             if immediate & 0x2000000:
                 immediate -= 0x4000000
-            target = load_checker().symbols(data, {'_polaris_io_start'})['_polaris_io_start']
+            target_name = '_polaris_probe_start' if probe_symbols else '_polaris_io_start'
+            target = load_checker().symbols(data, {target_name})[target_name]
             c_stack_entry_aligned = entry + 12 + immediate * 4 == target
-    return {'mode': 'io' if io_symbols else 'syscalls', 'io_symbols': io_symbols,
+    return {'mode': 'process' if process_symbols else 'probe' if probe_symbols else 'io' if io_symbols else 'syscalls',
+            'io_symbols': io_symbols, 'process_symbols': process_symbols, 'probe_symbols': probe_symbols,
             'c_stack_entry_aligned': c_stack_entry_aligned,
             'process_sha256': hashlib.sha256(data).hexdigest(), 'cdhash': hashlib.sha256(cd).hexdigest()[:40],
             'code_signature_page_bytes': 4096, 'signature_flags': flags, 'addresses': addresses,
             'code_file_offset': code_offset[1] + entry - code_offset[0], 'userland_booted': False,
-            'expected_checkpoint': 'POLARIS_IO_OK pid=1 pagesize=4096' if io_symbols else 'POLARIS_INIT_OK pid=1 pagesize=4096'}
+            'expected_checkpoint': 'POLARIS_PROC_OK child=N exit=42 reaped=1 cow=OK' if process_symbols else 'POLARIS_IO_OK pid=1 pagesize=4096' if io_symbols else 'POLARIS_INIT_OK pid=1 pagesize=4096'}
 
 
 def static_and_sign(unsigned):
@@ -158,6 +169,8 @@ def static_and_sign(unsigned):
 
 def ramdisk(image):
     identity = inspect(image)
+    if identity['mode'] in ('process', 'probe'):
+        raise ValueError('process fixtures require the multi-file bundle builder')
     if identity['mode'] != 'io':
         return image + bytes((-len(image)) % 4096)
     state_offset = (4096 + len(image) + 4095) & ~4095

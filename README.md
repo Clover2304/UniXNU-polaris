@@ -5,14 +5,19 @@ architecture (XNU 10063, source-kernel platform milestone). The retired
 ABL-shim chain ([ios16_on_polaris_mix2s](https://github.com/luuu20309/ios16_on_polaris_mix2s),
 XNU 8796 / iOS 16) is the measured-hardware reference for this tree.
 
-**The platform stage is verified on real hardware** (user-approved temporary
-`fastboot boot` sessions, 2026-10-24). The full chain — Renegade edk2-msm
-firmware → UniXNU boot manager from an ESP on userdata → DarwinBoot hand-off
-(upper-bank window, real 1080×2160 GOP) → XNU entry → scheduler, timer
-interrupts, corecrypto FIPS POST, BSD init, IOKit — runs to the designed
-platform boundary, where it panics `Failed to mount root device` because this
-kernel has no root by design. There is no userland, no touch/display/GPU
-driver and no daily-usable system on this tree yet.
+**A resident own PID 1 is verified on real hardware** (temporary `fastboot boot`,
+2026-11-11). Renegade firmware → UniXNU ESP on userdata → DarwinBoot → the
+single-core source XNU now mounts a mockfs RAM root, admits an explicitly named
+ad-hoc-signed static init, and passes getpid/sysctl, bounded 4 KiB RAM-file I/O
+and standard-descriptor checks. The user reported `POLARIS_IO_OK` and a changing
+`POLARIS_IO_LIVE` counter; this milestone has no captured hardware register dump
+or photograph. The C entry aligns the raw process stack before its first stack
+access, fixing the real-phone SIGBUS that the QEMU run did not expose.
+
+The framebuffer is inherited from firmware. There is no Apple userland,
+interactive input, persistent XNU storage, native touch/display/GPU driver or
+daily-usable system. The named multi-file root and second-process stage is
+under development and is qualified separately from the working resident init.
 
 ## English
 
@@ -32,7 +37,7 @@ This repository moves the port onto UniXNU's build driver and boot chain:
 | Build | macOS CI wrapping blacktop/darwin-xnu-build | `scripts/build-platform-kernel.py` on UniXNU `37987aea` |
 | Boot | boot.img → custom shim → kernel | edk2-msm (Renegade) firmware → UniXNU → DarwinBoot → payload kernel.macho |
 | ADT | iPhone X identity, ABL framebuffer/UFS nodes | platform ADT, `darwinboot-memory-range`, no Apple identity |
-| Root | iOS 16 userland on UFS/HFS+ | none yet (platform stage, by design) |
+| Root | iOS 16 userland on UFS/HFS+ | mockfs RAM root and own resident init; bounded RAM writes |
 | CPU | cpus=4 proven (A55 0-3); A75 4-7 never observed | same topology; prefix check migrated; scheduler proven on hardware |
 
 ### Implemented and verified
