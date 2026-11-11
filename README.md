@@ -76,6 +76,19 @@ the ten-boot qualification above remains specific to the older USB baseline.
 [Evidence and next steps](research/ufs-readonly-plan.md) distinguish register
 identification from UFS DMA, link handoff and media I/O, which remain unverified.
 
+**Read-only UFS queue/SMMU inventory also passes** on source `9f1401c1`
+([CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42992224617)).
+The `ufs-map` cached boot snapshot finds one SMR covering the mainline candidate
+SID window `0x100..0x10f`: slot 5, shared bank 2, with bypass-shaped context
+registers. USB uses bank 4. Both hardware samples are stable; firmware's transfer
+queue remains running, its task queue stopped, and both doorbells are zero.
+The scan covers all 76 exposed legacy groups (8 valid). This one phone boot also
+passes the original runtime and USB checks without errors. No SMMU/UFS register
+writes, firmware queue-memory reads or media commands were issued by the probe.
+[Evidence](research/ufs-queue-smmu-snapshot.json) keeps actual SID identity,
+queue ownership and DMA unqualified. Next is a bounded NOP test using newly
+allocated buffers and a checked queue handoff.
+
 ## English
 
 ### What "transfer from ABL" means here
@@ -152,8 +165,8 @@ kernel+QEMU and ESP images. Pinned upstream revisions in
 
 The ten-boot and USB reconnect checks have passed on the captured baseline.
 [Read-only UFS controller identification](research/ufs-readonly-plan.md) now passes
-on one phone boot. Next are read-only SMMU/queue discovery and bounded media
-readback. Apple userland,
+on one phone boot. Read-only SMMU/queue discovery also passes; next are a checked queue handoff,
+bounded NOP/DMA validation and media readback. Apple userland,
 prelinked components and native display/touch remain later stages. The full
 history of both chains is in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -172,9 +185,10 @@ RAM 根挂载、固定文件读写、fork/exec/exit/wait、退出状态和单个
 用户已确认真机出现 `STRESS_OK`、`STRESS_CLEAN`，且 tick 持续变化，本轮程序自检通过。
 内核内部资源计数仅在 QEMU 取证；完整内存泄漏排查仍未完成。
 原生 XNU 轮询 USB CDC 已在真机枚举为 `1209:0001`，主机完成 ping、随机串往返、构建身份核对和运行日志取回，包含原有进程与文件系统自检成功标记。
-USB 基线支持 `ping/echo/status/log/help`，UFS 探测版另有 `ufs` 缓存快照命令。当前镜像在一轮整机启动和十次 USB/IP 重连中命令错误计数保持零，每轮覆盖半条旧命令的清除；不支持的控制请求被 STALL 后，下一条正常控制请求及数据往返恢复，未新增总线复位。
+USB 基线支持 `ping/echo/status/log/help`，UFS 探测版另有 `ufs` 和 `ufs-map` 缓存快照命令。当前镜像在一轮整机启动和十次 USB/IP 重连中命令错误计数保持零，每轮覆盖半条旧命令的清除；不支持的控制请求被 STALL 后，下一条正常控制请求及数据往返恢复，未新增总线复位。
 随后约 53 秒完成 256 次、1～250 字符的往返，无新增错误或回复溢出。固件 PHY 未就绪时在端点初始化前恢复 QUSB2。
 同镜像十轮整机启动已通过身份、自检、持续心跳及零 USB 命令错误校验：8 轮按热启动指令执行、1 轮按用户确认关机后上电、首轮进入方式未单独分类。[逐轮日志哈希](research/usb-boot-series.json)已保存；该十轮记录仍属于 `7e3fa6f` 基线。新 `c5dbce2` 已完成一轮[原生 UFS 控制器只读识别](research/ufs-readonly-plan.md)：UFSHCI 2.1，原有自检与持续心跳通过，UFS 介质访问仍待实现。
+新增 `9f1401c1` 已完成一轮队列/SMMU 只读盘点：候选 SID `0x100～0x10f` 位于共享 bank 2，与 USB bank 4 不同，寄存器采样稳定；固件传输队列仍运行、两个 doorbell 均为零。原有自检和持续心跳通过，USB 错误及日志丢失均为零。[证据](research/ufs-queue-smmu-snapshot.json)已保存；接下来验证自有 DMA 队列交接和有界 NOP，尚未完成介质读写。
 日志限于控制台打开后的 64 KiB RAM 环，早期启动和持久化崩溃日志未完成。
 Apple 用户态、用户态终端输入、UFS 介质访问、触摸和 GPU 尚未接入。
 
