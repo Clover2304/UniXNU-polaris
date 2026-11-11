@@ -73,6 +73,12 @@ struct UsbHw {
     uint32_t lastCmdDep     = 0;
     uint32_t lastCmdWord    = 0;
     uint32_t lastCmdRaw     = 0;
+    uint32_t errorCmdDep    = 0;
+    uint32_t errorCmdWord   = 0;
+    uint32_t errorCmdRaw    = 0;
+    int errorCmdStatus     = 0;
+    const char *commandContext = "startup";
+    const char *errorContext = "none";
     const char *initPhase   = "preflight";
     uint32_t smmuBank       = 0;
     uint32_t smmuContextOff = 0;

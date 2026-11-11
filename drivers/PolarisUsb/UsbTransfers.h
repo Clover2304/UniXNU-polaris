@@ -22,7 +22,12 @@ static int epCmd(UsbHw &hw, unsigned dep, uint32_t cmd, uint32_t p0, uint32_t p1
     }
     if (drop) hw.wr(DWC3_GUSB2PHYCFG(0), cfg);
     hw.lastCmdSt = st;
-    if(st) polaris_usb_stats[3]=polaris_usb_stats[3]+1;
+    if(st) {
+        polaris_usb_stats[3]=polaris_usb_stats[3]+1;
+        hw.errorCmdDep=dep;hw.errorCmdWord=cmd;hw.errorCmdRaw=hw.lastCmdRaw;hw.errorCmdStatus=st;hw.errorContext=hw.commandContext;
+        uint64_t errors=polaris_usb_stats[3];
+        if(errors<=16 || !(errors&(errors-1)))console("POLARIS_USB_CMD_ERROR n=%llu context=%s dep=%u command=%08x raw=%08x status=%d\n",errors,hw.errorContext,dep,cmd,hw.errorCmdRaw,st);
+    }
     return st;
 }
 
@@ -73,9 +78,17 @@ static void ep0ArmSetup(UsbHw &hw) {
 }
 
 static void ep0Restart(UsbHw &hw) {
+    // EP0 stall clears automatically on the next SETUP. The Linux DWC3
+    // control restart issues SETSTALL only; CLEARSTALL is for data endpoints.
     (void)epCmd(hw, 0, DWC3_DEPCMD_SETSTALL, 0, 0, 0);
-    (void)epCmd(hw, 0, DWC3_DEPCMD_CLEARSTALL, 0, 0, 0);
     ep0ArmSetup(hw);
+}
+
+static void ep0Reset(UsbHw &hw) {
+    // A bus reset must leave EP0 in SETUP. Keep its active SETUP transfer
+    // when already there, rather than issuing a second STARTTRANSFER.
+    if(hw.ep0Stage!=0)ep0Restart(hw);
+    hw.ep0Zlp=false;hw.ep0Three=false;hw.ep0In=false;hw.ep0StatusDep=1;
 }
 
 static void ep0StartData(UsbHw &hw, unsigned dep, uint32_t len) {

@@ -72,6 +72,18 @@ Zero-error startup, repeated boots/reconnects, USB IRQs, isolation, throughput
 and long-term or suspend/resume reliability remain unqualified. Evidence
 scope and hashes are recorded in `research/bringup-test-plan.md`.
 
+Follow-up on that same running kernel used two USB/IP detach/reattach cycles.
+Both restored nonce/build/log verification, but reset counts 2/4/6 tracked
+command errors 3/5/7. This is evidence of reset-related error growth, not
+proof of the failing command. Linux `drivers/usb/dwc3/gadget.c` and `ep0.c`
+at the revision above retain an already active EP0 SETUP transfer on reset
+and use SETSTALL without CLEARSTALL for control-endpoint stall/restart.
+The next candidate follows that behavior, clears incomplete session input
+and unsent replies at reset/disconnect, and records the most recent command
+error with its event context. It also checks QUSB2 CORE_READY before issuing
+the first endpoint command; the same bounded PHY restore is used if not ready.
+These follow-up changes await their own hardware acceptance.
+
 This is a polling CDC diagnostic channel, enabled by `polaris-usb=1`.
 The log is a 64 KiB in-memory ring captured after the console opens. It does
 not preserve pre-console output or survive reset, and it does not implement

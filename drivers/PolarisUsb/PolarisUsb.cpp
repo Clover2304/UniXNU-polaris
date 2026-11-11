@@ -62,10 +62,10 @@ static void handleCommand(TerminalSession &s,const char *command) {
     else if(!strncmp(command,"echo ",5)) {
         respond(s,"POLARIS_ECHO ");respond(s,command+5);respond(s,"\n");
     } else if(!strcmp(command,"status")) {
-        snprintf(text,sizeof(text),"POLARIS_USB_STATUS build=%s stage=%llu core=%08x events=%u resets=%u configured=%u cmd_errors=%llu rx=%llu tx_done=%llu reply_overflow=%llu dma=%llx smmu=%08x/%08x phy_mode=%u\n",
+        snprintf(text,sizeof(text),"POLARIS_USB_STATUS build=%s stage=%llu core=%08x events=%u resets=%u configured=%u cmd_errors=%llu rx=%llu tx_done=%llu reply_overflow=%llu dma=%llx smmu=%08x/%08x phy_mode=%u last_error=%s/%u/%x/%x/%d\n",
                  POLARIS_USB_BUILD_ID,polaris_usb_stats[0],s.hw.rd(DWC3_GSNPSID),s.hw.usbEvents,s.hw.usbResets,s.hw.configured,
                  polaris_usb_stats[3],polaris_usb_stats[6],polaris_usb_stats[7],polaris_usb_stats[8],s.hw.dmaPhys,
-                 s.hw.smmuOrigSmr,s.hw.smmuOrigS2cr,s.hw.phyInitMode);
+                 s.hw.smmuOrigSmr,s.hw.smmuOrigS2cr,s.hw.phyInitMode,s.hw.errorContext,s.hw.errorCmdDep,s.hw.errorCmdWord,s.hw.errorCmdRaw,s.hw.errorCmdStatus);
         respond(s,text);
     } else if(!strcmp(command,"log")) {
         // All commands and TX run on this worker; only capture needs the spin lock.
@@ -165,10 +165,15 @@ static bool startController(TerminalSession &s) {
     if(!prepareSmmu(hw))return false;
     memset(hw.dmaVirt,0,DMA_TOTAL_BYTES);usbCacheRange(hw.dmaVirt,DMA_TOTAL_BYTES,1);
     polaris_usb_stats[0]=5;
+    if(!(hw.prd(0x1a0)&1u)) {
+        logStage("firmware QUSB2 not ready: restore before endpoint initialization");
+        if(!initQusb2(hw))return false;
+    }
     return true;
 }
 static bool runController(TerminalSession &s) {
     UsbHw &hw=s.hw;
+    hw.commandContext="startup";
     hw.initPhase="reset-timeout";
     hw.lastCmdSt=0;hw.lastCmdDep=hw.lastCmdWord=hw.lastCmdRaw=0;
     hw.wr(DWC3_DCTL,hw.rd(DWC3_DCTL)&~DWC3_DCTL_RUN_STOP);
@@ -232,7 +237,7 @@ static void worker(void *,wait_result_t) {
     bool ok=startController(*s);
     if(ok) {
         ok=runController(*s);
-        if(!ok && ((!strcmp(s->hw.initPhase,"ep0-command") && s->hw.lastCmdSt==-1) || !strcmp(s->hw.initPhase,"reset-timeout"))) {
+        if(!ok && !s->hw.phyInitMode && ((!strcmp(s->hw.initPhase,"ep0-command") && s->hw.lastCmdSt==-1) || !strcmp(s->hw.initPhase,"reset-timeout"))) {
             diagnostic();logStage("retry: QUSB2 init followed by full device reset");
             s->hw.wr(DWC3_DCTL,s->hw.rd(DWC3_DCTL)&~DWC3_DCTL_RUN_STOP);IOSleep(40);
             ok=initQusb2(s->hw) && runController(*s);

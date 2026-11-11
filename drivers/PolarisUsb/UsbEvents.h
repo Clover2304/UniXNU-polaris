@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 // Adapted from UniXNU-j716f; see SOURCES.md and LICENSE.
+static void discardUsbSession(TerminalSession &s) {
+    s.input.count=0;s.input.overflow=false;
+    s.reply.consume(s.reply.available());s.pending=0;
+    s.hw.configured=0;s.hw.hostReady=false;s.hw.lineState=0;s.hw.needReplay=true;
+}
+
 static void handleDepEvent(TerminalSession &s, uint32_t ev) {
     UsbHw &hw = s.hw;
     const unsigned dep    = (ev >> 1) & 0x1Fu;
@@ -89,28 +95,30 @@ static void pollUsbEvents(TerminalSession &s) {
             if (ev & 1u) {
                 const unsigned type = (ev >> 8) & 0x0Fu;
                 if (type == DWC3_DEV_EVENT_RESET) {
+                    hw.commandContext="usb-reset";
                     ++hw.usbResets;
                     if (hw.usbResets == 1u) {
                         logStage("usb: first host USB_RESET received");
                     }
                     endDepTransfer(hw, 2, hw.ep2RscIdx, hw.ep2Armed);
                     endDepTransfer(hw, 3, hw.ep3RscIdx, hw.ep3Busy);
-                    hw.configured = 0;
-                    hw.hostReady  = false;
+                    discardUsbSession(s);
                     hw.wr(DWC3_DCFG, hw.rd(DWC3_DCFG) & ~DWC3_DCFG_DEVADDR_MASK);
-                    ep0Restart(hw);
+                    ep0Reset(hw);
                 } else if (type == DWC3_DEV_EVENT_CONNECT_DONE) {
                     const uint32_t spd = hw.rd(DWC3_DSTS) & DWC3_DSTS_CONNECTSPD_MASK;
                     hw.bulkMps = (spd == DWC3_DCFG_HIGHSPEED) ? 512u : 64u;
                 } else if (type == DWC3_DEV_EVENT_DISCONNECT) {
+                    hw.commandContext="disconnect";
                     endDepTransfer(hw, 2, hw.ep2RscIdx, hw.ep2Armed);
                     endDepTransfer(hw, 3, hw.ep3RscIdx, hw.ep3Busy);
-                    hw.configured = 0;
-                    hw.hostReady  = false;
+                    discardUsbSession(s);
                 }
             } else {
+                hw.commandContext="endpoint-event";
                 handleDepEvent(s, ev);
             }
+            hw.commandContext="runtime";
             hw.evtOff = (hw.evtOff + 4u) % 4096u;
             left -= 4u;
         }

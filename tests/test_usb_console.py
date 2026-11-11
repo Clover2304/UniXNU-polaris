@@ -4,6 +4,72 @@ from pathlib import Path
 import shutil,subprocess,tempfile,unittest
 ROOT=Path(__file__).resolve().parents[1]
 class UsbTests(unittest.TestCase):
+    def test_ep0_bus_reset_preserves_setup_and_stall_restart_avoids_clearstall(self):
+        text=(ROOT/'drivers/PolarisUsb/UsbTransfers.h').read_text()
+        functions=text[text.index('static void ep0Restart('):text.index('static void ep0StartData(')]
+        source=r'''
+#include "Dwc3Regs.h"
+#include <cstdint>
+#include <cassert>
+#include <vector>
+struct UsbHw {
+ int ep0Stage=0;bool ep0Zlp=true,ep0Three=true,ep0In=true;unsigned ep0StatusDep=0,armed=0;
+ std::vector<unsigned> commands;
+};
+static int epCmd(UsbHw &hw,unsigned dep,uint32_t cmd,uint32_t,uint32_t,uint32_t) {
+ assert(dep==0&&cmd!=DWC3_DEPCMD_CLEARSTALL);hw.commands.push_back(cmd);return 0;
+}
+static void ep0ArmSetup(UsbHw &hw){hw.ep0Stage=0;hw.armed++;}
+''' + functions + r'''
+int main(){
+ for(int stage=0;stage<=3;stage++) {
+  UsbHw hw;hw.ep0Stage=stage;ep0Reset(hw);
+  assert(hw.ep0Stage==0&&!hw.ep0Zlp&&!hw.ep0Three&&!hw.ep0In&&hw.ep0StatusDep==1);
+  assert(hw.armed==(stage?1u:0u));assert(hw.commands.size()==(stage?1u:0u));
+  if(stage)assert(hw.commands[0]==DWC3_DEPCMD_SETSTALL);
+  auto armed=hw.armed;ep0Reset(hw);assert(hw.armed==armed);
+ }
+ UsbHw hw;ep0Restart(hw);assert(hw.armed==1&&hw.commands.size()==1&&hw.commands[0]==DWC3_DEPCMD_SETSTALL);
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            d=Path(directory);(d/'reset.cpp').write_text(source)
+            result=subprocess.run([shutil.which('clang++'),'-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I',ROOT/'drivers/PolarisUsb',d/'reset.cpp','-o',d/'reset'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run([d/'reset'],check=True,capture_output=True)
+
+    def test_disconnected_session_discards_partial_input_and_pending_reply(self):
+        text=(ROOT/'drivers/PolarisUsb/UsbEvents.h').read_text()
+        function=text[text.index('static void discardUsbSession('):text.index('static void handleDepEvent(')]
+        source=r'''
+#include "UsbBuffers.h"
+#include <cassert>
+#include <cstring>
+struct TerminalSession {
+ PolarisLine input;PolarisBytes<128> reply;size_t pending=0;
+ struct {unsigned configured=1,lineState=3;bool hostReady=true,needReplay=false;} hw;
+};
+''' + function + r'''
+int main(){
+ TerminalSession s;char out[256];
+ for(unsigned i=0;i<64;i++) {
+  s.input.feed('X',out);s.input.overflow=true;
+  assert(s.reply.append("old reply",9));s.pending=9;
+  s.hw.configured=1;s.hw.lineState=3;s.hw.hostReady=true;s.hw.needReplay=false;
+  discardUsbSession(s);
+  assert(!s.pending&&!s.reply.available()&&!s.hw.configured&&!s.hw.hostReady&&!s.hw.lineState&&s.hw.needReplay);
+  assert(s.input.feed('p',out)==PolarisLine::More);s.input.feed('i',out);s.input.feed('n',out);s.input.feed('g',out);
+  assert(s.input.feed('\n',out)==PolarisLine::Ready&&!strcmp(out,"ping"));
+  char full[128]{};assert(s.reply.append(full,sizeof(full)));discardUsbSession(s);
+ }
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            d=Path(directory);(d/'session.cpp').write_text(source)
+            result=subprocess.run([shutil.which('clang++'),'-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I',ROOT/'drivers/PolarisUsb',d/'session.cpp','-o',d/'session'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run([d/'session'],check=True,capture_output=True)
+
     def test_actual_endpoint_command_timeout_and_status_preserve_diagnostics(self):
         text=(ROOT/'drivers/PolarisUsb/UsbTransfers.h').read_text()
         command=text[text.index('static int epCmd('):text.index('static void endDepTransfer(')]
@@ -15,10 +81,13 @@ class UsbTests(unittest.TestCase):
 volatile uint64_t polaris_usb_stats[16];
 static unsigned delays;
 static void IODelay(unsigned amount){assert(amount==1);assert(++delays<=20000);}
+static void console(const char *,...){}
 struct UsbHw {
  std::map<unsigned,uint32_t> regs;
  unsigned polls=0,completeAfter=3,status=0,lastCmdDep=0,lastCmdWord=0,lastCmdRaw=0;
  int lastCmdSt=0;
+ unsigned errorCmdDep=0,errorCmdWord=0,errorCmdRaw=0;int errorCmdStatus=0;
+ const char *commandContext="test",*errorContext="none";
  void wr(unsigned off,uint32_t value){regs[off]=value;}
  uint32_t rd(unsigned off){
   if(off==DWC3_DEPCMD(1)&&completeAfter&&++polls>=completeAfter)
@@ -35,6 +104,7 @@ int main(){
   int result=epCmd(hw,1,DWC3_DEPCMD_STARTTRANSFER,1,0x23aa000,0,&raw);
   assert(result==(mode==0?0:mode==1?9:-1));assert(hw.lastCmdSt==result);
   assert(hw.lastCmdDep==1&&hw.lastCmdWord==DWC3_DEPCMD_STARTTRANSFER);
+  if(mode)assert(hw.errorCmdDep==1&&hw.errorCmdWord==DWC3_DEPCMD_STARTTRANSFER&&hw.errorCmdRaw==hw.lastCmdRaw&&hw.errorCmdStatus==result&&hw.errorContext==hw.commandContext);
   assert(hw.regs[DWC3_GUSB2PHYCFG(0)]==0x140);
   if(mode==2)assert(delays==20000&&(hw.lastCmdRaw&DWC3_DEPCMD_CMDACT));
   else assert(delays==2&&raw==hw.lastCmdRaw&&!(raw&DWC3_DEPCMD_CMDACT));
@@ -162,8 +232,8 @@ int main(){
  r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==9&&h->regs[0x84000/4]==0x79&&h->regs[0x1810/4]==0);delete h;
  h=new Hardware();h->regs[0x20/4]=(1u<<30)|168;
  r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(!r.error);delete h;
- // User-reported SDM845 geometry: 64 global pages, 45 banks, 172 groups.
- h=new Hardware();h->regs[0x20/4]=0x4c017eac;h->regs[0x24/4]=0x5000002d;h->regs[0x28/4]=0x5555;
+ // Captured SDM845 USB log: 64 global pages, 45 banks, 76 groups.
+ h=new Hardware();h->regs[0x20/4]=0x4c017e4c;h->regs[0x24/4]=0x5000002d;h->regs[0x28/4]=0x5555;
  h->regs[0xc08/4]=4;h->regs[0x44000/4]=0xe0;h->regs[0x1010/4]=0x1f000;h->regs[0x1810/4]=1;
  r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);
  assert(!r.error&&r.pages==64&&r.bank==4&&r.shared==1&&!r.remapped&&h->writes.empty());delete h;
