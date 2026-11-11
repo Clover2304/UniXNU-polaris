@@ -7,10 +7,12 @@ static int epCmd(UsbHw &hw, unsigned dep, uint32_t cmd, uint32_t p0, uint32_t p1
     hw.wr(DWC3_DEPCMDPAR0(dep), p0);
     hw.wr(DWC3_DEPCMDPAR1(dep), p1);
     hw.wr(DWC3_DEPCMDPAR2(dep), p2);
+    hw.lastCmdDep=dep;hw.lastCmdWord=cmd;
     hw.wr(DWC3_DEPCMD(dep), cmd | DWC3_DEPCMD_CMDACT);
     int st = -1;
     for (unsigned i = 0; i < 20000; ++i) {
         const uint32_t v = hw.rd(DWC3_DEPCMD(dep));
+        hw.lastCmdRaw=v;
         if (!(v & DWC3_DEPCMD_CMDACT)) {
             if (rawOut) *rawOut = v;
             st = static_cast<int>(DWC3_DEPCMD_STATUS(v));
@@ -174,16 +176,17 @@ static bool startBulkIn(UsbHw &hw, const uint8_t *data, uint32_t len) {
     return false;
 }
 
-static void programEp0(UsbHw &hw) {
-    (void)epCmd(hw, 0, DWC3_DEPCMD_DEPSTARTCFG, 0, 0, 0);
+static bool programEp0(UsbHw &hw) {
+    if(epCmd(hw, 0, DWC3_DEPCMD_DEPSTARTCFG, 0, 0, 0))return false;
     const uint32_t cfg = DWC3_DEPCFG_EP_TYPE(0) | DWC3_DEPCFG_MAX_PACKET_SIZE(64) | DWC3_DEPCFG_FIFO_NUMBER(0);
     const uint32_t ev  = DWC3_DEPCFG_XFER_COMPLETE_EN | DWC3_DEPCFG_XFER_NOT_READY_EN;
-    (void)epCmd(hw, 0, DWC3_DEPCMD_SETEPCONFIG, cfg, ev | DWC3_DEPCFG_EP_NUMBER(0), 0);
-    (void)epCmd(hw, 0, DWC3_DEPCMD_SETTRANSFRESOURCE, DWC3_DEPXFERCFG_NUM_XFER_RES(1), 0, 0);
-    (void)epCmd(hw, 1, DWC3_DEPCMD_SETEPCONFIG, cfg, ev | DWC3_DEPCFG_EP_NUMBER(1), 0);
-    (void)epCmd(hw, 1, DWC3_DEPCMD_SETTRANSFRESOURCE, DWC3_DEPXFERCFG_NUM_XFER_RES(1), 0, 0);
+    if(epCmd(hw, 0, DWC3_DEPCMD_SETEPCONFIG, cfg, ev | DWC3_DEPCFG_EP_NUMBER(0), 0))return false;
+    if(epCmd(hw, 0, DWC3_DEPCMD_SETTRANSFRESOURCE, DWC3_DEPXFERCFG_NUM_XFER_RES(1), 0, 0))return false;
+    if(epCmd(hw, 1, DWC3_DEPCMD_SETEPCONFIG, cfg, ev | DWC3_DEPCFG_EP_NUMBER(1), 0))return false;
+    if(epCmd(hw, 1, DWC3_DEPCMD_SETTRANSFRESOURCE, DWC3_DEPXFERCFG_NUM_XFER_RES(1), 0, 0))return false;
     hw.wr(DWC3_DALEPENA, DWC3_DALEPENA_EP(0) | DWC3_DALEPENA_EP(1));
     ep0ArmSetup(hw);
+    return hw.lastCmdSt==0;
 }
 
 static void enableDataEndpoints(UsbHw &hw) {

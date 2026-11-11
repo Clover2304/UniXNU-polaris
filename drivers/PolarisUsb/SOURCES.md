@@ -38,6 +38,27 @@ unchanged. Readbacks are checked and a failed remap restores the original
 mapping and candidate context when possible. Failure diagnostics include
 the actual context register values, original bank, sharing and remap status.
 
+The next hardware report confirmed CBA2R `00000001`: bank 4 is already a
+usable shared bypass and is retained without writes. IDR0/1/2 were
+`4c017eac/5000002d/00005555` (64 global pages, 45 banks, extended stream
+groups limited to the first 128). The controller then reached endpoint
+initialization and timed out with `cmd=-1`; HWPARAMS0/1/6/7 were
+`4020400a/0162493b/07ea0020/03080a65`, and FIFO0 read back `00000040`.
+The FIFO planner accepts those exact parameters in a host regression.
+
+For the HS-only owned DT profile, select the qcom UTMI-as-PIPE clock path
+explicitly, using the sequence documented in Linux `dwc3-qcom.c` at the
+same revision above. SDM845's PIPE branch uses BRANCH_HALT_SKIP; its old
+bit-31-only running test is not reliable. Enable GCC AHB2PHY `0x6a004`
+before PHY register accesses, and clear USB2 PHY suspend settings again
+after device reset. Endpoint initialization stops at its first command
+failure and preserves the command/raw value. A startup command timeout or
+reset timeout permits one QUSB2 reinitialization and full device reset,
+reusing the same DMA arena; CORE_READY is polled for at most 10 ms.
+Failures print clock and read-only SMMU fault context too. Those fault
+registers may include earlier firmware activity and are not cleared.
+These changes are candidates for hardware validation, not USB qualification.
+
 This is a polling CDC diagnostic channel, enabled by `polaris-usb=1`.
 The log is a 64 KiB in-memory ring captured after the console opens. It does
 not preserve pre-console output or survive reset, and it does not implement

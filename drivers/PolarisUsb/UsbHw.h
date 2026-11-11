@@ -70,7 +70,12 @@ struct UsbHw {
     uint32_t usbResets      = 0;
     uint32_t usbCfgCount    = 0;
     int lastCmdSt           = 0;
+    uint32_t lastCmdDep     = 0;
+    uint32_t lastCmdWord    = 0;
+    uint32_t lastCmdRaw     = 0;
+    const char *initPhase   = "preflight";
     uint32_t smmuBank       = 0;
+    uint32_t smmuContextOff = 0;
     uint32_t smmuOrigSmr    = 0;
     uint32_t smmuOrigS2cr   = 0;
     uint32_t phyInitMode    = 0;

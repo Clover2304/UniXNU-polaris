@@ -101,11 +101,11 @@ static bool enableClocks(UsbHw &hw) {
     uint32_t power=hw.grd(0xf004);
     if(power&1)hw.gwr(0xf004,power&~1u);
     for(unsigned i=0;!(hw.grd(0xf004)&0x80000000u);i++){if(i==5000)return false;IODelay(5);}
-    // Master, sleep, mock UTMI, cfg_noc, aggre, PHY aux/com/ref.
-    static const unsigned branches[]={0xf00c,0xf010,0xf014,0x502c,0x8201c,0xf04c,0xf050,0x8c008};
+    // Master, sleep, mock UTMI, cfg_noc, aggre, PHY aux/com/ref and AHB2PHY.
+    static const unsigned branches[]={0xf00c,0xf010,0xf014,0x502c,0x8201c,0xf04c,0xf050,0x8c008,0x6a004};
     for(unsigned off:branches)hw.gwr(off,hw.grd(off)|1u);
     for(unsigned off:branches) {
-        for(unsigned i=0;hw.grd(off)&0x80000000u;i++){if(i==2000)return false;IODelay(2);}
+        for(unsigned i=0;hw.grd(off)&0x80000000u;i++){if(i==2000){console("POLARIS_USB_CLOCK_GATE off=%x value=%08x\n",off,hw.grd(off));return false;}IODelay(2);}
     }
     return true;
 }
@@ -122,6 +122,7 @@ static bool prepareSmmu(UsbHw &hw) {
     PolarisSmmuIo io{const_cast<uint32_t *>(hw.smmu),smmuRead,smmuWrite};
     auto result=polaris_usb_smmu(io,hw.dmaPhys,DMA_TOTAL_BYTES);
     hw.smmuOrigSmr=result.smr;hw.smmuOrigS2cr=result.s2cr;hw.smmuBank=result.bank;
+    if(!result.error && result.pages && result.smr && ((result.s2cr>>16)&3u)==0)hw.smmuContextOff=(result.pages+result.bank)*4096u;
     polaris_usb_stats[9]=result.bank;polaris_usb_stats[10]=result.error;
     polaris_usb_stats[11]=result.before;polaris_usb_stats[12]=result.after;
     polaris_usb_stats[13]=result.cbar;polaris_usb_stats[14]=result.cba2r;polaris_usb_stats[15]=result.idr1;
@@ -132,13 +133,16 @@ static bool prepareSmmu(UsbHw &hw) {
     return result.error==0;
 }
 
-static void initQusb2(UsbHw &hw) {
+static bool initQusb2(UsbHw &hw) {
+    hw.initPhase="phy-not-ready";
     hw.phyInitMode=1;
     hw.gwr(0x12000,1);IODelay(150);hw.gwr(0x12000,0);IODelay(150);
     // Owned polaris DTB qcom,qusb-phy-init-seq; value, offset pairs.
     static const uint32_t sequence[]={0x23,0x210,0x03,0x04,0x7c,0x18c,0x80,0x2c,0x0a,0x184,0x19,0xb4,0x40,0x194,0x17,0x198,0x21,0x214,0x08,0x220,0x58,0x224,0x07,0x240,0x2b,0x244,0xca,0x248,0x04,0x24c,0x03,0x250,0x00,0x23c,0x22,0x210};
     for(unsigned i=0;i<sizeof(sequence)/sizeof(sequence[0]);i+=2)hw.pwr(sequence[i+1],sequence[i]);
     IODelay(200);
+    for(unsigned i=0;i<10000;i++){if(hw.prd(0x1a0)&1u)return true;IODelay(1);}
+    return false;
 }
 static bool startController(TerminalSession &s) {
     UsbHw &hw=s.hw;
@@ -165,21 +169,26 @@ static bool startController(TerminalSession &s) {
 }
 static bool runController(TerminalSession &s) {
     UsbHw &hw=s.hw;
+    hw.initPhase="reset-timeout";
+    hw.lastCmdSt=0;hw.lastCmdDep=hw.lastCmdWord=hw.lastCmdRaw=0;
     hw.wr(DWC3_DCTL,hw.rd(DWC3_DCTL)&~DWC3_DCTL_RUN_STOP);
-    // Select the UTMI clock when the firmware's SS pipe is not running.
-    if(hw.phyInitMode || (hw.grd(0xf054)&0x80000000u)) {
-        hw.wr(QSCRATCH_GENERAL_CFG,hw.rd(QSCRATCH_GENERAL_CFG)|QSCRATCH_PIPE_UTMI_CLK_DIS);IODelay(100);
-        hw.wr(QSCRATCH_GENERAL_CFG,hw.rd(QSCRATCH_GENERAL_CFG)|QSCRATCH_PIPE_UTMI_CLK_SEL|QSCRATCH_PIPE3_PHYSTATUS_SW);IODelay(100);
-        hw.wr(QSCRATCH_GENERAL_CFG,hw.rd(QSCRATCH_GENERAL_CFG)&~QSCRATCH_PIPE_UTMI_CLK_DIS);
-    }
+    // The owned DT limits this controller to HS. Follow the qcom UTMI-as-PIPE
+    // sequence directly; SDM845 PIPE uses BRANCH_HALT_SKIP, not a reliable HALT bit.
+    hw.wr(QSCRATCH_GENERAL_CFG,hw.rd(QSCRATCH_GENERAL_CFG)|QSCRATCH_PIPE_UTMI_CLK_DIS);IODelay(100);
+    hw.wr(QSCRATCH_GENERAL_CFG,hw.rd(QSCRATCH_GENERAL_CFG)|QSCRATCH_PIPE_UTMI_CLK_SEL|QSCRATCH_PIPE3_PHYSTATUS_SW);IODelay(100);
+    hw.wr(QSCRATCH_GENERAL_CFG,hw.rd(QSCRATCH_GENERAL_CFG)&~QSCRATCH_PIPE_UTMI_CLK_DIS);
     hw.wr(QSCRATCH_HS_PHY_CTRL,hw.rd(QSCRATCH_HS_PHY_CTRL)|QSCRATCH_UTMI_OTG_VBUS_VALID|QSCRATCH_SW_SESSVLD_SEL);
     hw.wr(QSCRATCH_SS_PHY_CTRL,hw.rd(QSCRATCH_SS_PHY_CTRL)|QSCRATCH_LANE0_PWR_PRESENT);
     hw.wr(DWC3_GUSB2PHYCFG(0),hw.rd(DWC3_GUSB2PHYCFG(0))&~(DWC3_GUSB2PHYCFG_SUSPHY|DWC3_GUSB2PHYCFG_ENBLSLPM));
     hw.wr(DWC3_GCTL,(hw.rd(DWC3_GCTL)&~0x3000u)|DWC3_GCTL_PRTCAPDIR(2));
     hw.wr(DWC3_DCTL,hw.rd(DWC3_DCTL)|DWC3_DCTL_CSFTRST);
     for(unsigned i=0;hw.rd(DWC3_DCTL)&DWC3_DCTL_CSFTRST;i++){if(i==100000)return false;IODelay(5);}
+    // Device reset can restore PHY suspend defaults. Keep HS clocks available
+    // throughout endpoint initialization, including between commands.
+    hw.wr(DWC3_GUSB2PHYCFG(0),hw.rd(DWC3_GUSB2PHYCFG(0))&~(DWC3_GUSB2PHYCFG_SUSPHY|DWC3_GUSB2PHYCFG_ENBLSLPM));
     hw.wr(DWC3_GSBUSCFG0,hw.rd(DWC3_GSBUSCFG0)|0x0eu);
     hw.wr(DWC3_GCTL,hw.rd(DWC3_GCTL)|DWC3_GCTL_DSBLCLKGTNG);
+    hw.initPhase="fifo-plan";
     uint32_t fifos[3];
     if(!polaris_usb_fifos(hw.rd(0xc140),hw.rd(0xc144),hw.rd(0xc158),hw.rd(0xc15c),hw.rd(DWC3_GTXFIFOSIZ(0)),fifos))return false;
     for(unsigned i=0;i<3;i++)hw.wr(DWC3_GTXFIFOSIZ(i),fifos[i]);
@@ -190,10 +199,11 @@ static bool runController(TerminalSession &s) {
     hw.wr(DWC3_GEVNTSIZ(0),4096|(1u<<31)); // Polling: mask IRQ, retain DMA events.
     hw.wr(DWC3_GEVNTCOUNT(0),0);hw.evtOff=0;
     hw.configured=0;hw.ep2Armed=false;hw.ep3Busy=false;hw.ep2RscIdx=hw.ep3RscIdx=0;
-    programEp0(hw);
-    if(hw.lastCmdSt)return false;
+    hw.initPhase="ep0-command";
+    if(!programEp0(hw))return false;
     IOSleep(30);hw.wr(DWC3_DCTL,hw.rd(DWC3_DCTL)|DWC3_DCTL_RUN_STOP);
     polaris_usb_stats[0]=6;
+    hw.initPhase="running";
     console("POLARIS_USB_RUN core=%08x dma=%llx phy=%08x\n",hw.rd(DWC3_GSNPSID),hw.dmaPhys,hw.prd(0x1a0));
     return true;
 }
@@ -205,13 +215,31 @@ static void worker(void *,wait_result_t) {
     IOSleep(200);
     void *memory=IOMalloc(sizeof(TerminalSession));if(!memory){thread_terminate(current_thread());return;}
     auto *s=new(memory,Place{})TerminalSession();s->hw.initDefaults();
-    if(!startController(*s)||!runController(*s)){
+    console("POLARIS_USB_BUILD %s\n",POLARIS_USB_BUILD_ID);
+    auto diagnostic=[&]() {
         console("POLARIS_USB_FAILED stage=%llu core=%08llx cmd=%d dma=%llx smmu=%08x/%08x cr0=%08x\n",
             polaris_usb_stats[0],polaris_usb_stats[1],s->hw.lastCmdSt,s->hw.dmaPhys,s->hw.smmuOrigSmr,s->hw.smmuOrigS2cr,s->hw.smmu?s->hw.smmu[0]:0);
+        console("POLARIS_USB_STOP reason=%s dep=%u command=%08x raw=%08x dctl=%08x\n",
+            s->hw.initPhase,s->hw.lastCmdDep,s->hw.lastCmdWord,s->hw.lastCmdRaw,s->hw.core?s->hw.rd(DWC3_DCTL):0);
         if(s->hw.core)console("POLARIS_USB_HW h0=%08x h1=%08x h6=%08x h7=%08x fifo0=%08x\n",s->hw.rd(0xc140),s->hw.rd(0xc144),s->hw.rd(0xc158),s->hw.rd(0xc15c),s->hw.rd(DWC3_GTXFIFOSIZ(0)));
-        thread_terminate(current_thread());return;
+        if(s->hw.core)console("POLARIS_USB_CLOCK usb2=%08x usb3=%08x mux=%08x pipe=%08x phy=%08x ahb=%08x\n",
+            s->hw.rd(DWC3_GUSB2PHYCFG(0)),s->hw.rd(DWC3_GUSB3PIPECTL(0)),s->hw.rd(QSCRATCH_GENERAL_CFG),s->hw.grd(0xf054),s->hw.phy?s->hw.prd(0x1a0):0,s->hw.grd(0x6a004));
+        if(s->hw.smmu && s->hw.smmuContextOff) {
+            unsigned cb=s->hw.smmuContextOff;
+            console("POLARIS_USB_FAULT fsr=%08x far=%08x%08x syn=%08x\n",s->hw.smmu[(cb+0x58)/4],s->hw.smmu[(cb+0x64)/4],s->hw.smmu[(cb+0x60)/4],s->hw.smmu[(cb+0x68)/4]);
+        }
+    };
+    bool ok=startController(*s);
+    if(ok) {
+        ok=runController(*s);
+        if(!ok && ((!strcmp(s->hw.initPhase,"ep0-command") && s->hw.lastCmdSt==-1) || !strcmp(s->hw.initPhase,"reset-timeout"))) {
+            diagnostic();logStage("retry: QUSB2 init followed by full device reset");
+            s->hw.wr(DWC3_DCTL,s->hw.rd(DWC3_DCTL)&~DWC3_DCTL_RUN_STOP);IOSleep(40);
+            ok=initQusb2(s->hw) && runController(*s);
+        }
     }
-    uint64_t started=nowMs(),next=started+5000;bool fallback=false;
+    if(!ok){diagnostic();thread_terminate(current_thread());return;}
+    uint64_t started=nowMs(),next=started+5000;bool fallback=s->hw.phyInitMode!=0;
     for(;;) {
         pollUsbEvents(*s);
         polaris_usb_stats[4]=s->hw.usbEvents;
@@ -226,7 +254,7 @@ static void worker(void *,wait_result_t) {
                 s->hw.usbEvents,s->hw.usbResets,s->hw.configured,s->hw.lastCmdSt,s->hw.rd(DWC3_DSTS),s->hw.rd(DWC3_DCTL),s->hw.prd(0x1a0),s->hw.smmuOrigSmr,s->hw.smmuOrigS2cr);
             if(!fallback && !s->hw.usbEvents) {
                 fallback=true;s->hw.wr(DWC3_DCTL,s->hw.rd(DWC3_DCTL)&~DWC3_DCTL_RUN_STOP);IOSleep(40);
-                initQusb2(s->hw);if(!runController(*s)){logStage("fallback-failed");thread_terminate(current_thread());return;}
+                if(!initQusb2(s->hw)||!runController(*s)){diagnostic();logStage("fallback-failed");thread_terminate(current_thread());return;}
             }
         }
         IOSleep(2);
