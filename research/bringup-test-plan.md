@@ -4,12 +4,12 @@
 
 ## 当前基线与证据
 
-- 已到达：单核 XNU、具名 RAM 根目录、自制 init 与独立子程序的 fork/exec/exit/wait，以及有容量上限的 `/tmp` 动态普通文件。
+- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件，以及 1,000 次进程创建/执行/回收自检（含每批 8 个子进程）。
 - 配置：6 GB 机型配置；当前仅启用 1 CPU，内核限制在受控的 1 GiB 内存窗口。完整 RAM 和 SMP 未验证。
-- 源码基线：`ce50a4154caeaef5e4524b880cccfdb55c80f703`。上一轮多进程基线 `ef3cabf1aebb10301fb7b229b4a4c965b2c27d38` 及镜像仍保留。
-- [完整 CI 与模拟器运行记录](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42950190208)；39 项本地 unittest，另有定时器及加载窗口的原生 C/C++ 检查。
-- 真机证据：用户回报 `POLARIS_TMP_CHILD_OK shared=OK`、`POLARIS_TMP_OK create=OK dir=OK unlink=OK reuse=64`，且 tick 持续变化。上一轮已回报 CHILD_OK、PROC_OK 和持续心跳。没有真机寄存器转储或照片。
-- 工作区基线镜像：`/root/projects/xnu-polaris/artifacts/tmp-ready/`。ESP SHA256：`8bd741e37966bf9f829ef59f026298ebe39e4ca88af528ed5677180a66aeeb49`；旧镜像保留在 `artifacts/process-ready/`。
+- 源码基线：`c4081260dd52a6ccdbd3b4f99128b1f4e9c4025e`。前两轮基线 `ce50a4154caeaef5e4524b880cccfdb55c80f703`、`ef3cabf1aebb10301fb7b229b4a4c965b2c27d38` 及镜像仍保留。
+- [完整 CI 与模拟器运行记录](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42953408390)；41 项本地主机 unittest，另有定时器及加载窗口的原生 C/C++ 检查。
+- 真机证据：用户确认 `POLARIS_STRESS_OK total=1000 reaped=1000 maxlive=8`、`POLARIS_STRESS_CLEAN nochild=OK fd=OK tmp=OK cow=OK`，且 tick 持续变化；前几轮已确认 TMP_CHILD_OK、TMP_OK、CHILD_OK、PROC_OK 和持续心跳。没有真机寄存器转储或照片；内部进程/task/内存页计数仅在 QEMU 取证。
+- 工作区基线镜像：`/root/projects/xnu-polaris/artifacts/stress-ready/`。ESP SHA256：`bbeb0a04c639b7f2330c12f9e62710ceb9c8d94a3fc53883e10b4a4a69f7cb30`；旧镜像保留在 `artifacts/tmp-ready/` 和 `artifacts/process-ready/`。
 - 当前根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。尚无 Apple 用户态、交互输入、原生 UFS 或完整可写文件系统。
 - 目标 Apple 镜像先固定为 arm64 iPadOS 17.7.11（21H461，iPad7,1）；自制程序通过不等于该系统已兼容。
 
@@ -35,7 +35,7 @@
 | B2 | 定时等待、唤醒并继续执行 | 真机通过；IRQ 计数模拟取证 |
 | B3 | 用户代码、数据与栈映射 | 基本路径真机通过 |
 | B4 | C 入口栈 16 字节对齐 | 真机通过；已修复 SIGBUS |
-| B5 | fork 后父子私有内存隔离 | 单个 COW 自检真机通过 |
+| B5 | fork 后父子私有内存隔离 | 单个 COW 变量及四个独立 4 KiB 页各抽样字节的进程自检真机通过 |
 | B6 | 非法地址、只读页写入和执行权限错误处理 | 待验证 |
 | B7 | mmap/mprotect/munmap、缺页与大范围 COW | 待验证 |
 | B8 | FPU/NEON/SIMD 上下文保存恢复 | 待验证；当前程序禁用 SIMD |
@@ -50,8 +50,8 @@
 | C2 | stdout/stderr 与管道 stdin | 真机通过；stdin 为自测管道 |
 | C3 | fork/exec/exit/wait、PID/PPID、退出状态 | 真机通过：子进程 2、父进程 1、退出码 42 |
 | C4 | 描述符继承和共享 RAM 文件访问 | 真机通过 |
-| C5 | 多子进程并发、1,000 次创建回收，无僵尸和泄漏 | 200 串行 + 800 个分批子进程模拟通过；真机待确认；完整泄漏排查未完成 |
-| C6 | 跨进程管道、信号、阻塞 I/O、EINTR 和就绪通知 | 待验证 |
+| C5 | 多子进程并发、1,000 次创建回收，无僵尸和泄漏 | 200 串行 + 800 个分批子进程真机自检通过；内部链表仅模拟取证；完整泄漏排查未完成 |
+| C6 | 跨进程管道、信号、阻塞 I/O、EINTR 和就绪通知 | 管道屏障跨进程收发真机通过；其余待验证 |
 | C7 | Mach 消息、端口权限与生命周期、跨进程内存传递 | 待验证 |
 | C8 | 多线程、TLS、互斥锁、条件变量和信号量 | 待验证 |
 
@@ -66,7 +66,7 @@
 | D5 | 负偏移、超大长度、分配与用户拷贝失败 | 内核例程主机通过；完整真机故障注入待做 |
 | D6 | 动态文件/目录创建和目录遍历 | 普通文件创建和目录遍历真机通过；动态目录未实现 |
 | D7 | lseek、追加、截断、删除、重命名和元数据更新 | lseek、追加、截断和删除真机通过；重命名及完整元数据待做 |
-| D8 | 并发 I/O、空间耗尽、删除后回收的一致性 | 单进程容量耗尽、打开后删除及回收真机通过；并发待验证 |
+| D8 | 并发 I/O、空间耗尽、删除后回收的一致性 | 容量耗尽、打开后删除及回收真机通过；8 子进程各自临时文件和退出清理自检通过；同文件并发一致性待验证 |
 | D9 | 持久化、fsync、重启保留与断电恢复 | 未接入 |
 
 ## E. 签名与诊断
@@ -112,7 +112,7 @@
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
 | H1 | 连续 24 小时运行并记录心跳、内存与错误 | 仅短时运行通过 |
-| H2 | 1,000 次进程创建/执行/回收，资源占用可回归 | 模拟通过进程/task 回归、描述符和临时节点检查；真机待确认；完整内存回收未验证 |
+| H2 | 1,000 次进程创建/执行/回收，资源占用可回归 | 进程、描述符及临时节点自检真机通过；内部计数回归仅模拟取证；完整内存回收未验证 |
 | H3 | 文件操作完成后，10,000 次创建/读写/删除循环 | 本轮 64 轮真机通过；10,000 轮未测 |
 | H4 | 内存、空间和描述符耗尽后正确报错并恢复 | 有界 `/tmp` 名称/节点耗尽和恢复真机通过；全局内存和描述符耗尽未测 |
 | H5 | 故障注入后日志可取回、设备可恢复启动 | 部分具备诊断与 fastboot 恢复能力 |
@@ -160,7 +160,7 @@ QEMU 在短暂让出 CPU 后按固定里程碑读取真实进程、task、回收
 - `/tmp` 全程创建和删除计数均为 1,146（原有自测 114 + 子进程 1,000 + 最后的 32 个节点检查）；结束时 32 个节点均可再次分配。
 - 原始内核 SHA256：`cf1ebb044a82c6db0183c2f0872fa52f06d27f114106013312185789e614b2fd`；打包内核：`db0644cf2da1d9c4e17225a2e42343c7aa24655ac6c434755c4767e91c801d59`；128 MiB ESP：`bbeb0a04c639b7f2330c12f9e62710ceb9c8d94a3fc53883e10b4a4a69f7cb30`。镜像及报告在 `/root/projects/xnu-polaris/artifacts/stress-ready/`。
 - 最终打包镜像在独立 QEMU 显示检查中出现 STRESS_OK 和 STRESS_CLEAN，tick 由 4 增至 7。显示检查未使用 GDB 断点或来宾内存写入。
-- 真机于 2026-11-11 03:47 UTC 完成测试 ESP 写入并接受临时启动；等待用户确认 `POLARIS_STRESS_OK total=1000 reaped=1000 maxlive=8`、`POLARIS_STRESS_CLEAN nochild=OK fd=OK tmp=OK cow=OK` 和持续心跳。内核内部计数尚无真机转储。
+- 真机于 2026-11-11 03:47 UTC 完成测试 ESP 写入并接受临时启动；用户随后确认 `POLARIS_STRESS_OK total=1000 reaped=1000 maxlive=8`、`POLARIS_STRESS_CLEAN nochild=OK fd=OK tmp=OK cow=OK` 和持续心跳。本轮程序自检按用户回报画面验收通过；内核内部计数尚无真机转储，全局内存泄漏排查仍未完成。
 
 ## 后续顺序
 

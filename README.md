@@ -40,7 +40,9 @@ The process stress stage also passes [CI and QEMU](https://github.com/Clover2304
 results, inherited descriptors, exit-time temporary-file cleanup and four
 sampled COW pages. Quiescent process/task counts return to baseline with an
 empty zombie list. Whole-kernel memory leak freedom is not qualified.
-The exact ESP has been temporarily booted on the phone; screen confirmation is pending.
+The user confirmed `POLARIS_STRESS_OK`, `POLARIS_STRESS_CLEAN` and a continuously
+changing tick on the phone after temporary boot. Internal kernel resource
+counts are QEMU evidence; the physical acceptance uses the program's self-checks.
 
 ## English
 
@@ -132,7 +134,8 @@ RAM 根挂载、固定文件读写、fork/exec/exit/wait、退出状态和单个
 用户已确认真机出现 `TMP_CHILD_OK`、`TMP_OK`，且 tick 持续变化；本轮自检通过。
 完整清单和证据见[验收与基准测试计划](research/bringup-test-plan.md)。
 1,000 次进程创建/执行/回收（200 串行、800 个分批子进程）已通过 CI 和 QEMU，覆盖 0～63 号父进程描述符、退出时临时文件回收和四个 COW 页抽样。
-真机已临时启动压力镜像，等待画面确认；完整内存泄漏排查仍未完成。
+用户已确认真机出现 `STRESS_OK`、`STRESS_CLEAN`，且 tick 持续变化，本轮程序自检通过。
+内核内部资源计数仅在 QEMU 取证；完整内存泄漏排查仍未完成。
 Apple 用户态、交互输入、原生 UFS、触摸和 GPU 尚未接入。
 
 ### 本次移植期间发现并修复的两个通用 bug
