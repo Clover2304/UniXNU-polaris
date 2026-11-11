@@ -55,8 +55,8 @@ def grade_stress(report):
         return False
     return (all(final.get(n,0)-baseline.get(n,0)==1000 for n in ['_polaris_process_exec_checks','_polaris_child_signature_accepted']) and
             final.get('_nprocs')==baseline['_nprocs'] and final.get('_tasks_count')==baseline['_tasks_count'] and
-            final.get('_zombproc')==0 and final.get('_terminated_tasks_count')==baseline['_terminated_tasks_count'] and
-            final.get('_terminated_threads_count')==baseline['_terminated_threads_count'] and
+            final.get('_zombproc')==0 and final.get('_terminated_tasks_count',2**64)<=baseline['_terminated_tasks_count'] and
+            final.get('_terminated_threads_count',2**64)<=baseline['_terminated_threads_count'] and
             final.get('_polaris_tmp_creates')==final.get('_polaris_tmp_unlinks')==1146)
 
 

@@ -21,6 +21,8 @@ class StressTests(unittest.TestCase):
         bad=copy.deepcopy(report);bad['stress_samples'].pop(2);self.assertFalse(CHECK.grade_stress(bad))
         bad=copy.deepcopy(report);bad['stress_barrier']['_nprocs']=9;self.assertFalse(CHECK.grade_stress(bad))
         bad=copy.deepcopy(report);bad['stress_samples'][3]['_zombproc']=0x1234;self.assertFalse(CHECK.grade_stress(bad))
+        drained=copy.deepcopy(report);drained['stress_samples'][0].update(_terminated_tasks_count=1,_terminated_threads_count=1)
+        self.assertTrue(CHECK.grade_stress(drained)) # Pre-existing deferred work may drain too.
 
     def test_signed_stress_bundle_has_parent_observation_points_and_tmp_enabled(self):
         builder=module('stress_bundle',ROOT/'scripts/build-polaris-process.py')

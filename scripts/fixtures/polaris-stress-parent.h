@@ -24,6 +24,13 @@ static void stress_check_fd(u64 baseline)
 {
  s64 fd=open_file("/etc/message",0,80);
  process_require((u64)fd==baseline,80,(u64)fd);close_file(fd,80);stress_results[5]++;
+ /* This fixture's maximum live FD is below 64 (32 temporary files).
+  * Checking only the first free FD would miss a leaked higher descriptor. */
+ for(unsigned descriptor=0;descriptor<64;descriptor++) {
+  struct reply r=CALL(92,descriptor,1,0,0);
+  if(descriptor<baseline)process_require(!ERROR(r),80,descriptor);
+  else expect_error(r,9,80); /* EBADF */
+ }
 }
 static void stress_run(s64 state_fd)
 {
