@@ -109,7 +109,17 @@ response lengths, identifiers, guards and cleanup pass with no new SMMU fault.
 The device reports UFS 2.1; unit 0 reports 4 KiB blocks and a 59,064,188,928-byte
 capacity hint. Runtime self-checks and heartbeat pass without USB errors or lost
 logs. [Evidence](research/ufs-query-result.json) covers QUERY metadata only;
-PRDT payloads, SCSI capacity and block reads remain the next steps.
+The later PRDT/capacity result below extends this baseline; block reads remain pending.
+
+**Single-entry PRDT INQUIRY and READ CAPACITY now pass on source `88cf31d`.**
+The separate data page is above 4 GiB; both commands complete once with intact
+DMAs/guards and a stopped queue. Unit 0 has 14,419,968 4 KiB blocks,
+59,064,188,928 bytes, matching its descriptor. Baseline self-checks and heartbeat
+pass with zero USB errors or dropped logs. [Evidence](research/ufs-scsi-result.json)
+qualifies metadata DMA; no sector reads or media writes have been submitted.
+The Mac CI kernel and signature gate passed, with 70 local host tests and 15
+local runtime checks. EFI was unchanged and reused from the prior successful
+CI; current Linux CI failed at apt mirror DNS, so full CI is not claimed.
 
 Apple-input reuse is also being checked against the exact iPad7,1 / 17.7.11
 cache. [Input and static prelink results](research/apple-userland-reuse.md)
@@ -204,7 +214,8 @@ kernel+QEMU and ESP images. Pinned upstream revisions in
 The ten-boot and USB reconnect checks have passed on the captured baseline.
 [Read-only UFS controller identification](research/ufs-readonly-plan.md) now passes
 on one phone boot. Read-only inventory and one owned-queue NOP DMA also pass.
-DEVICE/UNIT-0 descriptors also pass. Next are PRDT payload validation, SCSI capacity and bounded media readback. Apple userland,
+DEVICE/UNIT-0 descriptors and single-entry PRDT INQUIRY/READ CAPACITY also pass.
+Next is bounded native sector/GPT readback. Apple userland,
 prelinked components and native display/touch remain later stages. The full
 history of both chains is in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -223,13 +234,15 @@ RAM 根挂载、固定文件读写、fork/exec/exit/wait、退出状态和单个
 用户已确认真机出现 `STRESS_OK`、`STRESS_CLEAN`，且 tick 持续变化，本轮程序自检通过。
 内核内部资源计数仅在 QEMU 取证；完整内存泄漏排查仍未完成。
 原生 XNU 轮询 USB CDC 已在真机枚举为 `1209:0001`，主机完成 ping、随机串往返、构建身份核对和运行日志取回，包含原有进程与文件系统自检成功标记。
-USB 基线支持 `ping/echo/status/log/help`，UFS 测试版另有 `ufs`、`ufs-map` 、`ufs-nop` 和 `ufs-query` 缓存诊断命令。USB 基线曾在一轮整机启动和十次 USB/IP 重连中命令错误计数保持零，每轮覆盖半条旧命令的清除；不支持的控制请求被 STALL 后，下一条正常控制请求及数据往返恢复，未新增总线复位。
+USB 基线支持 `ping/echo/status/log/help`，UFS 测试版另有 `ufs`、`ufs-map` 、`ufs-nop` 、`ufs-query` 和 `ufs-scsi` 缓存诊断命令。USB 基线曾在一轮整机启动和十次 USB/IP 重连中命令错误计数保持零，每轮覆盖半条旧命令的清除；不支持的控制请求被 STALL 后，下一条正常控制请求及数据往返恢复，未新增总线复位。
 随后约 53 秒完成 256 次、1～250 字符的往返，无新增错误或回复溢出。固件 PHY 未就绪时在端点初始化前恢复 QUSB2。
 同镜像十轮整机启动已通过身份、自检、持续心跳及零 USB 命令错误校验：8 轮按热启动指令执行、1 轮按用户确认关机后上电、首轮进入方式未单独分类。[逐轮日志哈希](research/usb-boot-series.json)已保存；该十轮记录仍属于 `7e3fa6f` 基线。新 `c5dbce2` 已完成一轮[原生 UFS 控制器只读识别](research/ufs-readonly-plan.md)：UFSHCI 2.1，原有自检与持续心跳通过，UFS 介质访问仍待实现。
 新增 `9f1401c1` 已完成一轮队列/SMMU 只读盘点：候选 SID `0x100～0x10f` 位于共享 bank 2，与 USB bank 4 不同，寄存器采样稳定；固件传输队列仍运行、两个 doorbell 均为零。原有自检和持续心跳通过，USB 错误及日志丢失均为零。[证据](research/ufs-queue-smmu-snapshot.json)已保存，作为下一轮 NOP 的前置证据。
 `1d38b035` 已在一轮真机启动中完成自有队列单次 NOP：16 KiB 缓冲位于 `0x1023bc000`，高于 4 GiB；OCS=0、NOP IN/tag 和保护区校验通过，最终传输队列停止、页面保留。SMMU 配置未写，原有自检/持续心跳和 USB 正常。[结果](research/ufs-nop-result.json)只证明本次描述符/响应 DMA；PRDT、介质读取仍待验证。
 日志限于控制台打开后的 64 KiB RAM 环，早期启动和持久化崩溃日志未完成。
 `9feeaca` 已完成一轮只读设备/UNIT 0 描述符查询：[结果](research/ufs-query-result.json)记录 UFS 2.1、4 KiB 块及约 59.06 GB 容量线索，队列停止与原有自检、心跳和 USB 均通过；PRDT、SCSI 容量与实际扇区读取仍待验证。目标 Apple 输入与已有预链接工具的静态复用核对见[盘点](research/apple-userland-reuse.md)。
+
+`88cf31d` 已在普通重启中通过单项 PRDT INQUIRY/READ CAPACITY：4 KiB 块、59,064,188,928 字节容量与描述符一致，高于 4 GiB 的独立数据页 DMA、保护区、队列停止和原有自检/心跳通过，USB 错误与日志丢失为零。[结果](research/ufs-scsi-result.json)仅覆盖元数据；下一轮为有界扇区/GPT 读回。Mac CI 内核通过，70 项本地主机测试、15 项本地运行验收通过；Linux CI 因软件源 DNS 故障未通过，EFI 复用来源已明确记录。
 
 Apple 用户态、用户态终端输入、UFS 介质访问、触摸和 GPU 尚未接入。
 

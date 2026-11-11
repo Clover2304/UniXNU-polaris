@@ -23,11 +23,11 @@ python3.11 scripts/check-uefi-usb-storage.py \
   --out /path/to/new-read-only-record
 ```
 
-`scripts/update-uefi-usb-esp.py` 接收 `prepare-usb-test.py` 生成的已通过 CI/QEMU 验收的 ready 目录。它先在本地 ESP 中重建 EFI 文件树，检查源文件清单与哈希、FAT、一一提取的文件及启动卷几何，再计算改变的块。默认只预览，`--apply` 才更新 userdata 开头 128 MiB 内对应的块；改动量最多 96 MiB。完成后完整直接回读，失败时尝试恢复改变的块，原 ESP 副本保留在记录目录。
+`scripts/update-uefi-usb-esp.py` 接收 `prepare-usb-test.py` 生成、已通过运行验收的 ready 目录。CI 和本地验收分别记录来源；镜像必须通过原有基线及拒绝控制，不以构建成功代替运行检查。它先在本地 ESP 中重建 EFI 文件树，检查源文件清单与哈希、FAT、一一提取的文件及启动卷几何，再计算改变的块。默认只预览，`--apply` 才更新 userdata 开头 128 MiB 内对应的块；改动量最多 96 MiB。完成后完整直接回读，失败时尝试恢复改变的块，原 ESP 副本保留在记录目录。
 
 ```sh
 python3.11 scripts/update-uefi-usb-esp.py \
-  --ready /path/to/ci-qualified-ready \
+  --ready /path/to/qualified-ready \
   --expected-image /path/to/current-verified-esp.img \
   --out /path/to/new-update-record
 ```
@@ -59,8 +59,12 @@ fastboot flash boot /path/to/original-boot.img
 
 ## 首轮实际文件更新与启动结果
 
-通过上述文件更新工具重建 EFI 文件树，并把唯一启动项标题改为 `polaris: USB UPDATE VERIFIED`。内核、ADT、根镜像、EFI 程序和全部启动参数保持同一已验收基线，文件逐一回读核对。实际写入 19,128,320 字节的改变块，随后完整 128 MiB 直接回读一致；当前 ESP SHA256 为 `87deb85d398cc846fb72d8486b7803403151dce7a35f95017dbff730126887a2`。这一步更新的是文件内容和 FAT 分配信息，未向手机重新传输整张 ESP 镜像。
+通过上述文件更新工具重建 EFI 文件树，并把唯一启动项标题改为 `polaris: USB UPDATE VERIFIED`。内核、ADT、根镜像、EFI 程序和全部启动参数保持同一已验收基线，文件逐一回读核对。实际写入 19,128,320 字节的改变块，随后完整 128 MiB 直接回读一致；该轮 ESP SHA256 为 `87deb85d398cc846fb72d8486b7803403151dce7a35f95017dbff730126887a2`。这一步更新的是文件内容和 FAT 分配信息，未向手机重新传输整张 ESP 镜像。
 
 普通重启中用户确认新标题生效，原生 CDC 重新接入后取回 5,530 字节运行日志，SHA256 `df3fa4442d8a8aa97b81220a870be573128bae9f507f2b7d1f326afe5d2fcf88`。基线自检、UFS 查询与持续心跳通过。这是默认启动链和 USB 文件更新验收，不代表换用了新的内核源码版本。
 
 主机工具专项 7 项测试通过，覆盖 GPT 主备 CRC/表一致性、重复/缺失/重叠分区、目标分区显式选择、非块设备拒绝、改变块对齐与写入上限、路径穿越/外部符号链接拒绝，以及只改标题时启动参数不变。安装、更新预览和本机读写/回读也已分别实测。原始证据与备份只保留本地，仓库保存必要摘要。
+
+## 当前运行镜像
+
+最新成功源码 `88cf31d` 已通过同一路径更新并普通重启，PRDT INQUIRY/READ CAPACITY 及基线自检、心跳、USB 通过。当前 expected image 为工作区 `private/ufs-scsi-padding-deploy/update/updated-esp.img`，SHA256 `6d80d80a7d40e5f958560c57fd29976d099e228dd02b0ad8c40dca60314a2f4b`；后续更新必须匹配这份实际启动卷。内核 Mac CI、本地 15 项运行验收与未变更 EFI 的来源见 [结果](ufs-scsi-result.json)，同轮 Linux CI 的 DNS 故障不记为完整 CI 成功。

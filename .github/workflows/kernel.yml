@@ -89,9 +89,7 @@ jobs:
           name: efi-results
           path: out/efi
       - name: Tools
-        run: |
-          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
-          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --no-install-recommends -y qemu-system-arm qemu-efi-aarch64 clang llvm lld
+        run: python3 scripts/ensure-linux-tools.py --profile native
       - name: QEMU native platform check
         if: env.POLARIS_DEFCONFIG != 'polaris_prelink_defconfig'
         run: python3 scripts/check-platform-kernel.py --kernel out/kernel/kernel.macho --efi out/efi

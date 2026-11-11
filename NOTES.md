@@ -1,6 +1,32 @@
 # UniXNU-polaris handoff notes
 
 
+## 2026-11-11: SCSI PRDT metadata and capacity verified
+
+Current running source is `88cf31dc88bcdc966824c3ecfbfc7eec4ed32081`.
+A normal restart after the USB file update passed INQUIRY and READ CAPACITY(10)
+via a one-entry PRDT and separate data page above 4 GiB. Unit 0 has 14,419,968
+4 KiB blocks (59,064,188,928 bytes); baseline checks and heartbeat pass with
+zero USB errors or log loss. No sector read or media write has been issued.
+See `research/ufs-scsi-result.json` and `research/ufs-readonly-plan.md`.
+
+Mac CI kernel/signature-gate checks passed. Linux CI was blocked by apt mirror
+DNS failures; complete local host and 15 runtime checks passed using that exact
+kernel and the unchanged EFI binaries from the previous successful CI. This
+is not recorded as complete CI success. The rejected NUL-padding attempt is
+preserved separately.
+
+Current phone ESP: `../private/ufs-scsi-padding-deploy/update/updated-esp.img`,
+SHA256 `6d80d80a7d40e5f958560c57fd29976d099e228dd02b0ad8c40dca60314a2f4b`.
+Ready package: `../artifacts/ufs-scsi-padding-ready/`. The older images below
+are historical baselines. Continue with bounded READ(10) and GPT readback.
+
+Linux tool preparation now reuses installed versioned LLVM, installs only missing
+packages with bounded apt operations and bypasses the broken runner mirror
+indirection while preserving package signature verification. The independent
+`ci/polaris-linux-tools` run 43043993659 passed host checks; its EFI job remains
+pending. This does not replace the failed Linux jobs of the kernel build run.
+
 ## 2026-11-11: default edk2 startup and USB file updates verified
 
 The user explicitly selected installing the already-tested edk2 image to boot.
@@ -13,7 +39,7 @@ Use SimpleInit → Mass Storage (`05f9:1234`) to expose the phone for host file
 updates, then restart normally. The bundled Linux helper exports storage only,
 without a fastboot/reboot interface; XNU also has no USB reboot command yet.
 Routine updates no longer require entering Android fastboot or flashing the
-whole ESP. Current ESP SHA256 is
+whole ESP. The initial default-boot test ESP SHA256 was
 `87deb85d398cc846fb72d8486b7803403151dce7a35f95017dbff730126887a2`.
 The host-side current image is
 `../private/edk2-usb-menu-test/file-update/updated-esp.img`.

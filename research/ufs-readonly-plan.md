@@ -1,6 +1,6 @@
 # Polaris 原生 UFS 只读识别与后续计划
 
-当前源码 `9feeaca4f7e9d0b8352c2ce0c86434824c681114` 已在真机完成自有队列上的一次 NOP OUT/IN，以及 DEVICE 和 UNIT 0 两次 READ_DESCRIPTOR：描述符、请求和响应在高于 4 GiB 的物理内存中经 DMA 验证。原有 RAM 根、进程/文件系统压力自检与 USB 通道通过。介质读取、PRDT 数据负载、精确硬件 SID 和长期独占所有权仍未验证。
+当前源码 `88cf31dc88bcdc966824c3ecfbfc7eec4ed32081` 已在真机完成自有队列 NOP、DEVICE/UNIT 0 READ_DESCRIPTOR，以及独立 PRDT 数据页上的 INQUIRY 和 READ CAPACITY(10)。4 KiB 块、59,064,188,928 字节容量与描述符一致，原有 RAM 根、进程/文件系统压力自检、变化心跳与 USB 均通过。实际扇区读取、精确硬件 SID 和长期独占所有权仍未验证。
 
 首轮控制器识别 `c5dbce2`、只读队列/SMMU 盘点 `9f1401c` 和十轮启动的 USB 基线 `7e3fa6f` 均保留。当前 NOP 成功镜像只验证一轮启动、一次命令；此前 `5670f6c` 被 FSR 判断误拦，未提交命令，记录单独保留。
 
@@ -164,7 +164,7 @@ READ CAPACITY(10)（8 字节），LUN/tag 0，无 VPD、PMI 或任意 CDB 接口
 本地主机 70 项 unittest、定时器和加载窗口检查通过，其中新的独立
 CPU/device DMA 模型核对字节级 UTRD/CDB/PRDT，模拟数据页未 invalidate、
 数据未返回、坏 PRDT/保护区、CHECK CONDITION、错误 residual、超时及清理失败。
-当前候选仍待完整 CI 与真机验收，不能提前记为 PRDT 或容量验证通过。
+首版与修正版的实际验收分别记录在下方；完整 CI 与本地/真机验收不混记。
 这一轮仍不读取扇区，不写介质。后续使用已知 ESP 数据做有界扇区读回。
 
 真机部署沿用 [默认 edk2 与 USB 文件更新](uefi-usb-update.md)，保留当前成功
@@ -184,4 +184,34 @@ SCSI GOOD、residual=0，PRDT/保护区与停止状态通过，SMMU 未变化且
 修正版逐字段允许 ASCII 前缀及仅由 NUL/空格构成的尾部；拒绝 NUL 后再次出现
 非空格文本及其他控制/非 ASCII 字节。数据区初始化改为非 ASCII 哨兵，确保
 仅部分更新文本字段尾部也被拒绝。实测字节已加入主机和实际 C++ 传输模型回归。
-仍需重编译和新一轮真机验收，容量与扇区读取资格未改变。
+随后已重编译并完成以下新一轮真机验收；扇区读取仍待验证。
+
+
+### 第五轮修正版：PRDT 与 SCSI 容量真机通过
+
+源码 `88cf31d` 经 USB EFI 文件更新后普通重启成功，三次独立 USB 采样返回
+相同的启动缓存，未重发 SCSI 命令。INQUIRY 的 36 字节与 READ CAPACITY 的
+8 字节均在高于 4 GiB 的独立数据页经单项 PRDT DMA 返回；OCS=0、SCSI GOOD、
+residual=0、保护区完整，队列停止且 doorbell=0。返回设备 `SKhynix` /
+`H28U74301AMR` / `D003`；容量为 14,419,968 个 4 KiB 块，合计
+59,064,188,928 字节，与 UNIT 0 描述符一致。
+
+两条 SCSI 命令共 6 次 MMIO 写入、2 次 doorbell，无 SMMU 写入、扇区命令或
+介质写命令。SMMU global FSR 保持 0、bank FSR 保持已有 FORMAT=0x400；
+未出现新增故障位。PID 1、RAM 文件、子进程、1,000 次进程自检与变化心跳均通过，
+USB 错误、回复溢出和日志丢失均为零。[脱敏证据](ufs-scsi-result.json)保留精确哈希。
+
+构建来源：Mac CI 完成内核和实际签名门检查；EFI 复用源码未变更的 `a05b083`
+成功 CI 二进制。本地 70 项 unittest、定时器/窗口 ASan/UBSan、15 项 QEMU 运行与
+拒绝控制、最终打包画面均通过（QEMU 6.2 使用 CPU=max，画面心跳 4→7）。
+同轮 GitHub Linux 任务因 Ubuntu 软件源 DNS 故障失败，未记为完整 CI 通过。
+本地组装及旧 EFI 来源明确保存在结果中；该故障不作为驱动运行结果解释。
+
+### 下一轮：首个有界原生扇区读取
+
+先固定 READ(10) 的 LUN 0、单次 4 KiB、LBA 0/1 及 GPT 所需的有界表区间，
+不提供任意 CDB 或写接口。与 Mass Storage 阶段保存的只读参考逐字节/哈希比对，
+检查 GPT 签名、头与表 CRC、LBA/容量及分区边界。依次验证请求、DMA 数据、保护区、
+停止状态和故障位；失败即停止，无自动重试。先在主机 CPU/device DMA 模型和
+打包镜像验收，再通过同样的 USB 文件更新及普通重启进行真机测试。
+本轮继续使用 RAM 根；完成扇区读回后，再进入只读块设备/文件系统与 Apple 输入加载。
