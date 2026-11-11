@@ -16,8 +16,16 @@ access, fixing the real-phone SIGBUS that the QEMU run did not expose.
 
 The framebuffer is inherited from firmware. There is no Apple userland,
 interactive input, persistent XNU storage, native touch/display/GPU driver or
-daily-usable system. The named multi-file root and second-process stage is
-under development and is qualified separately from the working resident init.
+daily-usable system. The named-root and second-process stage is also verified by the user-reported
+phone screen: `POLARIS_CHILD_OK pid=2 ppid=1`,
+`POLARIS_PROC_OK child=2 exit=42 reaped=1 cow=OK`, and a changing
+`POLARIS_PROC_LIVE` counter. Init forks and execs the independently signed
+`/bin/probe`, the child reads `/etc/message` and updates shared RAM state,
+then init reaps exit status 42 and checks private-memory copy-on-write.
+[Source build and rejection checks](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42943892037)
+passed before the temporary physical boot. The tree has ten boot-defined entries
+(five directories, five files); only one fixed 4 KiB state file is writable.
+Runtime file creation and a general-purpose writable filesystem are not implemented.
 
 ## English
 
@@ -37,7 +45,7 @@ This repository moves the port onto UniXNU's build driver and boot chain:
 | Build | macOS CI wrapping blacktop/darwin-xnu-build | `scripts/build-platform-kernel.py` on UniXNU `37987aea` |
 | Boot | boot.img → custom shim → kernel | edk2-msm (Renegade) firmware → UniXNU → DarwinBoot → payload kernel.macho |
 | ADT | iPhone X identity, ABL framebuffer/UFS nodes | platform ADT, `darwinboot-memory-range`, no Apple identity |
-| Root | iOS 16 userland on UFS/HFS+ | mockfs RAM root and own resident init; bounded RAM writes |
+| Root | iOS 16 userland on UFS/HFS+ | named mockfs RAM root, own init and child; bounded RAM writes |
 | CPU | cpus=4 proven (A55 0-3); A75 4-7 never observed | same topology; prefix check migrated; scheduler proven on hardware |
 
 ### Implemented and verified
