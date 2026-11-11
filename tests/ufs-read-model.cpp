@@ -6,7 +6,7 @@
 #include <vector>
 struct ReadPeer {
     enum Mode { Good, Timeout, WrongType, CheckCondition, Residual, NoInvalidate,
-        DataMissing, PartialData, Overrun, CorruptPrdt, NoStop, NoStart, Changed, ReadFailure } mode=Good;
+        DataMissing, PartialData, Overrun, CorruptPrdt, NoStop, NoStart, Changed, SenseTooLong, ReadFailure } mode=Good;
     uint64_t pa=0x102000000ULL;
     PolarisUfsNopResult owned;
     PolarisUfsDescriptor unit;
@@ -30,6 +30,7 @@ struct ReadPeer {
         auto *p=device+UFS_NOP_RSP;std::memset(p,0,34);p[0]=mode==WrongType?0x36:0x21;
         if(mode==Residual)p[15]=1;
         if(mode==CheckCondition){p[7]=2;p[11]=20;p[33]=18;std::memset(p+34,0,18);p[34]=0x70;p[36]=6;p[46]=0x29;}
+        if(mode==SenseTooLong){p[7]=2;p[11]=20;p[32]=p[33]=0xff;}
         unsigned lba=device[UFS_NOP_UCD+21];
         if(mode!=DataMissing)for(unsigned i=0;i<(mode==PartialData?4095u:4096u);i++)device[UFS_SCSI_DATA+i]=expected(lba,i);
         if(mode==Overrun)device[UFS_SCSI_DATA+4096]^=1;
@@ -99,6 +100,7 @@ int main() {
             assert(sector.data[4095]!=ReadPeer::expected(3,4095));
         } else assert(r.state!=PolarisUfsScsiResult::Success);
         assert(f.submissions<=1);
+        assert(r.senseLength<=sizeof(r.sense));
         if(mode==ReadPeer::Timeout)assert(r.polls==5000 && r.finalDb==1 && r.stopped);
         if(mode==ReadPeer::CheckCondition)assert(r.senseLength==18 && r.sense[2]==6);
         if(mode==ReadPeer::NoStart || mode==ReadPeer::ReadFailure)assert(f.submissions==0);

@@ -99,8 +99,9 @@ static inline PolarisUfsScsiResult::State polaris_ufs_scsi_parse(PolarisUfsScsiR
     r.flags=p[1];r.response=p[6];r.status=p[7];r.segment=polaris_ufs_be16(p+10);r.residual=polaris_ufs_be32(p+12);
     if(p[0]!=0x21 || p[2] || p[3] || p[6] || p[8] || r.segment>20 || r.segment==1)return PolarisUfsScsiResult::ResponseError;
     if(r.segment) {
-        r.senseLength=polaris_ufs_be16(p+32);
-        if(r.senseLength>18 || r.senseLength+2!=r.segment)return PolarisUfsScsiResult::ResponseError;
+        unsigned senseLength=polaris_ufs_be16(p+32);
+        if(senseLength>sizeof(r.sense) || senseLength+2!=r.segment)return PolarisUfsScsiResult::ResponseError;
+        r.senseLength=senseLength;
         for(unsigned i=0;i<r.senseLength;i++)r.sense[i]=p[34+i];
     }
     // Error status is diagnostic only. Never retry, issue REQUEST SENSE or
