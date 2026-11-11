@@ -1,6 +1,18 @@
 # UniXNU-polaris handoff notes
 
 
+## 2026-11-11: alternate Ubuntu dependency mirrors for the next build
+
+Linux tool preparation now tries MIT, kernel.org and the Ubuntu archive in that
+order, while still reusing installed tools. Each mirror has its own source file
+and fresh package indexes; failed updates cannot fall back to old Azure URLs.
+All pockets, including security, require the Ubuntu archive signing keyring.
+Each apt command is bounded to 180 seconds with a five-second forced-stop grace;
+update/download failures advance to the next mirror. No global apt sources are
+rewritten. Three failure-recovery tests pass, covering update failure, download
+timeout and exhaustion of all mirrors. The actual next CI download remains to
+be verified; historical failed runs keep their recorded status.
+
 ## 2026-11-11: SCSI PRDT metadata and capacity verified
 
 Current running source is `88cf31dc88bcdc966824c3ecfbfc7eec4ed32081`.

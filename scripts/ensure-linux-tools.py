@@ -3,9 +3,60 @@
 import argparse
 import os
 from pathlib import Path
+import platform
+import re
 import shutil
 import subprocess
 import tempfile
+
+
+APT_MIRRORS = (
+    'https://mirrors.mit.edu/ubuntu',
+    'https://mirrors.edge.kernel.org/ubuntu',
+    'https://archive.ubuntu.com/ubuntu',
+)
+UBUNTU_KEYRING = Path('/usr/share/keyrings/ubuntu-archive-keyring.gpg')
+
+
+def install_packages(packages, work):
+    release = platform.freedesktop_os_release()
+    codename = release.get('VERSION_CODENAME', '')
+    architecture = subprocess.check_output(['dpkg', '--print-architecture'], text=True).strip()
+    if release.get('ID') != 'ubuntu' or not re.fullmatch('[a-z][a-z0-9]*', codename) or architecture != 'amd64':
+        raise SystemExit('Linux CI dependency installation requires Ubuntu amd64')
+    if not UBUNTU_KEYRING.is_file():
+        raise SystemExit('Ubuntu archive signing keyring is missing')
+    work.chmod(0o755)
+    for index, mirror in enumerate(APT_MIRRORS):
+        attempt = work / f'apt-{index}'
+        attempt.mkdir(mode=0o755)
+        lists = attempt / 'lists'
+        lists.mkdir(mode=0o755)
+        source = attempt / 'ubuntu.sources'
+        source.write_text(
+            f'Types: deb\nURIs: {mirror}\n'
+            f'Suites: {codename} {codename}-updates {codename}-security\n'
+            'Components: main restricted universe multiverse\n'
+            f'Architectures: {architecture}\nSigned-By: {UBUNTU_KEYRING}\n')
+        source.chmod(0o644)
+        # Isolate both sources and indexes: failed updates cannot reuse the
+        # runner's stale Azure-mirror package URLs. Keep Ubuntu signatures.
+        apt = ['sudo', 'timeout', '--kill-after=5s', '180s', 'apt-get',
+               '-o', f'Dir::Etc::sourcelist={source}', '-o', 'Dir::Etc::sourceparts=-',
+               '-o', f'Dir::State::lists={lists}', '-o', 'APT::Update::Error-Mode=any',
+               '-o', 'Acquire::Retries=0', '-o', 'Acquire::ForceIPv4=true',
+               '-o', 'Acquire::http::Timeout=15', '-o', 'Acquire::https::Timeout=15']
+        print(f'Ubuntu dependency mirror {index + 1}/{len(APT_MIRRORS)}: {mirror}', flush=True)
+        try:
+            subprocess.run([*apt, 'update'], check=True, timeout=195)
+            subprocess.run([*apt, 'install', '--no-install-recommends', '-y', *packages],
+                           check=True, timeout=195)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            print(f'Mirror attempt failed ({type(error).__name__}); trying the next mirror', flush=True)
+            continue
+        print('Dependencies installed through ' + mirror, flush=True)
+        return
+    raise SystemExit('All Ubuntu dependency mirrors failed; no unsigned packages or stale indexes accepted')
 
 
 def main():
@@ -47,25 +98,8 @@ def main():
 
     packages = missing()
     if packages:
-        # Replace only the runner's Ubuntu mirror indirection. Signed-By and
-        # normal apt signature verification stay intact.
-        sources = [Path('/etc/apt/sources.list'), *Path('/etc/apt/sources.list.d').glob('*.list'),
-                   *Path('/etc/apt/sources.list.d').glob('*.sources')]
-        for path in sources:
-            if not path.is_file():
-                continue
-            before = path.read_text()
-            after = before.replace('mirror+file:/etc/apt/apt-mirrors.txt', 'https://archive.ubuntu.com/ubuntu')
-            after = after.replace('mirror+file:/etc/apt/apt-mirrors-security.txt', 'https://security.ubuntu.com/ubuntu')
-            after = after.replace('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
-            if after != before:
-                subprocess.run(['sudo', 'tee', str(path)], input=after, text=True,
-                               stdout=subprocess.DEVNULL, check=True, timeout=15)
-        apt = ['sudo', 'apt-get', '-o', 'Acquire::Retries=1', '-o', 'Acquire::ForceIPv4=true',
-               '-o', 'Acquire::http::Timeout=15', '-o', 'Acquire::https::Timeout=15']
         print('Installing missing tool packages:', ', '.join(packages), flush=True)
-        subprocess.run([*apt, 'update'], check=True, timeout=240)
-        subprocess.run([*apt, 'install', '--no-install-recommends', '-y', *packages], check=True, timeout=240)
+        install_packages(packages, aliases)
         if missing():
             p.error('tools still missing after package installation: ' + ', '.join(missing()))
     else:
