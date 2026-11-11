@@ -52,10 +52,10 @@ struct TerminalSession {
     size_t pending=0;
 };
 static void respond(TerminalSession &s,const char *text) {
-    if(!s.reply.append(text,strlen(text)))polaris_usb_stats[8]++;
+    if(!s.reply.append(text,strlen(text)))polaris_usb_stats[8]=polaris_usb_stats[8]+1;
 }
 static void handleCommand(TerminalSession &s,const char *command) {
-    polaris_usb_stats[5]++;
+    polaris_usb_stats[5]=polaris_usb_stats[5]+1;
     char text[512];
     if(!strcmp(command,"ping"))respond(s,"POLARIS_PONG\n");
     else if(!strncmp(command,"echo ",5)) {
@@ -83,7 +83,7 @@ static void handleCommand(TerminalSession &s,const char *command) {
             bytes=(head-cursor)<sizeof(s.logScratch)?static_cast<size_t>(head-cursor):sizeof(s.logScratch);
             for(size_t i=0;i<bytes;i++)s.logScratch[i]=gLog.data[(cursor+i)%65536];
             IOSimpleLockUnlockEnableInterrupt(gLogLock,state);
-            if(!s.reply.append(s.logScratch,bytes)){polaris_usb_stats[8]++;break;}
+            if(!s.reply.append(s.logScratch,bytes)){polaris_usb_stats[8]=polaris_usb_stats[8]+1;break;}
             cursor+=bytes;
         }
         snprintf(text,sizeof(text),"\nPOLARIS_LOG_END end=%llu dropped=%llu\n",head,dropped);respond(s,text);
@@ -115,7 +115,7 @@ static bool prepareSmmu(UsbHw &hw) {
     int freeSlot=-1;
     for(unsigned i=0;i<count;i++) {
         uint32_t smr=hw.smmu[(0x800+4*i)/4],s2cr=hw.smmu[(0xc00+4*i)/4];
-        if(!(smr&0x80000000u)){if(freeSlot<0)freeSlot=i;continue;}
+        if(!(smr&0x80000000u)){if(freeSlot<0)freeSlot=static_cast<int>(i);continue;}
         uint32_t mask=(smr>>16)&0x7fff;
         if(((smr^0x740u)&0xffffu&~mask)!=0)continue;
         hw.smmuOrigSmr=smr;hw.smmuOrigS2cr=s2cr;

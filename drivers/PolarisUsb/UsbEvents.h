@@ -57,13 +57,13 @@ static void handleDepEvent(TerminalSession &s, uint32_t ev) {
             if(result==PolarisLine::Ready)handleCommand(s,line);
             else if(result==PolarisLine::TooLong)s.reply.append("ERR line-too-long\n",18);
         }
-        polaris_usb_stats[6]+=got;
+        polaris_usb_stats[6]=polaris_usb_stats[6]+got;
         armBulkOut(hw);
         return;
     }
 
     if (dep == 3u && kind == DWC3_DEPEVT_XFERCOMPLETE) {
-        polaris_usb_stats[7]++;
+        polaris_usb_stats[7]=polaris_usb_stats[7]+1;
         hw.ep3Busy   = false;
         hw.ep3RscIdx = 0u;
         return;

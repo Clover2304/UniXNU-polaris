@@ -20,7 +20,7 @@ static int epCmd(UsbHw &hw, unsigned dep, uint32_t cmd, uint32_t p0, uint32_t p1
     }
     if (drop) hw.wr(DWC3_GUSB2PHYCFG(0), cfg);
     hw.lastCmdSt = st;
-    if(st) polaris_usb_stats[3]++;
+    if(st) polaris_usb_stats[3]=polaris_usb_stats[3]+1;
     return st;
 }
 
