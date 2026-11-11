@@ -1,0 +1,65 @@
+{
+  "passed": true,
+  "scope": "extracted actual CodeDirectory page-size gate only",
+  "source_sha256": "a727aaafa46e22e6f573f877c3c2ca2a9558ee67de54af8bb611ee8fe8db74ec",
+  "gate_sha256": "b96159d52cdeec41af1ed10d4559855c20325efccc8e76d816baf8869580c3fd",
+  "cases": [
+    {
+      "kernel_page_shift": 12,
+      "signature_page_shift": 12,
+      "integrity_cache_enabled": false,
+      "accepted": true
+    },
+    {
+      "kernel_page_shift": 12,
+      "signature_page_shift": 14,
+      "integrity_cache_enabled": false,
+      "accepted": false
+    },
+    {
+      "kernel_page_shift": 14,
+      "signature_page_shift": 12,
+      "integrity_cache_enabled": false,
+      "accepted": true
+    },
+    {
+      "kernel_page_shift": 14,
+      "signature_page_shift": 14,
+      "integrity_cache_enabled": false,
+      "accepted": true
+    },
+    {
+      "kernel_page_shift": 12,
+      "signature_page_shift": 12,
+      "integrity_cache_enabled": true,
+      "accepted": true
+    },
+    {
+      "kernel_page_shift": 12,
+      "signature_page_shift": 14,
+      "integrity_cache_enabled": true,
+      "accepted": true
+    },
+    {
+      "kernel_page_shift": 14,
+      "signature_page_shift": 12,
+      "integrity_cache_enabled": true,
+      "accepted": true
+    },
+    {
+      "kernel_page_shift": 14,
+      "signature_page_shift": 14,
+      "integrity_cache_enabled": true,
+      "accepted": true
+    }
+  ],
+  "complete_signature_validator_verified": false,
+  "apple_binary_executed": false,
+  "hardware_verified": false,
+  "kernel_configuration_changed": false,
+  "common_revision": "37987aea410691df3c1e0e146a1bfd6127932149",
+  "input_kind": "staged patched Darwin 23 source; full source hash recorded",
+  "target": "iPadOS 17.7.11 / iPad7,1",
+  "current_build_script_default_integrity_cache_mode": 0,
+  "apple_binary_signature_granule_inspected": false
+}

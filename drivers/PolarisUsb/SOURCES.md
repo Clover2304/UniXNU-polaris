@@ -84,6 +84,28 @@ not part of `ARM_SMMU_CB_FSR_FAULT` (`0xc00001fe`). Both kernel and evidence
 grader now test that fault mask while preserving raw FSR values. FORMAT-only
 values 0/0x200/0x400/0x600 are covered alongside every real context fault bit.
 
+## Read-only descriptor queries
+
+`UfsQuery.h` reuses the NOP-owned stopped queue, UTRD layout and explicit cache
+callbacks. `polaris-ufs-query=1` additionally enables one READ_DESCRIPTOR for
+DEVICE (IDN 0) and one for UNIT index 0 (IDN 2), selector 0. The request is
+QUERY REQUEST 0x16, STANDARD READ REQUEST 0x01, opcode 0x01, maximum length
+255. Descriptor data arrives after the 32-byte QUERY RESPONSE UPIU (0x36),
+inside the existing 512-byte response area; there is no PRDT or sector I/O.
+The frozen Linux revision's `ufshcd.c` query composition/copy functions and
+[scsi_bsg_ufs.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/uapi/scsi/scsi_bsg_ufs.h)
+provide the header/OSF byte layout. `ufs.h` supplies descriptor field offsets.
+
+Each command checks ownership/base/status before touching memory, accepts only
+these two read IDs, performs at most one doorbell submission, and requests stop
+after completion or failure. It checks OCS, response type/result/tag, opcode,
+IDN/index/selector, segment/OSF lengths, descriptor bLength/type, unit geometry
+and guards. OSF length must cover actual descriptor bytes and fit the request.
+No string descriptor, device flag/attribute/configuration write, RPMB, queue
+pointer traversal or automatic retry is supported. `ufs-query` returns a cached
+boot result. Public summaries omit raw descriptor bytes and retain only hashes
+and necessary capability fields; UNIT geometry is a hint until SCSI validation.
+
 The DWC3 transfer state machine, register definitions, DMA cache helpers and
 CDC descriptors are adapted from Denis0x00/UniXNU-j716f at
 `bf2d0f32f706adbe414551e452f1426ed7c4bd19`, files

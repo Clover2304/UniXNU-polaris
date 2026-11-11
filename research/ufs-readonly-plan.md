@@ -127,3 +127,7 @@ doorbell 在第 2 次轮询中归零，这只是功能完成记录，不作为�
 ### 下一轮：只读设备查询，再验证数据负载
 
 先在已验证的自有队列中加入限时 QUERY READ_DESCRIPTOR，验证响应类型、tag、长度、返回码与边界，取得设备/单元描述符；原始唯一标识保留在本地，公开摘要仅记录必要能力。随后分别实现 SCSI LUN/容量查询和带 PRDT 的有界读取，用已知 ESP 内容做读回哈希比对。每类命令单独记录资格；继续使用 RAM 根。介质写入、RPMB、持久根、精确 SID 的动态归属及长期独占仍不包含在 NOP 成功结论中。
+
+## 第四轮候选：只读 QUERY READ_DESCRIPTOR
+
+新增独立 `--ufs-query` 开关，必须同时启用已有 USB/probe/inventory/NOP 路径。NOP 成功且自有队列停止后，最多执行两条 READ_DESCRIPTOR：DEVICE（IDN 0）和 UNIT index 0（IDN 2），selector 0、请求长度 255；不查询字符串或写设备配置。描述符随 QUERY RESPONSE 返回到已有 512 字节响应区，不使用 PRDT，也不读扇区。每条命令只提交一次，核对返回码、tag、opcode/IDN/index/selector、分段/OSF 长度、bLength/type、保护区及停止状态，失败即停止，缓冲区保留至重启。USB `ufs-query` 返回启动时缓存；公开证据只保留必要能力、长度和哈希。UNIT 中的块数/块大小只是描述符线索，仍待 SCSI 容量与数据读取验证。当前候选尚待完整 CI 和真机验收。

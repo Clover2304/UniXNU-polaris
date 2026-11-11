@@ -19,6 +19,7 @@
 #include "UfsProbe.h"
 #include "UfsInventory.h"
 #include "UfsNop.h"
+#include "UfsQuery.h"
 
 #ifndef POLARIS_USB_BUILD_ID
 #define POLARIS_USB_BUILD_ID "local-unqualified"
@@ -58,6 +59,10 @@ struct TerminalSession {
     uint64_t ufsDmaPhys=0;
     PolarisUfsNopResult ufsNop;
     uint32_t ufsFaultBefore[2]{},ufsFaultAfter[5]{};
+    PolarisUfsDescriptor ufsDescriptors[2];
+    unsigned ufsQueryCount=0;
+    bool ufsQueryEnabled=false,ufsQuerySmmuUnchanged=false;
+    uint32_t ufsQueryFaultBefore[2]{},ufsQueryFaultAfter[2]{};
     PolarisBytes<131072> reply;
     PolarisLine input;
     uint8_t tx[DMA_EP3_MAX_CHUNK]{};
@@ -166,6 +171,47 @@ static void ufsNopText(TerminalSession &s,bool response) {
     snprintf(text,sizeof(text),"POLARIS_UFS_NOP_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x far=%08x%08x syn=%08x\nPOLARIS_UFS_NOP_END\n",
         s.ufsFaultBefore[0],s.ufsFaultBefore[1],s.ufsFaultAfter[0],s.ufsFaultAfter[1],s.ufsFaultAfter[3],s.ufsFaultAfter[2],s.ufsFaultAfter[4]);emit();
 }
+static void runUfsQueries(TerminalSession &s,bool enabled) {
+    s.ufsQueryEnabled=enabled;
+    if(!enabled || s.ufsNop.state!=PolarisUfsNopResult::Success || !s.ufsNop.smmuUnchanged)return;
+    unsigned cb=(s.ufsInventory.pages+2u)*4096u;
+    if(!ufsSmmuRead(&s,0x48,&s.ufsQueryFaultBefore[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsQueryFaultBefore[1]) ||
+       polaris_ufs_nop_fault(s.ufsQueryFaultBefore[0],s.ufsQueryFaultBefore[1]))return;
+    const unsigned ids[]={0,2};
+    for(unsigned i=0;i<2;i++) {
+        s.ufsQueryCount++;
+        s.ufsDescriptors[i]=polaris_ufs_read_descriptor({&s,ufsNopRead,ufsNopWrite,ufsNopDelay,ufsNopCache},
+            s.ufsNop,s.ufsDma,s.ufsDmaPhys,ids[i],true);
+        if(s.ufsDescriptors[i].state!=PolarisUfsDescriptor::Success)break;
+    }
+    auto after=polaris_ufs_inventory({&s,ufsRead},{&s,ufsSmmuRead},true,true);
+    s.ufsQuerySmmuUnchanged=polaris_ufs_nop_same_smmu(s.ufsInventory,after);
+    if(!ufsSmmuRead(&s,0x48,&s.ufsQueryFaultAfter[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsQueryFaultAfter[1]) ||
+       polaris_ufs_nop_fault(s.ufsQueryFaultAfter[0],s.ufsQueryFaultAfter[1]))s.ufsQuerySmmuUnchanged=false;
+}
+static void queryHex(const uint8_t *data,unsigned bytes,char *out) {
+    const char digits[]="0123456789abcdef";
+    for(unsigned i=0;i<bytes;i++){out[2*i]=digits[data[i]>>4];out[2*i+1]=digits[data[i]&15u];}out[2*bytes]=0;
+}
+static void ufsQueryText(TerminalSession &s,bool response) {
+    char text[512],hex[65];auto emit=[&](){if(response)respond(s,text);else console("%s",text);};
+    unsigned writes=0,doorbells=0;bool ok=s.ufsQueryCount==2 && s.ufsQuerySmmuUnchanged;
+    for(unsigned i=0;i<s.ufsQueryCount;i++){const auto &d=s.ufsDescriptors[i];writes+=d.writes;doorbells+=d.doorbells;ok&=d.state==PolarisUfsDescriptor::Success;}
+    snprintf(text,sizeof(text),"POLARIS_UFS_QUERY build=%s state=%s count=%u writes=%u doorbells=%u smmu_unchanged=%u sector_commands=0 smmu_writes=0 retained=%u pa=%016llx\n",
+        POLARIS_USB_BUILD_ID,!s.ufsQueryEnabled?"disabled":ok?"ok":"failed",s.ufsQueryCount,writes,doorbells,s.ufsQuerySmmuUnchanged,s.ufsDmaDesc!=nullptr,s.ufsDmaPhys);emit();
+    for(unsigned i=0;i<s.ufsQueryCount;i++) {
+        const auto &d=s.ufsDescriptors[i];queryHex(d.upiu,32,hex);
+        snprintf(text,sizeof(text),"POLARIS_UFS_DESC n=%u idn=%02x index=00 selector=00 state=%s ocs=%u response=%02x requested=255 segment=%u osf=%u guards=%u stopped=%u polls=%u run=%08x db=%08x is=%08x upiu=%s\n",
+            i,d.idn,polaris_ufs_descriptor_state(d.state),d.ocs,d.response,d.length,d.osfLength,d.guards,d.stopped,d.polls,d.finalRun,d.finalDb,d.isAfter,hex);emit();
+        for(unsigned offset=0;offset<d.length && offset<255;offset+=32) {
+            unsigned bytes=d.length-offset;if(bytes>32)bytes=32;if(bytes>255-offset)bytes=255-offset;
+            queryHex(d.data+offset,bytes,hex);
+            snprintf(text,sizeof(text),"POLARIS_UFS_DESC_DATA n=%u offset=%u hex=%s\n",i,offset,hex);emit();
+        }
+    }
+    snprintf(text,sizeof(text),"POLARIS_UFS_QUERY_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x\nPOLARIS_UFS_QUERY_END\n",
+        s.ufsQueryFaultBefore[0],s.ufsQueryFaultBefore[1],s.ufsQueryFaultAfter[0],s.ufsQueryFaultAfter[1]);emit();
+}
 static void handleCommand(TerminalSession &s,const char *command) {
     polaris_usb_stats[5]=polaris_usb_stats[5]+1;
     char text[512];
@@ -202,7 +248,8 @@ static void handleCommand(TerminalSession &s,const char *command) {
     } else if(!strcmp(command,"ufs")){ufsText(s,text,sizeof(text));respond(s,text);}
     else if(!strcmp(command,"ufs-map"))ufsInventoryText(s,true);
     else if(!strcmp(command,"ufs-nop"))ufsNopText(s,true);
-    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map ufs-nop help\n");
+    else if(!strcmp(command,"ufs-query"))ufsQueryText(s,true);
+    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map ufs-nop ufs-query help\n");
     else respond(s,"ERR unknown-command\n");
 }
 #include "UsbEvents.h"
@@ -369,6 +416,9 @@ static void worker(void *,wait_result_t) {
     unsigned nopEnable=0;
     bool nop=inventory && PE_parse_boot_argn("polaris-ufs-nop",&nopEnable,sizeof(nopEnable)) && nopEnable==1;
     runUfsNop(*s,nop);if(nop)ufsNopText(*s,false);
+    unsigned queryEnable=0;
+    bool query=nop && PE_parse_boot_argn("polaris-ufs-query",&queryEnable,sizeof(queryEnable)) && queryEnable==1;
+    runUfsQueries(*s,query);if(query)ufsQueryText(*s,false);
     uint64_t started=nowMs(),next=started+5000;bool fallback=s->hw.phyInitMode!=0;
     for(;;) {
         pollUsbEvents(*s);

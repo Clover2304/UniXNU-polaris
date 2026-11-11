@@ -48,6 +48,10 @@ jobs:
           xcrun --sdk iphoneos --find iig
       - name: Build source kernel and platform drivers
         run: python3 scripts/build-platform-kernel.py --base out/upstream -j 4 --defconfig "$POLARIS_DEFCONFIG"
+      - name: Verify actual Apple signature page-size gate
+        run: |
+          python3 scripts/check-apple-signature-gate.py --source out/native/polaris/tree/.cache/xnu-work/bsd/kern/ubc_subr.c --out out/apple-signature-gate
+          cp out/apple-signature-gate/report.json out/native/polaris/kernel/apple-signature-gate.json
       - name: Preserve compile records and generated headers
         if: always()
         run: |
@@ -193,6 +197,36 @@ jobs:
             out/polaris-usb-esp/
             out/polaris-ufs-esp/
             out/polaris-ufs-inventory-esp/
+            out/stress-check/report.json
+            out/stress-check/serial.log
+            out/stress-check/qemu.log
+            out/stress-check/screen.ppm
+            out/tmp-check/report.json
+            out/process-check/report.json
+            out/process-wrong-hash-check/report.json
+            out/process-damaged-check/report.json
+            out/process-unsigned-check/report.json
+            out/process-cached-init-check/report.json
+            out/io-check/report.json
+            out/io-missing-file-check/report.json
+            out/init-check/report.json
+            out/init-wrong-hash-check/report.json
+            out/init-damaged-code-check/report.json
+            out/init-unsigned-check/report.json
+            out/root-check/report.json
+            out/platform-check/report.json
+      - name: Assemble read-only device and unit descriptor payload
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-ufs-query-esp --cpus 1 --ram 6 --process-dir out/polaris-stress --usb-console --ufs-probe --ufs-inventory --ufs-nop --ufs-query
+      - uses: actions/upload-artifact@v4
+        if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        with:
+          name: ufs-query-stage-results
+          retention-days: 7
+          path: |
+            out/kernel/apple-signature-gate.json
+            out/polaris-stress/
+            out/polaris-ufs-query-esp/
             out/stress-check/report.json
             out/stress-check/serial.log
             out/stress-check/qemu.log

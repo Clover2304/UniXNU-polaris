@@ -7,6 +7,50 @@ it does not use fastboot/ADB and does not submit a reboot or memory-write comman
 import argparse,hashlib,json,re,secrets,time
 from pathlib import Path
 
+def verify_ufs_query(build,raw,prior):
+    if prior.get('source_commit')!=build or not prior.get('ufs_owned_nop_verified') or not prior.get('ufs_dma_verified'):raise ValueError('QUERY requires a matching verified owned NOP')
+    lines=raw.splitlines()
+    if len(lines)<6 or not raw.endswith(b'\n') or lines[-1]!=b'POLARIS_UFS_QUERY_END':raise ValueError('incomplete UFS QUERY record')
+    h=re.fullmatch(rb'POLARIS_UFS_QUERY build='+build.encode()+rb' state=ok count=2 writes=6 doorbells=2 smmu_unchanged=1 sector_commands=0 smmu_writes=0 retained=1 pa=([0-9a-f]{16})',lines[0])
+    if not h or int(h[1],16)!=prior['ufs_nop_dma']['pa']:raise ValueError('wrong QUERY identity, count or owned buffer')
+    cursor=1;descriptors=[]
+    for n,idn in enumerate((0,2)):
+        if cursor>=len(lines):raise ValueError('missing descriptor record')
+        pattern=(rb'POLARIS_UFS_DESC n='+str(n).encode()+rb' idn='+f'{idn:02x}'.encode()+
+            rb' index=00 selector=00 state=ok ocs=0 response=00 requested=255 segment=(\d+) osf=(\d+) guards=1 stopped=1 polls=(\d+) run=00000000 db=00000000 is=([0-9a-f]{8}) upiu=([0-9a-f]{64})')
+        m=re.fullmatch(pattern,lines[cursor]);cursor+=1
+        if not m:raise ValueError('descriptor command did not complete with checked guards and stop')
+        length,osf,polls=int(m[1]),int(m[2]),int(m[3]);is_value=int(m[4],16);upiu=bytes.fromhex(m[5].decode())
+        if not (26 if idn==0 else 19)<=length<=osf<=255 or not 1<=polls<=5000 or is_value&0x71884:
+            raise ValueError('invalid descriptor response length or status')
+        if upiu[0]!=0x36 or upiu[1]&0x60 or any(upiu[i] for i in (2,3,6,7,8,14,15)) or upiu[12:14]!=bytes((1,idn)) or int.from_bytes(upiu[10:12],'big')!=length or int.from_bytes(upiu[18:20],'big')!=osf:
+            raise ValueError('descriptor UPIU does not match its request or lengths')
+        data=bytearray()
+        while len(data)<length:
+            if cursor>=len(lines):raise ValueError('descriptor data truncated')
+            prefix=rb'POLARIS_UFS_DESC_DATA n='+str(n).encode()+rb' offset='+str(len(data)).encode()+rb' hex=([0-9a-f]+)'
+            part=re.fullmatch(prefix,lines[cursor]);cursor+=1
+            if not part or len(part[1])!=2*min(32,length-len(data)):raise ValueError('descriptor data has a gap or exceeds bounds')
+            data.extend(bytes.fromhex(part[1].decode()))
+        if data[0]!=length or data[1]!=idn or (idn==2 and data[2]):raise ValueError('wrong descriptor type, index or bLength')
+        record=dict(idn=idn,length=length,osf_length=osf,polls=polls,upiu_hex=upiu.hex(),data_hex=data.hex(),sha256=hashlib.sha256(data).hexdigest())
+        if idn==0:
+            if not 1<=data[6]<=32:raise ValueError('invalid LU count')
+            record.update(spec_version=int.from_bytes(data[16:18],'big'),manufacturer_id=int.from_bytes(data[24:26],'big'),number_lus=data[6],number_wlus=data[7])
+        else:
+            enabled=data[3];shift=data[10];blocks=int.from_bytes(data[11:19],'big')
+            if enabled>1 or (enabled and (not 9<=shift<=16 or not blocks or blocks>((1<<64)-1)>>shift)):raise ValueError('invalid unit geometry')
+            record.update(unit_index=0,enabled=bool(enabled),block_shift=shift,logical_blocks=blocks,capacity_hint_bytes=(blocks<<shift) if enabled else None)
+        descriptors.append(record)
+    if cursor!=len(lines)-2:raise ValueError('unexpected QUERY data or duplicate descriptor')
+    f=re.fullmatch(rb'POLARIS_UFS_QUERY_FAULT global_before=([0-9a-f]{8}) bank_before=([0-9a-f]{8}) global_after=([0-9a-f]{8}) bank_after=([0-9a-f]{8})',lines[cursor])
+    if not f:raise ValueError('missing QUERY fault snapshot')
+    faults=dict(zip(('global_before','bank_before','global_after','bank_after'),[int(v,16) for v in f.groups()]))
+    if faults['global_before'] or faults['global_after'] or (faults['bank_before']|faults['bank_after'])&0xc00001fe:raise ValueError('SMMU fault around descriptor queries')
+    return dict(ufs_descriptor_queries_verified=True,ufs_read_descriptor_results=descriptors,ufs_query_faults=faults,
+                ufs_query_sha256=hashlib.sha256(raw).hexdigest(),ufs_prdt_payload_verified=False,
+                ufs_native_media_read_verified=False,ufs_scsi_capacity_verified=False)
+
 def verify_ufs_nop(build,raw,prior,status):
     lines=raw.splitlines()
     if len(lines)!=5 or lines[-1]!=b'POLARIS_UFS_NOP_END' or not raw.endswith(b'\n'):raise ValueError('incomplete UFS NOP record')
@@ -143,10 +187,12 @@ def main():
     p.add_argument('--ufs-probe',action='store_true',help='collect and validate the opt-in cached UFS snapshot')
     p.add_argument('--ufs-inventory',action='store_true',help='also collect the read-only candidate stream/queue inventory')
     p.add_argument('--ufs-nop',action='store_true',help='verify the cached single owned-queue NOP result')
+    p.add_argument('--ufs-query',action='store_true',help='verify cached read-only device and unit descriptor results')
     p.add_argument('--wait',type=float,default=120);a=p.parse_args()
     if not re.fullmatch('[0-9a-f]{40}',a.expected_build):p.error('requires the exact source commit')
     if a.ufs_inventory and not a.ufs_probe:p.error('--ufs-inventory requires --ufs-probe')
     if a.ufs_nop and not a.ufs_inventory:p.error('--ufs-nop requires --ufs-inventory')
+    if a.ufs_query and not a.ufs_nop:p.error('--ufs-query requires --ufs-nop')
     import usb.core,usb.util
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False)
     report=dict(passed=False,physical_polaris=False,source_commit=a.expected_build,transport='native XNU polling USB CDC',
@@ -195,6 +241,10 @@ def main():
             raw=exchange('ufs-nop',lambda d:b'POLARIS_UFS_NOP_END\n' in d)
             (out/'ufs-nop.raw').write_bytes(raw)
             report.update(verify_ufs_nop(a.expected_build,raw,report,status))
+        if a.ufs_query:
+            raw=exchange('ufs-query',lambda d:b'POLARIS_UFS_QUERY_END\n' in d)
+            (out/'ufs-query.raw').write_bytes(raw)
+            report.update(verify_ufs_query(a.expected_build,raw,report))
         values=verify_response(a.expected_build,nonce,pong,echo,status,log)
         report.update(values,passed=True,physical_polaris=True,nonce=nonce,
                       native_enumeration_verified=True,bidirectional_roundtrip_verified=True,build_identity_verified=True,
