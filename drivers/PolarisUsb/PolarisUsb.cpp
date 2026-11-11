@@ -15,6 +15,7 @@
 #include "UsbWire.h"
 #include "UsbBuffers.h"
 #include "UsbFifo.h"
+#include "UsbSmmu.h"
 
 #ifndef POLARIS_USB_BUILD_ID
 #define POLARIS_USB_BUILD_ID "local-unqualified"
@@ -108,36 +109,27 @@ static bool enableClocks(UsbHw &hw) {
     }
     return true;
 }
+static uint32_t smmuRead(void *context,unsigned offset) {
+    return static_cast<volatile uint32_t *>(context)[offset/4];
+}
+static void smmuWrite(void *context,unsigned offset,uint32_t value) {
+    static_cast<volatile uint32_t *>(context)[offset/4]=value;
+    __asm__ volatile("dsb sy":::"memory");
+}
 static bool prepareSmmu(UsbHw &hw) {
     hw.smmu=reinterpret_cast<volatile uint32_t *>(mapRangeUncached(0x15000000,0x100000,hw.smmuMap));
     if(!hw.smmu)return false;
-    unsigned count=hw.smmu[0x20/4]&255u;if(!count || count>128)return false;
-    int freeSlot=-1;
-    for(unsigned i=0;i<count;i++) {
-        uint32_t smr=hw.smmu[(0x800+4*i)/4],s2cr=hw.smmu[(0xc00+4*i)/4];
-        if(!(smr&0x80000000u)){if(freeSlot<0)freeSlot=static_cast<int>(i);continue;}
-        uint32_t mask=(smr>>16)&0x7fff;
-        if(((smr^0x740u)&0xffffu&~mask)!=0)continue;
-        hw.smmuOrigSmr=smr;hw.smmuOrigS2cr=s2cr;
-        if((s2cr&0x30000u)==0x10000u)return true;
-        if(mask)return false; // Do not alter a mapping shared with other streams.
-        hw.smmu[(0xc00+4*i)/4]=(s2cr&~0x30000u)|0x10000u;
-        __asm__ volatile("dsb sy":::"memory");
-        return (hw.smmu[(0xc00+4*i)/4]&0x30000u)==0x10000u;
-    }
-    if(!(hw.smmu[0]&(1u<<10)))return true; // Unmatched streams already bypass.
-    if(freeSlot<0)return false;
-    unsigned slot=static_cast<unsigned>(freeSlot);
-    uint32_t old=hw.smmu[(0xc00+4*slot)/4];
-    hw.smmu[(0xc00+4*slot)/4]=0x10000u;
-    __asm__ volatile("dsb sy":::"memory");
-    hw.smmu[(0x800+4*slot)/4]=0x80000740u;
-    __asm__ volatile("dsb sy":::"memory");
-    hw.smmuOrigSmr=hw.smmu[(0x800+4*slot)/4];hw.smmuOrigS2cr=hw.smmu[(0xc00+4*slot)/4];
-    if(hw.smmuOrigSmr==0x80000740u && hw.smmuOrigS2cr==0x10000u)return true;
-    if(!(hw.smmuOrigSmr&0x80000000u))hw.smmu[(0xc00+4*slot)/4]=old;
-    return false;
+    PolarisSmmuIo io{const_cast<uint32_t *>(hw.smmu),smmuRead,smmuWrite};
+    auto result=polaris_usb_smmu(io,hw.dmaPhys,DMA_TOTAL_BYTES);
+    hw.smmuOrigSmr=result.smr;hw.smmuOrigS2cr=result.s2cr;hw.smmuBank=result.bank;
+    polaris_usb_stats[9]=result.bank;polaris_usb_stats[10]=result.error;
+    polaris_usb_stats[11]=result.before;polaris_usb_stats[12]=result.after;
+    polaris_usb_stats[13]=result.cbar;polaris_usb_stats[14]=result.cba2r;polaris_usb_stats[15]=result.idr1;
+    console("POLARIS_USB_SMMU error=%u bank=%u smr=%08x s2cr=%08x sctlr=%08x/%08x cbar=%08x cba2r=%08x idr=%08x/%08x/%08x\n",
+        result.error,result.bank,result.smr,result.s2cr,result.before,result.after,result.cbar,result.cba2r,result.idr0,result.idr1,result.idr2);
+    return result.error==0;
 }
+
 static void initQusb2(UsbHw &hw) {
     hw.phyInitMode=1;
     hw.gwr(0x12000,1);IODelay(150);hw.gwr(0x12000,0);IODelay(150);
@@ -155,6 +147,7 @@ static bool startController(TerminalSession &s) {
     if(!hw.core || !hw.phy)return false;
     uint32_t core=hw.rd(DWC3_GSNPSID),id=core&DWC3_GSNPSID_MASK;
     polaris_usb_stats[1]=core;polaris_usb_stats[0]=3;
+    hw.wr(DWC3_DCTL,hw.rd(DWC3_DCTL)&~DWC3_DCTL_RUN_STOP);IOSleep(20);
     if(id!=DWC3_GSNPSID_USB3 && id!=DWC3_GSNPSID_USB31 && id!=DWC3_GSNPSID_USB31_3331)return false;
     hw.dmaDesc=IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task,
         static_cast<IOOptionBits>(kIODirectionInOut)|static_cast<IOOptionBits>(kIOMemoryPhysicallyContiguous),DMA_TOTAL_BYTES,0xfffffff000ULL);

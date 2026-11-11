@@ -169,4 +169,8 @@ QEMU 在短暂让出 CPU 后按固定里程碑读取真实进程、task、回收
 主机使用 `check-polaris-usb.py` 核对 USB 1209:0001、产品串、随机 nonce、源码构建身份和实际运行时日志；未完成前不标记 USB 真机通过。
 日志范围为打开控制台后的 64 KiB RAM 环，包含覆盖丢失计数；不覆盖早期启动、跨重启保存、panic 后取回或 Apple USB 配对。
 
+首轮 USB 候选 `d9e2024a045ff9627fa8edf60197e5be81edae1b` 的 [CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42958623959) 已通过，但真机停在 stage 4，未枚举 USB。用户回报 core=`5533300a`、HWPARAMS0=`4020400a`、SMR/S2CR=`80000740/00000004`、sCR0=`002d0406`；DMA 地址在 4 GiB 以上。现有 USB 流映射到 context bank 4。直接设置 S2CR BYPASS 未通过读回检查，与 Linux 高通驱动记录的固件 BYPASS→FAULT 行为一致，但尚未取得写后的寄存器原值。
+
+下一候选保留 SMR/S2CR，检查 bank 4 没有其他已映射设备后，设置该 USB 上下文 SCTLR=0、CBA2R=1、CBAR=0x10000，采用上下文旁路；任何共享、地址宽度不符或读回失败均中止，并输出 IDR 和上下文诊断。主机测试涵盖上述固件行为、共享拒绝和失败恢复；这些测试不代替真机 DMA 和 USB 验证。E5/F3 仍未验收。
+
 D6/D7 基本可写 RAM 文件系统 → C5/H2 进程回收压力 → E5 日志和 F3 交互通道 → F2 原生存储。G 组可与部分硬件驱动并行，启动 Apple 用户态不要求先完成相机、蓝牙等全部外设。

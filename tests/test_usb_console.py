@@ -4,6 +4,56 @@ from pathlib import Path
 import shutil,subprocess,tempfile,unittest
 ROOT=Path(__file__).resolve().parents[1]
 class UsbTests(unittest.TestCase):
+    def test_firmware_usb_context_bypass_preserves_other_devices_and_s2cr(self):
+        source=r'''
+#include "UsbSmmu.h"
+#include <cassert>
+#include <vector>
+#include <utility>
+#include <cstring>
+struct Hardware {
+ uint32_t regs[0x100000/4]{};
+ std::vector<std::pair<unsigned,uint32_t>> writes;
+ bool rejectCbar=false;
+ Hardware(){regs[0x20/4]=(1u<<30)|128;regs[0x24/4]=(6u<<28)|80;regs[0x28/4]=0x1222;
+  regs[(0x800+7*4)/4]=0x80000740;regs[(0xc00+7*4)/4]=4;
+  regs[0x84000/4]=0x79;regs[(0x1000+16)/4]=0;regs[(0x1800+16)/4]=0;
+  regs[(0x800+2*4)/4]=0x80000060;regs[(0xc00+2*4)/4]=5;regs[0x85000/4]=0x7d;
+ }
+ static uint32_t read(void *p,unsigned off){assert(!(off%4)&&off<0x100000);return ((Hardware*)p)->regs[off/4];}
+ static void write(void *p,unsigned off,uint32_t value){auto &h=*(Hardware*)p;h.writes.emplace_back(off,value);
+  // Model the documented QHEE quirk: direct BYPASS would become FAULT.
+  if(off>=0xc00&&off<0xe00&&(value&0x30000)==0x10000)value=(value&~0x30000)|0x20000;
+  if(h.rejectCbar&&off==0x1010)return;
+  h.regs[off/4]=value;
+ }
+ PolarisSmmuIo io(){return {this,read,write};}
+};
+int main(){
+ auto *h=new Hardware();auto r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);
+ assert(!r.error&&r.bank==4&&r.before==0x79&&r.after==0&&r.cbar==0x10000&&r.cba2r==1);
+ assert(h->regs[(0xc00+7*4)/4]==4&&h->regs[(0x800+7*4)/4]==0x80000740);
+ assert(h->regs[0x85000/4]==0x7d&&h->writes.size()==3);
+ for(auto w:h->writes)assert(w.first==0x84000||w.first==0x1010||w.first==0x1810);
+ h->writes.clear();r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(!r.error&&h->writes.empty());delete h;
+ h=new Hardware();h->regs[(0xc00+2*4)/4]=4;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==7&&h->writes.empty()&&h->regs[0x84000/4]==0x79);delete h;
+ h=new Hardware();h->regs[(0x800+7*4)/4]=0x80010740;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==3&&h->writes.empty());delete h;
+ h=new Hardware();h->regs[0x28/4]=0x1000;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==2&&h->writes.empty());delete h;
+ h=new Hardware();h->rejectCbar=true;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==9&&h->regs[0x84000/4]==0x79&&h->regs[0x1810/4]==0);delete h;
+ h=new Hardware();h->regs[0x20/4]=(1u<<30)|168;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(!r.error);delete h;
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            d=Path(directory);(d/'smmu.cpp').write_text(source)
+            result=subprocess.run([shutil.which('clang++'),'-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I',ROOT/'drivers/PolarisUsb',d/'smmu.cpp','-o',d/'smmu'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run([d/'smmu'],check=True,capture_output=True)
+
     def test_real_buffers_randomized_streams_command_limits_and_cdc_layout(self):
         source=r'''
 #include "UsbBuffers.h"
