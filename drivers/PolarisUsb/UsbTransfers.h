@@ -86,7 +86,7 @@ static void ep0StartData(UsbHw &hw, unsigned dep, uint32_t len) {
             hw.ep0Zlp  = false;
             hw.ep0Trbs = 2;
             ep0SetTrb(hw, 1, bufPa, 0u, DWC3_TRBCTL_CONTROL_DATA, true);
-            ep0TrbPtr(hw, 1)[3] |= DWC3_TRB_CTRL_HWO;
+            ep0TrbPtr(hw, 1)[3] = ep0TrbPtr(hw, 1)[3] | DWC3_TRB_CTRL_HWO;
             __asm__ volatile("dsb sy" ::: "memory");
             ep0SetTrb(hw, 0, bufPa, len, DWC3_TRBCTL_CONTROL_DATA, false);
         } else {
@@ -124,7 +124,7 @@ static void armBulkOut(UsbHw &hw) {
     t[3] = DWC3_TRBCTL_NORMAL | DWC3_TRB_CTRL_CSP | DWC3_TRB_CTRL_ISP_IMI |
            DWC3_TRB_CTRL_IOC | DWC3_TRB_CTRL_LST;
     __asm__ volatile("dsb sy" ::: "memory");
-    t[3] |= DWC3_TRB_CTRL_HWO;
+    t[3] = t[3] | DWC3_TRB_CTRL_HWO;
     usbCacheRange(hw.dmaVirt + DMA_EP2_TRB_OFF, 64u, 1);
     uint32_t raw = 0;
     if (epCmd(hw, 2, DWC3_DEPCMD_STARTTRANSFER, static_cast<uint32_t>(trbPa >> 32),
@@ -161,7 +161,7 @@ static bool startBulkIn(UsbHw &hw, const uint8_t *data, uint32_t len) {
         t0[3] = DWC3_TRBCTL_NORMAL | DWC3_TRB_CTRL_ISP_IMI | DWC3_TRB_CTRL_IOC | DWC3_TRB_CTRL_LST;
     }
     __asm__ volatile("dsb sy" ::: "memory");
-    t0[3] |= DWC3_TRB_CTRL_HWO;
+    t0[3] = t0[3] | DWC3_TRB_CTRL_HWO;
     usbCacheRange(hw.dmaVirt + DMA_EP3_TRB_OFF, 64u, 1);
     uint32_t raw = 0;
     if (epCmd(hw, 3, DWC3_DEPCMD_STARTTRANSFER, static_cast<uint32_t>(trbPa >> 32),
