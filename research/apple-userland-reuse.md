@@ -37,6 +37,16 @@
 
 ## 第一项已执行的兼容检查
 
-新增 `scripts/check-apple-signature-gate.py`，复用已有检查思路，在 Linux/macOS 编译实际 `ubc_subr.c` 中的 CodeDirectory 页粒度判断。当前从已保存的 Darwin 23 补丁源文件提取并通过 8 个组合；[结果](apple-signature-gate.json)记录完整输入与提取代码哈希。4K 内核配默认 integrity-cache=0 时，4K 签名页通过、16K 签名页被拒；已有 cache=1 路径允许后者进入下一步。这只测试一道实际检查，不证明完整签名完整性、entitlement、dyld 或原版程序执行。
+新增 `scripts/check-apple-signature-gate.py`，复用已有检查思路，在 Linux/macOS 编译实际 `ubc_subr.c` 中的 CodeDirectory 页粒度判断。已先对保存的 Darwin 23 补丁源执行，随后对本次 macOS CI 实际组装的源码执行，8 个组合均通过；[结果](apple-signature-gate.json)记录完整输入与提取代码哈希。4K 内核配默认 integrity-cache=0 时，4K 签名页通过、16K 签名页被拒；已有 cache=1 路径允许后者进入下一步。这只测试一道实际检查，不证明完整签名完整性、entitlement、dyld 或原版程序执行。
 
-下一次内核 CI 会对本次实际组装的 XNU 源码执行同样检查，并随查询镜像携带报告。目标 Apple 二进制的实际签名页粒度尚未读取；在取得样本前，不将上述条件性结果当作该二进制的实际失败原因，也不直接改变当前成功内核配置。
+查询内核 `9feeaca` 的完整 CI 已通过；发布的报告来自这次实际编译输入，提取 gate 的哈希和 8 个结果与先前本地检查一致。目标 Apple 二进制的实际签名页粒度尚未读取；在取得样本前，不将上述条件性结果当作该二进制的实际失败原因，也不直接改变当前成功内核配置。
+
+## 已取得的目标输入与预链接计划
+
+已通过 Apple CDN 的 ZIP 范围读取取得同一 `17.7.11 / 21H461 / iPad7,1 / j120ap` 镜像的 BuildManifest、KernelCache、DeviceTree 和两份 trust cache；四个组件均与 Erase identity 中的 SHA-384 Digest 相符。未下载整个 IPSW 或系统根 DMG；manifest 内的摘要核对也不等于 Apple 签名信任链验证。必要元数据见 [apple-target-inputs.json](apple-target-inputs.json)，Apple 二进制只保留在本地。
+
+解压后的 ARM64 原版内核 SHA256 为 `f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7`，与固定 UniXNU 的目标 pin 完全一致。板配置所选的 10 个预链接根组件均存在。原版版本是 `10063.142.1.703.8`，自编源码是 `10063.141.1`，仍须验证 ABI 与运行行为。
+
+复用了固定 NativePrelink `3380d3006068cdaab69454b37668e6b532ed2584` 的只读 `plan`，输入为该原版内核与本次 CI 通过的查询源码 `9feeaca` 对应打包内核。依赖闭包为 18 个可执行组件、7 个 kernel interface；13,156 个组件指针和 24,460 个内核符号指针均完成计划解析。该结果只覆盖工具枚举的绝对指针，工具仍明确返回 `instruction_relocation_complete=false`、`abi_qualified=false`、`loadable=false`。没有生成或加载组件，也没有运行 Apple 用户态程序。
+
+下一步直接沿用已有用户态审计及预链接生成工具，对实际 launchd/dyld 样本核对代码页、trust cache 与加载器依赖，再选择最小执行实验。不能把静态指针计划或缓存内存在组件，记为 G2 的运行验收通过。

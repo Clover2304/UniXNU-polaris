@@ -1,6 +1,6 @@
 # Polaris 原生 UFS 只读识别与后续计划
 
-当前源码 `1d38b03539ec26b146ceda717c6cf831ab572cec` 已在真机完成自有队列上的一次 NOP OUT/IN：描述符、请求和响应在高于 4 GiB 的物理内存中经 DMA 验证。原有 RAM 根、进程/文件系统压力自检与 USB 通道通过。介质读取、PRDT 数据负载、精确硬件 SID 和长期独占所有权仍未验证。
+当前源码 `9feeaca4f7e9d0b8352c2ce0c86434824c681114` 已在真机完成自有队列上的一次 NOP OUT/IN，以及 DEVICE 和 UNIT 0 两次 READ_DESCRIPTOR：描述符、请求和响应在高于 4 GiB 的物理内存中经 DMA 验证。原有 RAM 根、进程/文件系统压力自检与 USB 通道通过。介质读取、PRDT 数据负载、精确硬件 SID 和长期独占所有权仍未验证。
 
 首轮控制器识别 `c5dbce2`、只读队列/SMMU 盘点 `9f1401c` 和十轮启动的 USB 基线 `7e3fa6f` 均保留。当前 NOP 成功镜像只验证一轮启动、一次命令；此前 `5670f6c` 被 FSR 判断误拦，未提交命令，记录单独保留。
 
@@ -124,10 +124,28 @@ doorbell 在第 2 次轮询中归零，这只是功能完成记录，不作为�
 
 原有 IO、子进程、`/tmp` 和 1,000 次进程回收自检通过，第二次主机采样中的 tick 继续增长至 4。USB 命令错误、回复溢出和日志丢失均为零；最终日志响应 4,414 字节，SHA256 `0f3dca2597455e674c44decb215b2a79bace9069057666463a8eec3cc339db2e`。NOP 响应 SHA256 `766a13c5c393d42dcc8100e34f30322c7b2c5c896c0e19a16a0b4332ebcb203c`。镜像保留于 `artifacts/ufs-nop-format-ready/`。
 
-### 下一轮：只读设备查询，再验证数据负载
+### NOP 后的实施顺序
 
 先在已验证的自有队列中加入限时 QUERY READ_DESCRIPTOR，验证响应类型、tag、长度、返回码与边界，取得设备/单元描述符；原始唯一标识保留在本地，公开摘要仅记录必要能力。随后分别实现 SCSI LUN/容量查询和带 PRDT 的有界读取，用已知 ESP 内容做读回哈希比对。每类命令单独记录资格；继续使用 RAM 根。介质写入、RPMB、持久根、精确 SID 的动态归属及长期独占仍不包含在 NOP 成功结论中。
 
-## 第四轮候选：只读 QUERY READ_DESCRIPTOR
+## 第四轮：只读 QUERY READ_DESCRIPTOR（真机通过）
 
-新增独立 `--ufs-query` 开关，必须同时启用已有 USB/probe/inventory/NOP 路径。NOP 成功且自有队列停止后，最多执行两条 READ_DESCRIPTOR：DEVICE（IDN 0）和 UNIT index 0（IDN 2），selector 0、请求长度 255；不查询字符串或写设备配置。描述符随 QUERY RESPONSE 返回到已有 512 字节响应区，不使用 PRDT，也不读扇区。每条命令只提交一次，核对返回码、tag、opcode/IDN/index/selector、分段/OSF 长度、bLength/type、保护区及停止状态，失败即停止，缓冲区保留至重启。USB `ufs-query` 返回启动时缓存；公开证据只保留必要能力、长度和哈希。UNIT 中的块数/块大小只是描述符线索，仍待 SCSI 容量与数据读取验证。当前候选尚待完整 CI 和真机验收。
+新增独立 `--ufs-query` 开关，必须同时启用已有 USB/probe/inventory/NOP 路径。NOP 成功且自有队列停止后，最多执行两条 READ_DESCRIPTOR：DEVICE（IDN 0）和 UNIT index 0（IDN 2），selector 0、请求长度 255；不查询字符串或写设备配置。描述符随 QUERY RESPONSE 返回到已有 512 字节响应区，不使用 PRDT，也不读扇区。每条命令只提交一次，核对返回码、tag、opcode/IDN/index/selector、分段/OSF 长度、bLength/type、保护区及停止状态，失败即停止，缓冲区保留至重启。USB `ufs-query` 返回启动时缓存；公开证据只保留必要能力、长度和哈希。UNIT 中的块数/块大小只是描述符线索，仍待 SCSI 容量与数据读取验证。已通过 60 项主机 unittest、ARM64 语法检查、完整 CI、本地打包镜像 QEMU 画面，以及一轮真机验收。
+
+
+### 第四轮真机结果（2026-11-11 11:56 UTC）
+
+[CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43011741949)首轮未分配到 macOS runner；GitHub 注释说明容量不足，内核编译步骤未执行。重试同一提交后全部任务通过。128 MiB ESP 写入 userdata 后临时启动固定固件；本地 QEMU 画面为 STRESS_OK/CLEAN、tick 6→9。原生 CDC 验证精确源码身份、nonce、缓存查询与原有 IO/进程/tmp/1,000 次进程回收自检，后续采样中 tick 继续增长至 3。公开结果见 [ufs-query-result.json](ufs-query-result.json)，原始响应仅在本地 `artifacts/ufs-query-phone-9feeaca/`。
+
+| 项目 | 结果 |
+| --- | --- |
+| DEVICE | 64 字节，spec `0x0210`，manufacturer ID `0x01ad`，6 个 LU、4 个 WLU |
+| UNIT 0 | 35 字节，enabled=1，逻辑块 4,096 字节，块数 14,419,968 |
+| 容量线索 | 59,064,188,928 字节；来自 UNIT 描述符，尚非 SCSI 容量或块读取验证 |
+| 两次 QUERY | 各提交一次、OCS=0、response=0、tag/类型/长度/保护区校验通过，各在第 2 次轮询完成 |
+| 自有缓冲 | 复用 NOP 的 `0x1023bc000` / 16 KiB；每次完成后 run-stop=0、doorbell=0 |
+| 本轮写操作 | NOP 阶段 6 次 UFS MMIO 写，QUERY 阶段合计 6 次；SMMU 写入和介质命令均为 0 |
+| 故障状态 | global FSR 前后 0；bank FSR 前后 `0x400`，故障掩码内位均为 0；候选映射未变化 |
+| USB / 日志 | 命令错误、回复溢出和丢失均为 0；最终日志 5,100 字节 |
+
+两次后续 USB 采样读取同一启动缓存，不会重发设备查询。该结果证明 QUERY 响应中的元数据路径，不能替代 PRDT 数据负载、SCSI READ CAPACITY 或实际扇区读回。下一轮分别引入带 PRDT 的只读 SCSI 识别/容量命令和有界块读取，再用已写入的 ESP 固定内容做哈希比对；继续使用 RAM 根，保留本轮成功镜像。

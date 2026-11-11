@@ -87,7 +87,7 @@
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
 | F1 | DMA、缓存一致性、SMMU/IOMMU、设备中断 | USB 收发与 UFS 单次 NOP 描述符/响应 DMA、缓存维护真机通过，复用原有旁路；PRDT 负载、隔离和原生设备中断待验证 |
-| F2 | XNU 原生 UFS 识别、读写和持久化 | 部分：UFSHCI 2.1 识别、候选 SMMU 盘点、自有队列交接与单次 NOP（含 >4 GiB 描述符/响应 DMA）真机通过；PRDT、介质读写和持久化未验证；固件读 ESP 不计入 |
+| F2 | XNU 原生 UFS 识别、读写和持久化 | 部分：UFSHCI 2.1 识别、候选 SMMU 盘点、自有队列交接、单次 NOP 和 DEVICE/UNIT 0 描述符查询（含 >4 GiB 描述符/响应 DMA）真机通过；PRDT、介质读写和持久化未验证；固件读 ESP 不计入 |
 | F3 | XNU USB 枚举、收发和电脑控制台 | 轮询 CDC 枚举、诊断/日志、十次 USB/IP 重连及控制请求 STALL 恢复真机通过；物理插拔、POSIX 终端、吞吐和挂起恢复待验证 |
 | F4 | 原生显示控制器、面板初始化与刷新 | 未接入；当前继承固件 framebuffer |
 | F5 | Adreno 命令提交、显存管理与图形合成 | 未接入 |
@@ -101,7 +101,7 @@
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
 | G1 | 目标 Apple 二进制、签名和代码页兼容 | 未验证 |
-| G2 | 必需预链接组件、AMFI/CoreTrust/Sandbox 与存储组件匹配 | 未完成 |
+| G2 | 必需预链接组件、AMFI/CoreTrust/Sandbox 与存储组件匹配 | 部分静态核对：目标缓存 pin 与 10 个根组件确认；已有工具解析 18 个组件的绝对指针计划；指令重定位、ABI 和实际加载未验证 |
 | G3 | dyld、共享缓存、libSystem、TLS 和动态链接 | 未接入 |
 | G4 | Apple launchd 和基本 Mach 服务 | 未接入 |
 | G5 | 必需守护进程和系统服务持续运行 | 未接入 |
@@ -236,4 +236,4 @@ D6/D7 基本可写 RAM 文件系统 → C5/H2 进程回收压力 → E5 日志�
 
 <!-- polaris-boot-series:end -->
 
-F2 已完成控制器/队列/SMMU 盘点和自有队列单次 NOP：在 `0x1023bc000` 的 16 KiB 新分配中验证描述符、请求及 NOP IN 响应 DMA，OCS=0、tag 匹配、保护区完整，最终 UTRL run-stop=0、doorbell=0。候选 bank 2 配置未改；首轮误把 FSR FORMAT 当故障的问题已按 `0xc00001fe` 掩码修正并保存记录。原有自检与变化心跳通过，USB 错误、回复溢出和日志丢失均为零。下一轮先 QUERY 描述符，再分别验证 PRDT、容量与块读取；见 [UFS 计划和结果](ufs-readonly-plan.md)。
+F2 已完成控制器/队列/SMMU 盘点和自有队列单次 NOP：在 `0x1023bc000` 的 16 KiB 新分配中验证描述符、请求及 NOP IN 响应 DMA，OCS=0、tag 匹配、保护区完整，最终 UTRL run-stop=0、doorbell=0。候选 bank 2 配置未改；首轮误把 FSR FORMAT 当故障的问题已按 `0xc00001fe` 掩码修正并保存记录。原有自检与变化心跳通过，USB 错误、回复溢出和日志丢失均为零。查询源码 `9feeaca` 已进一步通过 DEVICE/UNIT 0 READ_DESCRIPTOR：UFS 2.1、4 KiB 块、59,064,188,928 字节容量线索，原有自检/持续心跳和 USB 正常；下一轮分别验证 PRDT、SCSI 容量与块读取；见 [UFS 计划和结果](ufs-readonly-plan.md)。

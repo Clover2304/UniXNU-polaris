@@ -1,0 +1,338 @@
+{
+  "version": "17.7.11",
+  "build": "21H461",
+  "product": "iPad7,1",
+  "device_class": "j120ap",
+  "manifest_sha256": "199fb5de41c26d86c080b4e8e402c40309c5f42e7bda18c210451b09bcb49bf7",
+  "ipsw_bytes": 6835124840,
+  "whole_ipsw_downloaded": false,
+  "kernelcache_inspection": {
+    "cpu_type": 16777228,
+    "cpu_subtype": 0,
+    "file_type": 2,
+    "bytes": 46415872,
+    "sha256": "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7",
+    "darwin_version_string": "Darwin Kernel Version 23.6.0: Fri Jul 11 17:39:39 PDT 2025; root:xnu-10063.142.1.703.8~1/RELEASE_ARM64_T8010",
+    "prelink_info_present": true,
+    "required_components": {
+      "com.apple.kec.corecrypto": {
+        "present": true,
+        "version": "14.0",
+        "dependencies": [
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported"
+        ]
+      },
+      "com.apple.driver.AppleARMPlatform": {
+        "present": true,
+        "version": "1.0.2",
+        "dependencies": [
+          "com.apple.iokit.IOReportFamily",
+          "com.apple.iokit.IOSlowAdaptiveClockingFamily",
+          "com.apple.iokit.IOStorageFamily",
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported"
+        ]
+      },
+      "com.apple.filesystems.apfs": {
+        "present": true,
+        "version": "2236.140.6",
+        "dependencies": [
+          "com.apple.driver.AppleARMWatchdogTimer",
+          "com.apple.driver.AppleEffaceableStorage",
+          "com.apple.iokit.CoreAnalyticsFamily",
+          "com.apple.iokit.IOStorageFamily",
+          "com.apple.kec.corecrypto",
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.dsep",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported",
+          "com.apple.security.AppleImage4"
+        ]
+      },
+      "com.apple.driver.AppleMobileFileIntegrity": {
+        "present": true,
+        "version": "1.0.5",
+        "dependencies": [
+          "com.apple.driver.ApplePMGR",
+          "com.apple.iokit.CoreAnalyticsFamily",
+          "com.apple.kec.corecrypto",
+          "com.apple.kext.CoreTrust",
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.dsep",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported",
+          "com.apple.security.AppleImage4"
+        ]
+      },
+      "com.apple.security.sandbox": {
+        "present": true,
+        "version": "300.0",
+        "dependencies": [
+          "com.apple.driver.AppleMobileFileIntegrity",
+          "com.apple.kext.AppleMatch",
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.dsep",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported"
+        ]
+      },
+      "com.apple.kext.CoreTrust": {
+        "present": true,
+        "version": "1",
+        "dependencies": [
+          "com.apple.kec.corecrypto",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.private"
+        ]
+      },
+      "com.apple.security.AppleImage4": {
+        "present": true,
+        "version": "6.3.0",
+        "dependencies": [
+          "com.apple.iokit.IOCryptoAcceleratorFamily",
+          "com.apple.kec.corecrypto",
+          "com.apple.kext.CoreTrust",
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.dsep",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported"
+        ]
+      },
+      "com.apple.iokit.IOStorageFamily": {
+        "present": true,
+        "version": "2.1",
+        "dependencies": [
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported"
+        ]
+      },
+      "com.apple.iokit.IOSurface": {
+        "present": true,
+        "version": "352.50.1",
+        "dependencies": [
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported"
+        ]
+      },
+      "com.apple.iokit.IOHIDFamily": {
+        "present": true,
+        "version": "2.0.0",
+        "dependencies": [
+          "com.apple.driver.AppleMobileFileIntegrity",
+          "com.apple.kpi.bsd",
+          "com.apple.kpi.iokit",
+          "com.apple.kpi.libkern",
+          "com.apple.kpi.mach",
+          "com.apple.kpi.private",
+          "com.apple.kpi.unsupported"
+        ]
+      }
+    },
+    "source_kernel_version": "10063.141.1",
+    "matches_common_target_cache_pin": true,
+    "component_abi_compatible_verified": false,
+    "early_amfi_address_verified": false
+  },
+  "components": {
+    "Cryptex1,AppOS": {
+      "member": "044-75188-038.dmg",
+      "bytes": 10485760,
+      "compressed_bytes": 2781428,
+      "downloaded": false,
+      "content_sha256_verified": false
+    },
+    "Cryptex1,AppTrustCache": {
+      "member": "Firmware/044-75188-038.dmg.trustcache",
+      "bytes": 767,
+      "compressed_bytes": 739,
+      "downloaded": false,
+      "content_sha256_verified": false
+    },
+    "Cryptex1,AppVolume": {
+      "member": "Firmware/044-75188-038.dmg.root_hash",
+      "bytes": 229,
+      "compressed_bytes": 69,
+      "downloaded": false,
+      "content_sha256_verified": false
+    },
+    "Cryptex1,SystemOS": {
+      "member": "044-76034-038.dmg",
+      "bytes": 3303014400,
+      "compressed_bytes": 1321525120,
+      "downloaded": false,
+      "content_sha256_verified": false
+    },
+    "Cryptex1,SystemTrustCache": {
+      "member": "Firmware/044-76034-038.dmg.trustcache",
+      "bytes": 1871,
+      "compressed_bytes": 1748,
+      "downloaded": true,
+      "content_sha256_verified": false,
+      "content_sha256": "9742f3d566369e6c48f63b3dc0740b06c243d13c6650e25bbf44616e13d6d097",
+      "zip_crc_verified": true,
+      "build_manifest_digest_matches": true,
+      "build_manifest_digest_algorithm": "sha384",
+      "payload": {
+        "version": 2,
+        "entries": 76,
+        "bytes": 1848,
+        "sha256": "d121ba89167e03aafd00fa687c30cd8ebc4ccafd10c1408adb2ba3de12403651",
+        "loaded_into_kernel": false
+      }
+    },
+    "Cryptex1,SystemVolume": {
+      "member": "Firmware/044-76034-038.dmg.root_hash",
+      "bytes": 229,
+      "compressed_bytes": 69,
+      "downloaded": false,
+      "content_sha256_verified": false
+    },
+    "DeviceTree": {
+      "member": "Firmware/all_flash/DeviceTree.j120ap.im4p",
+      "bytes": 35260,
+      "compressed_bytes": 35169,
+      "downloaded": true,
+      "content_sha256_verified": false,
+      "content_sha256": "3f612f64819fbf6a8aacc03fabeda08ba897c4bf5385df995c59815c0c80c8f0",
+      "zip_crc_verified": true,
+      "build_manifest_digest_matches": true,
+      "build_manifest_digest_algorithm": "sha384"
+    },
+    "KernelCache": {
+      "member": "kernelcache.release.ipad7",
+      "bytes": 16238580,
+      "compressed_bytes": 16214447,
+      "downloaded": true,
+      "content_sha256_verified": false,
+      "content_sha256": "13b97fa2c5ce97f04408dcc28c41fb6b0d60b9440065197879acf44b2572bf7b",
+      "zip_crc_verified": true,
+      "build_manifest_digest_matches": true,
+      "build_manifest_digest_algorithm": "sha384"
+    },
+    "OS": {
+      "member": "044-76040-038.dmg",
+      "bytes": 5157406069,
+      "compressed_bytes": 5157406069,
+      "downloaded": false,
+      "content_sha256_verified": false
+    },
+    "RestoreRamDisk": {
+      "member": "044-75545-038.dmg",
+      "bytes": 184549403,
+      "compressed_bytes": 132977414,
+      "downloaded": false,
+      "content_sha256_verified": false
+    },
+    "StaticTrustCache": {
+      "member": "Firmware/044-76040-038.dmg.trustcache",
+      "bytes": 59519,
+      "compressed_bytes": 54001,
+      "downloaded": true,
+      "content_sha256_verified": false,
+      "content_sha256": "4563bdbf6ed8f72237d45dbba3ccde432634338f95c10d79d5d4631678a97c7c",
+      "zip_crc_verified": true,
+      "build_manifest_digest_matches": true,
+      "build_manifest_digest_algorithm": "sha384",
+      "payload": {
+        "version": 2,
+        "entries": 2478,
+        "bytes": 59496,
+        "sha256": "da88460e6e513438d5307e5c526f76497a74754476a24da29f239f0c90120fc2",
+        "loaded_into_kernel": false
+      }
+    }
+  },
+  "apple_userland_binary_inspected": false,
+  "apple_userland_executed": false,
+  "component_loading_verified": false,
+  "native_prelink_pinned_revision": "3380d3006068cdaab69454b37668e6b532ed2584",
+  "common_kernelcache_pin": "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7",
+  "build_manifest_digest_is_not_signature_authentication": true,
+  "apple_trust_chain_verified": false,
+  "prelink_pointer_plan": {
+    "tool_revision": "3380d3006068cdaab69454b37668e6b532ed2584",
+    "tool_source_sha256": "948827f2c41a4666aec914d94e80453114eb93c8105b6abea3ec7447d9a92c4a",
+    "native_source_commit": "9feeaca4f7e9d0b8352c2ce0c86434824c681114",
+    "native_sha256": "3ba9e529fab4dd07d7642b6636cda002b348466a40ba17521f0c814abba60931",
+    "original_sha256": "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7",
+    "planning_completed": true,
+    "components": [
+      "com.apple.driver.AppleARMPlatform",
+      "com.apple.driver.AppleARMWatchdogTimer",
+      "com.apple.driver.AppleEffaceableStorage",
+      "com.apple.driver.AppleMobileFileIntegrity",
+      "com.apple.driver.ApplePMGR",
+      "com.apple.filesystems.apfs",
+      "com.apple.iokit.CoreAnalyticsFamily",
+      "com.apple.iokit.IOCryptoAcceleratorFamily",
+      "com.apple.iokit.IOHIDFamily",
+      "com.apple.iokit.IOReportFamily",
+      "com.apple.iokit.IOSlowAdaptiveClockingFamily",
+      "com.apple.iokit.IOStorageFamily",
+      "com.apple.iokit.IOSurface",
+      "com.apple.kec.corecrypto",
+      "com.apple.kext.AppleMatch",
+      "com.apple.kext.CoreTrust",
+      "com.apple.security.AppleImage4",
+      "com.apple.security.sandbox"
+    ],
+    "kernel_interfaces": [
+      "com.apple.kpi.bsd",
+      "com.apple.kpi.dsep",
+      "com.apple.kpi.iokit",
+      "com.apple.kpi.libkern",
+      "com.apple.kpi.mach",
+      "com.apple.kpi.private",
+      "com.apple.kpi.unsupported"
+    ],
+    "pointer_counts": {
+      "component": 13156,
+      "kernel": 24460
+    },
+    "images_modified": false,
+    "instruction_relocation_complete": false,
+    "abi_qualified": false,
+    "loadable": false,
+    "scope": "Pinned NativePrelink read-only pointer plan against the CI-qualified descriptor-query kernel; no component emitted or loaded"
+  },
+  "early_security_init_static_check": {
+    "bundle": "com.apple.driver.AppleMobileFileIntegrity",
+    "configured_address": "0xfffffff005ab4ae0",
+    "mapped_segments_in_target_component": [
+      "__TEXT_EXEC"
+    ],
+    "exact_parent_export_names": [],
+    "address_in_component_executable_segment": true,
+    "initializer_signature_verified": false,
+    "initializer_executed": false
+  }
+}
