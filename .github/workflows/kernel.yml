@@ -180,6 +180,9 @@ jobs:
       - name: Assemble read-only UFS queue and candidate stream inventory payload
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-ufs-inventory-esp --cpus 1 --ram 6 --process-dir out/polaris-stress --usb-console --ufs-probe --ufs-inventory
+      - name: Assemble owned UFS queue and single NOP payload
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-ufs-nop-esp --cpus 1 --ram 6 --process-dir out/polaris-stress --usb-console --ufs-probe --ufs-inventory --ufs-nop
       - uses: actions/upload-artifact@v4
         if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         with:
@@ -190,6 +193,32 @@ jobs:
             out/polaris-usb-esp/
             out/polaris-ufs-esp/
             out/polaris-ufs-inventory-esp/
+            out/stress-check/report.json
+            out/stress-check/serial.log
+            out/stress-check/qemu.log
+            out/stress-check/screen.ppm
+            out/tmp-check/report.json
+            out/process-check/report.json
+            out/process-wrong-hash-check/report.json
+            out/process-damaged-check/report.json
+            out/process-unsigned-check/report.json
+            out/process-cached-init-check/report.json
+            out/io-check/report.json
+            out/io-missing-file-check/report.json
+            out/init-check/report.json
+            out/init-wrong-hash-check/report.json
+            out/init-damaged-code-check/report.json
+            out/init-unsigned-check/report.json
+            out/root-check/report.json
+            out/platform-check/report.json
+      - uses: actions/upload-artifact@v4
+        if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        with:
+          name: ufs-nop-stage-results
+          retention-days: 7
+          path: |
+            out/polaris-stress/
+            out/polaris-ufs-nop-esp/
             out/stress-check/report.json
             out/stress-check/serial.log
             out/stress-check/qemu.log

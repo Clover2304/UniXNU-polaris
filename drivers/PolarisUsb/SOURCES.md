@@ -51,6 +51,33 @@ or media are read. Even a stable shared bypass-shaped context and zero
 doorbells do not prove the real UFS stream ID, DMA, exclusive ownership or
 firmware quiescence. Those remain separate transfer/handoff milestones.
 
+## Owned-queue NOP
+
+`UfsNop.h` and `polaris-ufs-nop=1` add exactly one NOP OUT on newly allocated
+16 KiB contiguous pages in the controlled upper-bank window. `ufs-nop` returns
+the cached result. This requires the separately enabled probe/inventory and
+the observed stable bank-2 shared bypass; SMMU registers stay unchanged.
+The only UFS writes are UTRLRSR, UTRLBA low/high and slot-0 UTRL doorbell.
+Interrupt enables/status, task-list registers, HCE, reset, clocks and PHY are
+preserved. After checking idle doorbells and stopping the inherited transfer
+queue, the code installs the owned list, runs one NOP, checks OCS/NOP IN/tag,
+guards and context stability, then requests queue stop. It retains the new
+pages and queue address until reboot on success or failure. It neither restores
+firmware buffer pointers nor frees possibly DMA-visible memory after a timeout.
+
+The original implementation uses register/packet semantics from the same pinned
+Linux revision's [ufshci.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufshci.h),
+[ufs.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufs.h)
+and [ufshcd.c](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/drivers/ufs/core/ufshcd.c):
+32-byte UTRD, storage command type 1, interrupt-command bit 24, no data/crypto,
+invalid initial OCS 15, doubleword response offsets/length, NOP OUT/IN 0x00/0x20.
+There is no PRDT payload. Command/response occupy separate 512-byte areas.
+The existing ARM64 cache helper cleans+invalidates the full owned allocation
+before DMA and invalidates it after the doorbell clears. A host model maintains
+separate CPU/device memory and injects readback, completion, tag, OCS, guard,
+cache and timeout failures. Successful NOP DMA does not qualify media payloads,
+the exact active SID or exclusive firmware quiescence.
+
 The DWC3 transfer state machine, register definitions, DMA cache helpers and
 CDC descriptors are adapted from Denis0x00/UniXNU-j716f at
 `bf2d0f32f706adbe414551e452f1426ed7c4bd19`, files

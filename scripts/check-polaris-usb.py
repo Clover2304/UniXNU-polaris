@@ -7,6 +7,43 @@ it does not use fastboot/ADB and does not submit a reboot or memory-write comman
 import argparse,hashlib,json,re,secrets,time
 from pathlib import Path
 
+def verify_ufs_nop(build,raw,prior,status):
+    lines=raw.splitlines()
+    if len(lines)!=5 or lines[-1]!=b'POLARIS_UFS_NOP_END' or not raw.endswith(b'\n'):raise ValueError('incomplete UFS NOP record')
+    h=re.fullmatch(rb'POLARIS_UFS_NOP build='+build.encode()+rb' state=ok bytes=16384 writes=6 doorbells=1 polls=(\d+) cache_prepared=1 response_read=1 guards=1 stopped=1 smmu_unchanged=1 media_commands=0 smmu_writes=0 retained=1',lines[0])
+    if not h or not 1<=int(h[1])<=5000:raise ValueError('UFS NOP did not satisfy single-command completion/cleanup')
+    def fields(line,prefix,keys,widths):
+        pattern=prefix.encode()+b''.join(b' '+key.encode()+rb'=([0-9a-f]{'+str(width).encode()+rb'})' for key,width in zip(keys,widths))
+        m=re.fullmatch(pattern,line)
+        if not m:raise ValueError('invalid UFS NOP record: '+prefix)
+        return dict(zip(keys,[int(v,16) for v in m.groups()]))
+    d=fields(lines[1],'POLARIS_UFS_NOP_DMA',('pa','old_base','final_base','usb_pa','ocs','rsp0','rsp1','rsp2'),(16,16,16,16,1,8,8,8))
+    r=fields(lines[2],'POLARIS_UFS_NOP_REG',('is_before','is_after','run','db','ie','hcs','hce'),(8,)*7)
+    f=fields(lines[3],'POLARIS_UFS_NOP_FAULT',('global_before','bank_before','global_after','bank_after','far','syn'),(8,8,8,8,16,8))
+    if not prior.get('ufs_controller_registers_verified') or not prior.get('ufs_readonly_inventory_verified') or not prior.get('ufs_candidate_bypass_register_shape'):
+        raise ValueError('missing matching UFS readiness inventory')
+    matches=prior['ufs_candidate_matches'];q=prior['ufs_queue_samples'][1]
+    if len(matches)!=1 or matches[0]['smr']!=0x800f0100 or matches[0]['s2cr']!=2 or matches[0]['bank']!=2 or not prior['ufs_idle_queue_samples']:
+        raise ValueError('NOP candidate does not match the qualified bank-2 path')
+    if prior['ufs_registers']['ver']!=0x210 or not prior['ufs_registers']['cap']&(1<<24) or q['tr_run']!=1 or q['tm_run']!=0:
+        raise ValueError('unsupported NOP handoff configuration')
+    if d['pa']&4095 or not 0x100000000<=d['pa']<=0x140000000-16384 or d['final_base']!=d['pa'] or d['old_base']!=q['trl'] or d['pa']==d['old_base']:
+        raise ValueError('invalid owned UFS DMA range or queue-base handoff')
+    m=re.search(rb'(?:^| )dma=([0-9a-f]+)(?: |\n)',status)
+    if not m or int(m[1],16)!=d['usb_pa'] or (d['pa']<d['usb_pa']+65536 and d['usb_pa']<d['pa']+16384):
+        raise ValueError('UFS allocation overlaps or misidentifies the USB allocation')
+    p=b''.join(d[k].to_bytes(4,'big') for k in ('rsp0','rsp1','rsp2'))
+    if d['ocs'] or p[0]!=0x20 or p[1]&0x60 or any(p[i] for i in (2,3,6,7,8,10,11)):
+        raise ValueError('wrong NOP IN response, task tag or OCS')
+    if r['run'] or r['db'] or r['ie'] or r['hce']!=1 or r['hcs']&0xb!=0xb or r['is_after']&0x71884 or r['is_before']!=q['is']:
+        raise ValueError('UFS queue did not reach the recorded stopped/healthy state')
+    if any(f[k] for k in ('global_before','bank_before','global_after','bank_after')):raise ValueError('SMMU fault present around the NOP')
+    return dict(ufs_owned_nop_verified=True,ufs_owned_queue_handoff_verified=True,ufs_dma_verified=True,
+                ufs_exclusive_firmware_quiescence_verified=False,ufs_native_media_read_verified=False,
+                ufs_nop_polls=int(h[1]),ufs_nop_dma=d,ufs_nop_regs=r,ufs_nop_faults=f,
+                ufs_nop_sha256=hashlib.sha256(raw).hexdigest(),
+                ufs_dma_scope='One NOP descriptor/request/response with owned pages, explicit cache maintenance, guard checks and stopped transfer queue; no data payload or media read')
+
 def verify_ufs_inventory(build,raw):
     """Validate a cached register inventory; never infer DMA or SID ownership."""
     def parse(line,prefix,spec):
@@ -104,9 +141,11 @@ def main():
     p.add_argument('--expected-build',required=True);p.add_argument('--out',type=Path,required=True)
     p.add_argument('--ufs-probe',action='store_true',help='collect and validate the opt-in cached UFS snapshot')
     p.add_argument('--ufs-inventory',action='store_true',help='also collect the read-only candidate stream/queue inventory')
+    p.add_argument('--ufs-nop',action='store_true',help='verify the cached single owned-queue NOP result')
     p.add_argument('--wait',type=float,default=120);a=p.parse_args()
     if not re.fullmatch('[0-9a-f]{40}',a.expected_build):p.error('requires the exact source commit')
     if a.ufs_inventory and not a.ufs_probe:p.error('--ufs-inventory requires --ufs-probe')
+    if a.ufs_nop and not a.ufs_inventory:p.error('--ufs-nop requires --ufs-inventory')
     import usb.core,usb.util
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False)
     report=dict(passed=False,physical_polaris=False,source_commit=a.expected_build,transport='native XNU polling USB CDC',
@@ -151,6 +190,10 @@ def main():
             raw=exchange('ufs-map',lambda d:b'POLARIS_UFS_INVENTORY_END\n' in d)
             (out/'ufs-map.raw').write_bytes(raw)
             report.update(verify_ufs_inventory(a.expected_build,raw))
+        if a.ufs_nop:
+            raw=exchange('ufs-nop',lambda d:b'POLARIS_UFS_NOP_END\n' in d)
+            (out/'ufs-nop.raw').write_bytes(raw)
+            report.update(verify_ufs_nop(a.expected_build,raw,report,status))
         values=verify_response(a.expected_build,nonce,pong,echo,status,log)
         report.update(values,passed=True,physical_polaris=True,nonce=nonce,
                       native_enumeration_verified=True,bidirectional_roundtrip_verified=True,build_identity_verified=True,

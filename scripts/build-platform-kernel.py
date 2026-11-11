@@ -185,6 +185,8 @@ def main():
             raise SystemExit('Missing opt-in UFS register probe')
         if b'POLARIS_UFS_INVENTORY' not in data or b'polaris-ufs-inventory' not in data:
             raise SystemExit('Missing opt-in read-only UFS inventory')
+        if b'POLARIS_UFS_NOP' not in data or b'polaris-ufs-nop' not in data:
+            raise SystemExit('Missing opt-in owned-queue UFS NOP')
         check.symbols(data, {'_polaris_tmp_ready','_polaris_tmp_creates','_polaris_tmp_unlinks','_polaris_tmp_reads','_polaris_tmp_writes','_polaris_tmp_reuses'})
     prelinked = None
     if do_prelink:
@@ -201,6 +203,7 @@ def main():
               'usb_diagnostic_available': source_mockfs,
               'ufs_register_probe_available': source_mockfs,
               'ufs_readonly_inventory_available': source_mockfs,
+              'ufs_owned_nop_available': source_mockfs,
               'usb_diagnostic_build_id': os.environ.get('GITHUB_SHA','local-unqualified') if source_mockfs else None,
               'ram_tmp_available': ram_tree_available,
               'process_signature_policy': 'pid1-and-direct-child-exact-cdhash-v1' if ram_tree_available else None,

@@ -47,6 +47,7 @@ def main():
     parser.add_argument('--usb-console',action='store_true',help='enable the SDM845 polling CDC diagnostic channel on the phone')
     parser.add_argument('--ufs-probe',action='store_true',help='opt in to a read-only UFS register snapshot; requires USB diagnostics')
     parser.add_argument('--ufs-inventory',action='store_true',help='add read-only firmware queue and candidate SID inventory; requires --ufs-probe')
+    parser.add_argument('--ufs-nop',action='store_true',help='install an owned transfer queue and issue one bounded NOP; requires --ufs-inventory')
     roots = parser.add_mutually_exclusive_group()
     roots.add_argument('--initrd', type=Path,
                         help='raw mount-only RAM disk; requires a newly built mockfs/checkpoint kernel')
@@ -65,6 +66,8 @@ def main():
     kernel = args.kernel.resolve()
     data = kernel.read_bytes()
     report = json.loads(kernel.with_suffix('.json').read_text())
+    if args.ufs_nop and (not args.ufs_inventory or report.get('ufs_owned_nop_available') is not True or args.cpus!=1 or args.owned_memory_size!=0x40000000):
+        parser.error('UFS NOP requires --ufs-inventory, source NOP support and the 1-CPU/1-GiB owned window')
     if args.ufs_inventory and (not args.ufs_probe or report.get('ufs_readonly_inventory_available') is not True):
         parser.error('UFS inventory requires --ufs-probe and source inventory support')
     if args.ufs_probe and (not args.usb_console or report.get('ufs_register_probe_available') is not True):
@@ -158,10 +161,11 @@ def main():
         if process_bundle:
             kernel_args += ['polaris-process=1', 'polaris-child-cdhash=' + process_bundle['child']['cdhash']]
             if process_bundle['tmp_enabled']:kernel_args += ['polaris-tmp=1']
-    kernel_args=[arg for arg in kernel_args if not arg.startswith(('polaris-usb=','polaris-ufs-probe=','polaris-ufs-inventory='))]
+    kernel_args=[arg for arg in kernel_args if not arg.startswith(('polaris-usb=','polaris-ufs-probe=','polaris-ufs-inventory=','polaris-ufs-nop='))]
     if args.usb_console:kernel_args+=['polaris-usb=1']
     if args.ufs_probe:kernel_args+=['polaris-ufs-probe=1']
     if args.ufs_inventory:kernel_args+=['polaris-ufs-inventory=1']
+    if args.ufs_nop:kernel_args+=['polaris-ufs-nop=1']
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
     prefix = load_module('cpu_prefix', ROOT / 'scripts/check-cpu-prefix.py')
@@ -229,6 +233,7 @@ def main():
         'usb_diagnostic_enabled': args.usb_console,
         'ufs_register_probe_enabled': args.ufs_probe,
         'ufs_readonly_inventory_enabled': args.ufs_inventory,
+        'ufs_owned_nop_enabled': args.ufs_nop,
         'sources': report.get('sources', {}),
     }, indent=2) + '\n', encoding='utf-8')
     print(f'{out}: payload ESP assembled; cpus={args.cpus}, ram={args.ram} GiB; host-verified only')
