@@ -17,7 +17,7 @@ or photograph. The C entry aligns the raw process stack before its first stack
 access, fixing the real-phone SIGBUS that the QEMU run did not expose.
 
 The framebuffer is inherited from firmware. There is no Apple userland,
-interactive input, persistent XNU storage, native touch/display/GPU driver or
+POSIX terminal input, persistent XNU storage, native touch/display/GPU driver or
 daily-usable system. The named-root and second-process stage is also verified by the user-reported
 phone screen: `POLARIS_CHILD_OK pid=2 ppid=1`,
 `POLARIS_PROC_OK child=2 exit=42 reaped=1 cow=OK`, and a changing
@@ -43,6 +43,19 @@ empty zombie list. Whole-kernel memory leak freedom is not qualified.
 The user confirmed `POLARIS_STRESS_OK`, `POLARIS_STRESS_CLEAN` and a continuously
 changing tick on the phone after temporary boot. Internal kernel resource
 counts are QEMU evidence; the physical acceptance uses the program's self-checks.
+
+**Native XNU USB diagnostics now work on the phone** (2026-11-11,
+[source/CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42969364633),
+source `638a344d865375c209f13f6109484eee7fd7d5fe`). The polling CDC channel
+enumerates as `1209:0001`. The host verified ping, a random nonce round-trip,
+the exact build identity and an 11,100-byte runtime log response with zero
+overwritten bytes, including the process and filesystem self-check markers.
+Ten more nonce/status samples over about ten seconds kept the command-error
+count at 3 with no reply overflow. Startup required one bounded QUSB2 recovery;
+the remaining historical command errors and repeated-boot reliability need
+follow-up. The supported commands are `ping`, `echo`, `status`, `log`, `help`.
+The 64 KiB log ring starts when the console opens; early boot and persistent
+crash logs, a POSIX user terminal, USB IRQs and suspend/resume remain unqualified.
 
 ## English
 
@@ -118,8 +131,9 @@ kernel+QEMU and ESP images. Pinned upstream revisions in
 
 ### Next stages
 
-A root for the kernel (ramdisk/mockfs first, UFS later), then the prelink and
-Apple-identity decision, then touch/display as Darwin 23 drivers. The full
+Repeat boot and USB reconnect checks on the captured successful baseline,
+then native read-only UFS identification and readback. Apple userland,
+prelinked components and native display/touch remain later stages. The full
 history of both chains is in [docs/HISTORY.md](docs/HISTORY.md).
 
 ## 简体中文
@@ -136,7 +150,10 @@ RAM 根挂载、固定文件读写、fork/exec/exit/wait、退出状态和单个
 1,000 次进程创建/执行/回收（200 串行、800 个分批子进程）已通过 CI 和 QEMU，覆盖 0～63 号父进程描述符、退出时临时文件回收和四个 COW 页抽样。
 用户已确认真机出现 `STRESS_OK`、`STRESS_CLEAN`，且 tick 持续变化，本轮程序自检通过。
 内核内部资源计数仅在 QEMU 取证；完整内存泄漏排查仍未完成。
-Apple 用户态、交互输入、原生 UFS、触摸和 GPU 尚未接入。
+原生 XNU 轮询 USB CDC 已在真机枚举为 `1209:0001`，主机完成 ping、随机串往返、构建身份核对，取回 11,100 字节运行日志响应，覆盖丢失计数为零，包含原有进程与文件系统自检成功标记。
+支持 `ping/echo/status/log/help`；约 10 秒的十次附加往返中命令错误计数保持 3，无回复溢出。启动使用了一次 QUSB2 恢复，历史命令错误与重复启动可靠性仍待排查。
+日志限于控制台打开后的 64 KiB RAM 环，早期启动和持久化崩溃日志未完成。
+Apple 用户态、用户态终端输入、原生 UFS、触摸和 GPU 尚未接入。
 
 ### 本次移植期间发现并修复的两个通用 bug
 

@@ -16,7 +16,8 @@ Hardware references:
   DWC3 `0x0a600000`, QUSB2 v2 `0x088e2000`, stream `0x740`, high-speed limit.
 - Linux `067c5c24cef23d913b67eaaf71ae67e7169a6620`:
   `drivers/clk/qcom/gcc-sdm845.c`, `drivers/phy/qualcomm/phy-qcom-qusb2.c`,
-  `drivers/usb/dwc3/core.h`, `drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c`
+  `drivers/usb/dwc3/core.h`, `drivers/usb/dwc3/dwc3-qcom.c`,
+  `drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c`
   (register semantics and firmware BYPASS-to-FAULT quirk; no Linux source copied).
 
 The first hardware candidate stopped at stage 4 with core `5533300a`, HWPARAMS0
@@ -57,7 +58,19 @@ reset timeout permits one QUSB2 reinitialization and full device reset,
 reusing the same DMA arena; CORE_READY is polled for at most 10 ms.
 Failures print clock and read-only SMMU fault context too. Those fault
 registers may include earlier firmware activity and are not cleared.
-These changes are candidates for hardware validation, not USB qualification.
+Hardware acceptance for source `638a344d865375c209f13f6109484eee7fd7d5fe`
+completed on 2026-11-11: the first EP0 SETEPCONFIG timed out, then QUSB2
+reinitialization and full device reset reached RUN and CDC enumeration.
+The host verified nonce round-trip, exact build identity and an 11,100-byte
+runtime log response with zero dropped bytes and the stress-test checkpoints.
+Direct USB logging read IDR0 `4c017e4c` (76 groups), correcting the earlier
+user transcription `4c017eac`; bank 4 remained an unchanged shared bypass.
+Ten further nonce/status samples over about ten seconds retained three
+historical command errors and two bus resets with no reply overflow.
+This qualifies basic polling diagnostic transport on one physical boot.
+Zero-error startup, repeated boots/reconnects, USB IRQs, isolation, throughput
+and long-term or suspend/resume reliability remain unqualified. Evidence
+scope and hashes are recorded in `research/bringup-test-plan.md`.
 
 This is a polling CDC diagnostic channel, enabled by `polaris-usb=1`.
 The log is a 64 KiB in-memory ring captured after the console opens. It does
