@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Tools
-        run: sudo apt-get update && sudo apt-get install -y clang lld llvm
+        run: python3 scripts/ensure-linux-tools.py --profile host
       - name: Protocol and ADT checks
         run: python3 scripts/check-host.py
       - name: CPU prefix smoke
@@ -51,8 +51,7 @@ jobs:
           path: out/upstream/package/Mu_Basecore
       - name: Tools and EDK2 inputs
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential uuid-dev python3 clang lld llvm gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu qemu-system-arm qemu-efi-aarch64
+          python3 scripts/ensure-linux-tools.py --profile efi
           git -C out/upstream/package/Mu_Basecore submodule update --init --depth 1 MdePkg/Library/BaseFdtLib/libfdt MdePkg/Library/MipiSysTLib/mipisyst BaseTools/Source/C/BrotliCompress/brotli
       - name: EFI compilation and QEMU
         run: python3 scripts/check-efi.py --base out/upstream
