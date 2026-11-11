@@ -133,14 +133,17 @@ _start:
 """
 
 
-def kernel_symbols(kernel):
+def kernel_symbols(kernel, by_name=False):
     """Address -> name for the kernel's symbols, from llvm-nm."""
     nm = shutil.which('llvm-nm') or '/opt/homebrew/opt/llvm/bin/llvm-nm'
     table = {}
     for line in subprocess.run([nm, '-n', kernel], capture_output=True, text=True, check=True).stdout.splitlines():
         parts = line.split()
         if len(parts) == 3:
-            table.setdefault(int(parts[0], 16), parts[2])
+            if by_name:
+                table[parts[2]] = int(parts[0], 16)
+            else:
+                table.setdefault(int(parts[0], 16), parts[2])
     return table
 
 
@@ -170,7 +173,7 @@ def find_call(data, symbols, function, name, occurrence):
     return hits[occurrence - 1]
 
 
-def assemble_c(source, va, workdir, symbols):
+def assemble_c(source, va, workdir, symbols, user_state=False):
     """Build a freestanding C file for VA; returns (bytes, load address of the first byte, address of panic_screen).
 
     The linker may start .text a little after VA (it keeps the ELF headers in front), so the
@@ -185,6 +188,13 @@ def assemble_c(source, va, workdir, symbols):
         font_dir = ROOT / 'scripts'   # vendored copy for firmware-tree-less runs
     obj, elf, binary = (workdir / name for name in ('panic.o', 'panic.elf', 'panic.bin'))
     definitions = []
+    if user_state:
+        for macro, name in [('CURRENT_THREAD', '_current_thread'), ('USER_REGS', '_find_user_regs')]:
+            address = symbols.get(name)
+            if address is None or address % 4 or not any(
+                    base <= address < base + size for base, size, _, _ in SEGMENTS):
+                raise SystemExit(f'Missing user-state diagnostic function {name}')
+            definitions.append(f'-D{macro}={address:#x}UL')
     for macro, name, width in (('MAX_MEM', '_max_mem', 8),
                                ('PAGE_TOTAL', '_vm_page_pages', 4),
                                ('PAGE_FREE', '_vm_page_free_count', 4)):
@@ -314,7 +324,7 @@ def rebase(kernel, data):
         CAVES = {stage: va + delta for stage, va in CAVES.items()}
         PANIC_VA += delta
         VINFO_VA += delta
-    names = {name: va for va, name in kernel_symbols(kernel).items()}
+    names = kernel_symbols(kernel, by_name=True)
     if '_start_first_cpu' in names:
         START_FIRST_CPU = names['_start_first_cpu']
         # Native bootstrap table-capacity checks can grow before SCTLR setup.
@@ -375,10 +385,13 @@ def main():
     parser.add_argument('--reset-after', metavar='SYMBOL', help='place the reset after this call in arm_init instead of stage 3')
     parser.add_argument('--reset-before', action='store_true', help='reset at the call site before invoking SYMBOL (requires --reset-after)')
     parser.add_argument('--panic-screen', action='store_true', help='draw panic() messages on the screen')
+    parser.add_argument('--user-state', action='store_true', help='also show saved ARM64 user fault registers (pinned XNU ABI)')
     parser.add_argument('--no-reset', action='store_true', help='no reset probe at all')
     parser.add_argument('--occurrence', type=int, default=1, help='which call to SYMBOL (1 = first)')
     parser.add_argument('--in', dest='function', default='_arm_init', help='function that makes the call (default _arm_init)')
     args = parser.parse_args()
+    if args.user_state and not args.panic_screen:
+        parser.error('--user-state requires --panic-screen')
     if args.reset_before and not args.reset_after:
         raise SystemExit('--reset-before requires --reset-after')
     data = bytearray(args.kernel.read_bytes())
@@ -403,16 +416,17 @@ def main():
         if args.panic_screen:
             with tempfile.TemporaryDirectory() as tmp:
                 preview, _, _ = assemble_c(ROOT / 'scripts/xnu-panic-screen.c',
-                    AFTER_MMU_VA + 0x400, Path(tmp), kernel_names)
+                    AFTER_MMU_VA + 0x400, Path(tmp), kernel_names, args.user_state)
             panic_capacity = (len(preview) + 15) & ~15
         # Stay in the retained executable segment containing the entry;
         # padding in __KLD or writable data has a different lifetime/protection.
         entry_end = next(va + size for va, _, _, size in SEGMENTS
                          if va <= ENTRY_VA < va + size)
+        stages = (1, 2) if args.no_reset else (1, 2, 3, 4)
         base = find_zero_window(data, AFTER_MMU_VA + 0x400,
-                               4 * CAVE_SIZE + panic_capacity, entry_end)
-        CAVES.update({stage: base + index * CAVE_SIZE for index, stage in enumerate((1, 2, 3, 4))})
-        PANIC_CAVE_END = base + 4 * CAVE_SIZE + panic_capacity
+                               len(stages) * CAVE_SIZE + panic_capacity, entry_end)
+        CAVES.update({stage: base + index * CAVE_SIZE for index, stage in enumerate(stages)})
+        PANIC_CAVE_END = base + len(stages) * CAVE_SIZE + panic_capacity
 
     # (site, cave stage, symbols the cave is linked with)
     sites = [(ENTRY_VA, 1, {'target': START_FIRST_CPU}),
@@ -443,7 +457,7 @@ def main():
         if word(PANIC_VA) in (0, 0xFFFFFFFF) or any(data[file_offset(PANIC_CAVE):file_offset(min(PANIC_CAVE + 0x1000, PANIC_CAVE_END))]):
             raise SystemExit('panic() or the panic screen padding is not as expected')
         with tempfile.TemporaryDirectory() as tmp:
-            code, load, entry = assemble_c(ROOT / 'scripts/xnu-panic-screen.c', PANIC_CAVE, Path(tmp), kernel_names)
+            code, load, entry = assemble_c(ROOT / 'scripts/xnu-panic-screen.c', PANIC_CAVE, Path(tmp), kernel_names, args.user_state)
             common_entry = panic_common_entry(Path(tmp), code, load)
         if load + len(code) > PANIC_CAVE_END:
             raise SystemExit(f'panic screen is {len(code):#x} bytes at {load:#x}, the padding ends at {PANIC_CAVE_END:#x}')

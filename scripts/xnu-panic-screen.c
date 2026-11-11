@@ -253,6 +253,30 @@ __attribute__((noreturn, used, section(".text.b_main"))) void panic_screen_main 
   }
   format (&g, fmt, args);
   g.log = 0;
+#ifdef USER_REGS
+  /* Pinned xnu d8b8029 ARM_SAVED_STATE64; use the kernel's accessors instead
+   * of guessing a machine-thread offset. Read only, with translation checks. */
+  {
+    struct saved64 {
+      u32 flavor, count;
+      u64 x[29], fp, lr, sp, pc;
+      u32 cpsr, reserved;
+      u64 far;
+      u32 esr, exception;
+    };
+    _Static_assert(__builtin_offsetof(struct saved64, pc) == 264, "saved PC ABI");
+    _Static_assert(__builtin_offsetof(struct saved64, far) == 280, "saved FAR ABI");
+    void *thread = ((void *(*)(void))CURRENT_THREAD)();
+    const struct saved64 *s = ((const struct saved64 *(*)(void *))USER_REGS)(thread);
+    if (s && readable((const char *)s, args) &&
+        readable((const char *)s + sizeof(*s) - 1, args) && s->flavor == 21) {
+      hex (&g, "\nUSER_PC=", s->pc);
+      hex (&g, "\nUSER_SP=", s->sp);
+      hex (&g, "\nUSER_FAR=", s->far);
+      hex (&g, "\nUSER_ESR=", s->esr);
+    }
+  }
+#endif
   __asm__ volatile ("dsb sy");
   /* Sample the active CPU translation regime, without changing it. This is
    * panic-time evidence only; it does not establish early mappings or EL0 ABI. */

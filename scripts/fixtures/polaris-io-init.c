@@ -53,8 +53,20 @@ static s64 open_file(const char *name,s64 flags,u64 stage) { return must(CALL(5,
 static void close_file(s64 fd,u64 stage) { exact(CALL(6,fd,0,0,0),0,stage);io_results[16]++; }
 static void expect_error(struct reply r,s64 error,u64 stage) { if(!ERROR(r)||r.value!=error)io_failure(stage,ERROR(r)?(u64)r.value:998); }
 
-__attribute__((noreturn)) void start(void)
+/* The raw Darwin process stack carries argc/argv, not a C call frame.
+ * Align it before any compiler-generated stack access (real A75 checks SP).
+ * Preserve its original address in x0 for diagnostics; this init takes no argv.
+ */
+__attribute__((naked,noreturn)) void start(void)
 {
+ __asm__ volatile("mov x0, sp\n\tand x9, x0, #0xfffffffffffffff0\n\tmov sp, x9\n\tb _polaris_io_start");
+}
+
+__attribute__((noreturn,used)) void polaris_io_start(u64 initial_sp)
+{
+ u64 aligned_sp;
+ __asm__ volatile("mov %0, sp":"=r"(aligned_sp));
+ io_results[21]=initial_sp;io_results[22]=aligned_sp;
  struct reply r=CALL(20,0,0,0,0);results[0]=(u64)r.value;results[2]=r.flags;
  int mib[2]={6,7};old_length=8;user_page_size=0;
  r=sc(202,(s64)mib,2,(s64)&user_page_size,(s64)&old_length,0,0);

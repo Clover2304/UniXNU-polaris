@@ -23,6 +23,7 @@ class IoFixtureTests(unittest.TestCase):
         image=(self.out/'launchd.macho').read_bytes();disk=(self.out/'root.img').read_bytes()
         identity=fixture.inspect(image)
         self.assertEqual(identity['mode'],'io')
+        self.assertTrue(identity['c_stack_entry_aligned'])
         self.assertEqual(set(identity['io_symbols']),fixture.IO_WANTED)
         magic,version,count,launch,size,state,capacity=struct.unpack_from('<8sII4Q',disk)
         self.assertEqual((magic,version,count,launch,capacity),(b'N4KROOT\0',2,2,4096,4096))
@@ -39,3 +40,11 @@ class IoFixtureTests(unittest.TestCase):
         image[identity['code_file_offset']]^=1
         with self.assertRaisesRegex(ValueError,'page hash mismatch'):
             fixture.ramdisk(image)
+
+    def test_valid_signature_does_not_qualify_an_unaligned_c_entry(self):
+        identity=fixture.inspect((self.out/'launchd.macho').read_bytes())
+        unsigned=bytearray((self.out/'unsigned.macho').read_bytes())
+        struct.pack_into('<I',unsigned,identity['code_file_offset'],0xd503201f)
+        # Re-sign our own fixture: integrity alone cannot prove its startup ABI.
+        signed=fixture.static_and_sign(unsigned)
+        self.assertFalse(fixture.inspect(signed)['c_stack_entry_aligned'])

@@ -81,6 +81,8 @@ def main():
         except (ValueError, IndexError) as error:
             parser.error(str(error))
         if user_init['mode'] == 'io':
+            if not user_init.get('c_stack_entry_aligned'):
+                parser.error('I/O init must align the process stack before entering C')
             if report.get('ram_io_available') is not True:
                 parser.error('I/O init requires the bounded RAM-file/console kernel')
             checker.symbols(data, {'_polaris_io_root_enabled', '_polaris_io_file_reads',

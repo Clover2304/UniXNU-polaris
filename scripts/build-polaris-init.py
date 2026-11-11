@@ -86,9 +86,19 @@ def inspect(data):
     if entry != addresses['_start'] or not code_offset[0] <= entry < code_offset[0] + code_offset[2]:
         raise ValueError('static entry does not match the source symbol')
     io_symbols = {}
+    c_stack_entry_aligned = False
     if b'_io_ticks\0' in data:
         io_symbols = load_checker().symbols(data, IO_WANTED)
+        entry_offset = code_offset[1] + entry - code_offset[0]
+        words = struct.unpack_from('<4I', data, entry_offset)
+        if words[:3] == (0x910003e0, 0x927cec09, 0x9100013f) and words[3] & 0xfc000000 == 0x14000000:
+            immediate = words[3] & 0x3ffffff
+            if immediate & 0x2000000:
+                immediate -= 0x4000000
+            target = load_checker().symbols(data, {'_polaris_io_start'})['_polaris_io_start']
+            c_stack_entry_aligned = entry + 12 + immediate * 4 == target
     return {'mode': 'io' if io_symbols else 'syscalls', 'io_symbols': io_symbols,
+            'c_stack_entry_aligned': c_stack_entry_aligned,
             'process_sha256': hashlib.sha256(data).hexdigest(), 'cdhash': hashlib.sha256(cd).hexdigest()[:40],
             'code_signature_page_bytes': 4096, 'signature_flags': flags, 'addresses': addresses,
             'code_file_offset': code_offset[1] + entry - code_offset[0], 'userland_booted': False,

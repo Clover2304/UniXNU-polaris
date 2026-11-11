@@ -23,7 +23,7 @@ FIELDS = ['stage', 'failure_errno', 'console_fd', 'stdout_bytes', 'stderr_bytes'
           'pipe_read_fd', 'pipe_write_fd', 'stdin_bytes', 'file_fd', 'seed_read_bytes',
           'file_write_bytes', 'file_read_bytes', 'bounds_errno', 'launchd_write_errno',
           'file_eof_verified', 'reopen_verified', 'closed_descriptors', 'heartbeat_writes',
-          'select_result', 'select_returns', 'pipe_eof_verified']
+          'select_result', 'select_returns', 'pipe_eof_verified', 'initial_sp', 'c_stack_sp']
 
 
 def module(name, path):
@@ -49,6 +49,8 @@ def main():
     identity = fixture.inspect(image)
     if identity['mode'] != 'io':
         p.error('requires the own resident I/O init')
+    if not identity.get('c_stack_entry_aligned'):
+        p.error('requires a verified stack-aligning entry before C code')
     data = a.kernel.read_bytes()
     build = json.loads(a.kernel.with_suffix('.json').read_text())
     if (build.get('kernel_sha256') != hashlib.sha256(data).hexdigest() or
@@ -165,7 +167,8 @@ def main():
                                     state['stdout_bytes']>0 and state['stderr_bytes']>0 and state['stdin_bytes']>0 and
                                     state['seed_read_bytes']>0 and state['file_write_bytes']==state['file_read_bytes']>0 and
                                     state['bounds_errno']==28 and state['launchd_write_errno'] in (26,30) and
-                                    state['file_eof_verified']==state['reopen_verified']==state['pipe_eof_verified']==1)
+                                    state['file_eof_verified']==state['reopen_verified']==state['pipe_eof_verified']==1 and
+                                    state['initial_sp']>0 and state['c_stack_sp']>0 and state['c_stack_sp']%16==0)
                                 if not report['io_verified']:break
                                 if pc==user['_io_checkpoint']:
                                     packet(f'z1,{pc:x},4');continue
