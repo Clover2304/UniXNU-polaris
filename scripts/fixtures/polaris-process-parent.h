@@ -15,6 +15,9 @@ static void process_require(int condition,u64 stage,u64 detail)
 #ifdef POLARIS_TMP_TEST
 #include "polaris-tmp-parent.h"
 #endif
+#ifdef POLARIS_STRESS_TEST
+#include "polaris-stress-parent.h"
+#endif
 static void process_run(s64 state_fd)
 {
  static const char message[]=PROBE_MESSAGE;
@@ -74,5 +77,8 @@ static void process_run(s64 state_fd)
  (void)CALL(4,1,suffix,sizeof(suffix)-1,0);
 #ifdef POLARIS_TMP_TEST
  tmp_after_child();
+#endif
+#ifdef POLARIS_STRESS_TEST
+ stress_run(state_fd);
 #endif
 }

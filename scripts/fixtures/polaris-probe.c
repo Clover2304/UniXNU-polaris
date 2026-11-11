@@ -12,6 +12,9 @@ static void require(int condition,u64 stage)
 {
  if(!condition) { (void)CALL(1,80+stage,0,0,0);reboot_return(); }
 }
+#ifdef POLARIS_STRESS_TEST
+#include "polaris-stress-child.h"
+#endif
 POLARIS_ENTRY(polaris_probe_start)
 __attribute__((noreturn,used)) void polaris_probe_start(u64 initial_sp)
 {
@@ -19,6 +22,9 @@ __attribute__((noreturn,used)) void polaris_probe_start(u64 initial_sp)
  probe_report.initial_sp=initial_sp;probe_report.c_stack_sp=aligned_sp;
  struct reply r=CALL(20,0,0,0,0);require(!ERROR(r)&&r.value>1,1);probe_report.pid=(u64)r.value;
  r=CALL(39,0,0,0,0);require(!ERROR(r)&&r.value==1,2);probe_report.ppid=(u64)r.value;
+#ifdef POLARIS_STRESS_TEST
+ stress_child_maybe(initial_sp,aligned_sp);
+#endif
  r=CALL(5,"/etc/message",0,0,0);require(!ERROR(r),3);s64 message_fd=r.value;
  char data[80];static const char expected[]=PROBE_MESSAGE;
  r=CALL(3,message_fd,data,sizeof(expected)-1,0);

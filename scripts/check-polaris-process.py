@@ -35,6 +35,31 @@ def module(name, path):
     return result
 
 
+def grade_stress(report):
+    """Qualify exact lifecycle results and observed process/task reclamation.
+
+    Free/wired-page samples are recorded, not treated as proof of leak freedom.
+    """
+    values=report.get('stress_results',[])
+    samples=report.get('stress_samples',[])
+    ready=report.get('stress_barrier',{})
+    final=report.get('snapshots',[{}])[-1]
+    if (values[:14]!=[100,1000,1000,1000,1000,301,300,300,300,300,8,4,300,32] or
+            [s.get('completed') for s in samples]!=[0,200,208,400,600,800,1000]):
+        return False
+    baseline=samples[0]
+    if (ready.get('completed')!=200 or ready.get('width')!=8 or
+            ready.get('_nprocs')!=baseline['_nprocs']+8 or ready.get('_tasks_count')!=baseline['_tasks_count']+8):
+        return False
+    if any(s['_nprocs']!=baseline['_nprocs'] or s['_zombproc'] for s in samples):
+        return False
+    return (all(final.get(n,0)-baseline.get(n,0)==1000 for n in ['_polaris_process_exec_checks','_polaris_child_signature_accepted']) and
+            final.get('_nprocs')==baseline['_nprocs'] and final.get('_tasks_count')==baseline['_tasks_count'] and
+            final.get('_zombproc')==0 and final.get('_terminated_tasks_count')==baseline['_terminated_tasks_count'] and
+            final.get('_terminated_threads_count')==baseline['_terminated_threads_count'] and
+            final.get('_polaris_tmp_creates')==final.get('_polaris_tmp_unlinks')==1146)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--kernel', type=Path, required=True)
@@ -50,6 +75,7 @@ def main():
     bundle_module = module('bundle', ROOT / 'scripts/build-polaris-process.py')
     bundle = bundle_module.inspect_bundle(a.process_dir)
     tmp_enabled=bundle['tmp_enabled']
+    stress_enabled=bundle['stress_enabled']
     child_checks=5 if tmp_enabled else 4
     image = (a.process_dir / 'launchd.macho').read_bytes()
     child = bundle['child']
@@ -77,6 +103,9 @@ def main():
     if tmp_enabled:
         if build.get('ram_tmp_available') is not True:p.error('tmp fixture requires the bounded writable tmp kernel')
         counters.update({name:8 for name in ['_polaris_tmp_ready','_polaris_tmp_creates','_polaris_tmp_unlinks','_polaris_tmp_reads','_polaris_tmp_writes','_polaris_tmp_reuses']})
+    if stress_enabled:
+        counters.update({name:4 for name in ['_nprocs','_tasks_count','_threads_count','_terminated_tasks_count','_terminated_threads_count','_vm_page_free_count','_vm_page_wire_count']})
+        counters['_zombproc']=8
     names = set(counters) | {'_panic', '_panic_with_options', '_panic_trap_to_debugger'}
     syms = platform.symbols(data, names)
     out = a.out.resolve();out.mkdir(parents=True, exist_ok=True)
@@ -120,7 +149,8 @@ def main():
                   resident_verified=False, physical_polaris_booted=False, apple_userland_booted=False,
                   interactive_input_qualified=False, stdin_source='self-fed pipe', snapshots=[])
     report.update(tmp_enabled=tmp_enabled,tmp_verified=False)
-    user = identity['addresses'];user.update(identity['io_symbols']);user.update(identity['process_symbols']);user.update(identity['tmp_symbols'])
+    report.update(stress_enabled=stress_enabled,stress_verified=False,stress_samples=[],global_memory_leak_freedom_qualified=False)
+    user = identity['addresses'];user.update(identity['io_symbols']);user.update(identity['process_symbols']);user.update(identity['tmp_symbols']);user.update(identity['stress_symbols'])
     child_user=child['probe_symbols']
     with tempfile.TemporaryDirectory(prefix='polaris-io-') as temporary:
         work = Path(temporary);qmp_path = work / 'qmp'
@@ -138,7 +168,7 @@ def main():
         with (out / 'qemu.log').open('w') as log:
             process = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT)
             try:
-                deadline = time.monotonic()+120
+                deadline = time.monotonic()+(300 if stress_enabled else 120)
                 while True:
                     try:
                         connection = socket.create_connection(('127.0.0.1', port), timeout=60);break
@@ -177,6 +207,7 @@ def main():
                                user['_process_checkpoint'],user['_process_failure'],child_user['_probe_checkpoint'],
                                syms['_panic'],syms['_panic_with_options'],syms['_panic_trap_to_debugger']]
                         if tmp_enabled:stops.append(user['_tmp_checkpoint'])
+                        if stress_enabled:stops.extend(user[n] for n in ['_stress_sample_checkpoint','_stress_batch_ready','_stress_checkpoint'])
                         for address in stops:
                             if packet(f'Z1,{address:x},4')!='OK':raise RuntimeError('Cannot set observation breakpoint')
                         while time.monotonic()<deadline:
@@ -227,6 +258,21 @@ def main():
                                     actual['_polaris_tmp_reuses']>=82 and actual['_polaris_tmp_reads']>32 and actual['_polaris_tmp_writes']>96)
                                 if not report['tmp_verified']:break
                                 packet(f'z1,{pc:x},4');continue
+                            if stress_enabled and pc in [user['_stress_sample_checkpoint'],user['_stress_batch_ready'],user['_stress_checkpoint']]:
+                                values=list(struct.unpack('<24Q',memory(user['_stress_results'],192)))
+                                if (psr&15)!=0:break
+                                if pc==user['_stress_sample_checkpoint']:
+                                    actual=kernel_counters();actual.update(completed=values[1],elapsed=time.monotonic())
+                                    report['stress_samples'].append(actual)
+                                    if packet(f'z1,{pc:x},4')!='OK':raise RuntimeError('Cannot disarm stress sample')
+                                    packet('s')
+                                    if packet(f'Z1,{pc:x},4')!='OK':raise RuntimeError('Cannot rearm stress sample')
+                                    continue
+                                if pc==user['_stress_batch_ready']:
+                                    actual=kernel_counters();actual.update(completed=values[1],width=values[10])
+                                    report['stress_barrier']=actual
+                                else:report['stress_results']=values
+                                packet(f'z1,{pc:x},4');continue
                             if pc in [user['_io_checkpoint'],user['_resident_checkpoint']]:
                                 values=struct.unpack('<32Q',memory(user['_io_results'],256));state=dict(zip(FIELDS,values));report['io_results']=state
                                 report['io_verified']=((psr&15)==0 and state['stage']==100 and state['failure_errno']==0 and
@@ -244,7 +290,8 @@ def main():
                                     first,last=report['snapshots'][0],sample
                                     report['resident_verified']=(last['ticks']>first['ticks']>=1 and last['select_returns']>=2 and state['select_result']==0 and
                                         last['elapsed']-first['elapsed']>=1.5 and last['_armcpu_timer_interrupts']>first['_armcpu_timer_interrupts']>0)
-                                    report['passed']=(not a.negative and (not tmp_enabled or report['tmp_verified']) and report['el0_observed'] and report['io_verified'] and report['resident_verified'] and report['process_verified'] and
+                                    if stress_enabled:report['stress_verified']=grade_stress(report)
+                                    report['passed']=(not a.negative and (not stress_enabled or report['stress_verified']) and (not tmp_enabled or report['tmp_verified']) and report['el0_observed'] and report['io_verified'] and report['resident_verified'] and report['process_verified'] and
                                         last['_polaris_tree_enabled']==1 and last['_polaris_tree_nodes']==len(bundle['entries'])+1 and
                                         last['_polaris_child_signature_accepted']>0 and last['_polaris_process_exec_checks']>=2 and
                                         last['_polaris_process_exec_rejected']==last['_polaris_child_signature_rejected']==0 and

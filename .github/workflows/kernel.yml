@@ -72,7 +72,7 @@ jobs:
   native-check:
     needs: [kernel, efi]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -162,6 +162,41 @@ jobs:
       - name: Assemble the writable tmp payload ESP
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-tmp-esp --cpus 1 --ram 6 --process-dir out/polaris-tmp
+      - name: Build 1000-child lifecycle acceptance programs
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/build-polaris-process.py --stress --out out/polaris-stress
+      - name: QEMU serial and eight-child lifecycle stress
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/check-polaris-process.py --kernel out/kernel/kernel.macho --platform-esp out/root-check/esp --process-dir out/polaris-stress --out out/stress-check
+      - name: Assemble the process stress payload ESP
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-stress-esp --cpus 1 --ram 6 --process-dir out/polaris-stress
+      - uses: actions/upload-artifact@v4
+        if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        with:
+          name: stress-stage-results
+          retention-days: 7
+          path: |
+            out/polaris-stress/
+            out/polaris-stress-esp/
+            out/stress-check/report.json
+            out/stress-check/serial.log
+            out/stress-check/qemu.log
+            out/stress-check/screen.ppm
+            out/tmp-check/report.json
+            out/process-check/report.json
+            out/process-wrong-hash-check/report.json
+            out/process-damaged-check/report.json
+            out/process-unsigned-check/report.json
+            out/process-cached-init-check/report.json
+            out/io-check/report.json
+            out/io-missing-file-check/report.json
+            out/init-check/report.json
+            out/init-wrong-hash-check/report.json
+            out/init-damaged-code-check/report.json
+            out/init-unsigned-check/report.json
+            out/root-check/report.json
+            out/platform-check/report.json
       - uses: actions/upload-artifact@v4
         if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         with:

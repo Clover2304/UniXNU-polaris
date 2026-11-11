@@ -78,17 +78,18 @@ def inspect_bundle(directory):
     disk=(directory/'root.img').read_bytes();entries=decode_tree(disk)
     expected=encode_tree(tree_files(init,child,f.IO_SEED))
     if disk!=expected:raise ValueError('container differs from verified programs and named data')
-    return dict(init=a,child=b,tmp_enabled=bool(a['tmp_symbols']),ramdisk_bytes=len(disk),ramdisk_sha256=hashlib.sha256(disk).hexdigest(),
+    return dict(init=a,child=b,tmp_enabled=bool(a['tmp_symbols']),stress_enabled=bool(a['stress_symbols']),ramdisk_bytes=len(disk),ramdisk_sha256=hashlib.sha256(disk).hexdigest(),
                 entries=entries,apple_userland_booted=False,interactive_input_qualified=False,
                 expected_checkpoint='POLARIS_PROC_OK child=N exit=42 reaped=1 cow=OK; POLARIS_PROC_LIVE tick changes')
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',type=Path,default=ROOT/'out/polaris-process');p.add_argument('--tmp',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--out',type=Path,default=ROOT/'out/polaris-process');p.add_argument('--tmp',action='store_true');p.add_argument('--stress',action='store_true');a=p.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=True);f=fixture_module()
     clang=shutil.which('clang');linker=shutil.which('ld64.lld') or next((str(p) for p in sorted(Path('/usr/lib').glob('llvm-*/bin/ld64.lld'),reverse=True)),None)
     if not clang or not linker:p.error('requires clang and ld64.lld')
     for label,source,extra in [('launchd','polaris-io-init.c',['-DPOLARIS_PROCESS_INIT=1']),('probe','polaris-probe.c',[])]:
-        if a.tmp:extra=extra+['-DPOLARIS_TMP_TEST=1']
+        if a.tmp or a.stress:extra=extra+['-DPOLARIS_TMP_TEST=1']
+        if a.stress:extra=extra+['-DPOLARIS_STRESS_TEST=1']
         subprocess.run([clang,'--target=arm64-apple-ios17.0','-O2','-ffreestanding','-fno-builtin','-fno-stack-protector','-mgeneral-regs-only',*extra,
                         '-c',ROOT/'scripts/fixtures'/source,'-o',out/(label+'.o')],check=True)
         placement=['-sectalign','__TEXT','__text','0x10000'] if label=='probe' else []
