@@ -21,7 +21,8 @@ jobs:
   efi:
     uses: ./.github/workflows/checks.yml
   kernel:
-    runs-on: macos-15
+    # Standard Intel image retains Xcode 26.2 and avoids the ARM runner queue.
+    runs-on: macos-15-intel
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
