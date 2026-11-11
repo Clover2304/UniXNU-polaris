@@ -108,6 +108,8 @@
 | G6 | IOSurface、图形服务、SpringBoard 及输入 | 未接入 |
 | G7 | 应用启动、权限、退出和崩溃恢复 | 未验证 |
 
+已有机型的签名、entitlement、Sandbox 和用户态启动方案进入优先复用清单，见 [Apple 用户态复用盘点](apple-userland-reuse.md)。G 组的“未验证/未接入”记录本机资格，不意味着相关通用实现需要从零开发；先检查固定 UniXNU 已有模块，再按 XNU 版本移植 davinci 等项目中已解决同类问题的代码。最小 Apple 程序与 launchd 验证可与 UFS 读取支线并行推进，不等待全部外设或完整 Apple 安全服务恢复。
+
 ## H. 稳定性与性能基线
 
 | 编号 | 验收内容 | 状态 |
