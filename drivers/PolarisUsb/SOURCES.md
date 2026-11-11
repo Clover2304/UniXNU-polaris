@@ -208,3 +208,31 @@ This is a polling CDC diagnostic channel, enabled by `polaris-usb=1`.
 The log is a 64 KiB in-memory ring captured after the console opens. It does
 not preserve pre-console output or survive reset, and it does not implement
 Apple USB pairing, a POSIX serial device, USB host mode or suspend/resume.
+
+
+## Bounded SCSI PRDT identity/capacity stage
+
+`UfsScsi.h` reuses the stopped NOP-owned 16 KiB allocation after successful
+DEVICE/UNIT-0 descriptor queries. A single PRDT entry at allocation+0x1400
+points to the separate 4 KiB-aligned data page at allocation+0x2000. Its
+little-endian DBC is exactly transfer bytes minus one; no data overlaps the
+request, response, PRDT or protection ranges. UTRD CT=1, DD=DEVICE_TO_HOST,
+interrupt bit enabled, crypto disabled; command UPIU uses READ, LUN/tag 0.
+Only standard INQUIRY (36 bytes, EVPD=0) and READ CAPACITY(10) (8 bytes, PMI=0)
+are available. No arbitrary CDB, READ sector, WRITE, flag/attribute mutation,
+RPMB or host-triggered command re-execution is exposed.
+
+Every command has one bounded submission, full allocation cache maintenance,
+raw response/sense and PRDT evidence, payload guards and stopped-queue checks.
+A non-GOOD response stops the stage without retry; error sense is retained.
+READ CAPACITY must agree with the already-validated UNIT-0 block count and size.
+The 32-bit last-LBA sentinel is rejected rather than silently inventing geometry.
+The allocation remains retained through reboot, including timeout/failure.
+`ufs-scsi` reports only the cached boot-time results. SCSI metadata PRDT success
+will qualify data payload DMA and native capacity, not sector reads or writes.
+
+Wire and PRDT layouts are cross-checked against fixed Linux
+`067c5c24cef23d913b67eaaf71ae67e7169a6620`:
+[ufs.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufs.h),
+[ufshci.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufshci.h),
+[ufshcd.c](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/drivers/ufs/core/ufshcd.c).

@@ -4,8 +4,57 @@
 Requires PyUSB and libusb. This talks to the XNU 1209:0001 diagnostic device;
 it does not use fastboot/ADB and does not submit a reboot or memory-write command.
 """
-import argparse,hashlib,json,re,secrets,time
+import argparse,hashlib,json,re,secrets,time,struct
 from pathlib import Path
+
+def verify_ufs_scsi(build,raw,prior):
+    if prior.get('source_commit')!=build or not prior.get('ufs_descriptor_queries_verified') or not prior.get('ufs_owned_nop_verified'):
+        raise ValueError('SCSI PRDT requires matching verified descriptor queries and owned NOP')
+    lines=raw.splitlines();pa=prior['ufs_nop_dma']['pa'];unit=prior['ufs_read_descriptor_results'][1]
+    if not unit['enabled'] or unit['unit_index']!=0:raise ValueError('unit 0 is not enabled')
+    h=(rb'POLARIS_UFS_SCSI build='+build.encode()+rb' state=ok count=2 writes=6 doorbells=2 smmu_unchanged=1 prdt_entries=1 sector_commands=0 media_writes=0 smmu_writes=0 retained=1 pa='+f'{pa:016x}'.encode())
+    if not lines or not re.fullmatch(h,lines[0]) or not raw.endswith(b'\n') or lines[-1]!=b'POLARIS_UFS_SCSI_END':raise ValueError('invalid or incomplete SCSI stage')
+    cursor=1;results=[]
+    for n,(kind,opcode,length) in enumerate((('inquiry',0x12,36),('capacity10',0x25,8))):
+        pattern=(rb'POLARIS_UFS_SCSI_CMD n='+str(n).encode()+rb' kind='+kind.encode()+rb' opcode='+f'{opcode:02x}'.encode()+
+            rb' lun=00 state=ok ocs=0 response=00 status=00 flags=([0-9a-f]{2}) bytes='+str(length).encode()+
+            rb' residual=0 segment=(0|2) sense_len=0 guards=1 stopped=1 polls=(\d+) run=00000000 db=00000000 is=([0-9a-f]{8}) upiu=([0-9a-f]{68})')
+        if cursor>=len(lines):raise ValueError('missing SCSI command')
+        m=re.fullmatch(pattern,lines[cursor]);cursor+=1
+        if not m:raise ValueError('SCSI command did not complete GOOD with guards and cleanup')
+        flags,segment,polls,is_value=int(m[1],16),int(m[2]),int(m[3]),int(m[4],16);upiu=bytes.fromhex(m[5].decode())
+        if flags&0x60 or not 1<=polls<=5000 or is_value&0x71884 or upiu[0]!=0x21 or upiu[1]!=flags or any(upiu[i] for i in (2,3,6,7,8)) or int.from_bytes(upiu[10:12],'big')!=segment or any(upiu[12:16]) or (segment and any(upiu[32:34])):
+            raise ValueError('invalid SCSI UPIU response, residual, sense or flags')
+        if cursor>=len(lines):raise ValueError('missing PRDT evidence')
+        m=re.fullmatch(rb'POLARIS_UFS_SCSI_DMA n='+str(n).encode()+rb' data_pa=([0-9a-f]{16}) prdt=([0-9a-f]{32})',lines[cursor]);cursor+=1
+        if not m:raise ValueError('invalid PRDT evidence')
+        data_pa=int(m[1],16);prdt=bytes.fromhex(m[2].decode());address,reserved,dbc=struct.unpack('<QII',prdt)
+        if data_pa!=pa+0x2000 or address!=data_pa or reserved or dbc!=length-1:raise ValueError('PRDT target or byte count differs from the separate owned data page')
+        data=bytearray()
+        while len(data)<length:
+            if cursor>=len(lines):raise ValueError('missing SCSI payload')
+            m=re.fullmatch(rb'POLARIS_UFS_SCSI_DATA n='+str(n).encode()+rb' offset='+str(len(data)).encode()+rb' hex=([0-9a-f]+)',lines[cursor]);cursor+=1
+            if not m or len(m[1])!=2*min(32,length-len(data)):raise ValueError('SCSI payload is truncated or noncontiguous')
+            data.extend(bytes.fromhex(m[1].decode()))
+        record=dict(kind=kind,opcode=opcode,bytes=length,polls=polls,flags=flags,segment=segment,data_pa=data_pa,
+                    prdt_hex=prdt.hex(),upiu_hex=upiu.hex(),data_hex=data.hex(),sha256=hashlib.sha256(data).hexdigest())
+        if n==0:
+            if data[0] or data[3]&15!=2 or data[4]<31 or any(c<0x20 or c>0x7e for c in data[8:36]):raise ValueError('invalid standard direct-access INQUIRY payload')
+            record.update(vendor=data[8:16].decode().strip(),product=data[16:32].decode().strip(),revision=data[32:36].decode().strip())
+        else:
+            last,block=struct.unpack('>II',data)
+            if last==0xffffffff or block!=1<<unit['block_shift'] or last+1!=unit['logical_blocks']:raise ValueError('SCSI capacity differs from unit descriptor')
+            capacity=dict(last_lba=last,logical_blocks=last+1,block_bytes=block,bytes=(last+1)*block)
+        results.append(record)
+    if cursor+3!=len(lines):raise ValueError('unexpected SCSI data or duplicate record')
+    wanted=(f"POLARIS_UFS_SCSI_CAPACITY last_lba={capacity['last_lba']:016x} block_bytes={capacity['block_bytes']} logical_blocks={capacity['logical_blocks']} bytes={capacity['bytes']} query_match=1").encode()
+    if lines[cursor]!=wanted or capacity['bytes']!=unit['capacity_hint_bytes']:raise ValueError('capacity summary disagrees with raw PRDT data')
+    m=re.fullmatch(rb'POLARIS_UFS_SCSI_FAULT global_before=([0-9a-f]{8}) bank_before=([0-9a-f]{8}) global_after=([0-9a-f]{8}) bank_after=([0-9a-f]{8})',lines[cursor+1])
+    if not m:raise ValueError('missing SCSI fault snapshot')
+    faults=dict(zip(('global_before','bank_before','global_after','bank_after'),[int(x,16) for x in m.groups()]))
+    if faults['global_before'] or faults['global_after'] or (faults['bank_before']|faults['bank_after'])&0xc00001fe:raise ValueError('SMMU fault around PRDT transfers')
+    return dict(ufs_scsi_identity_verified=True,ufs_prdt_payload_verified=True,ufs_scsi_capacity_verified=True,
+                ufs_scsi_results=results,ufs_scsi_capacity=capacity,ufs_scsi_faults=faults,ufs_scsi_sha256=hashlib.sha256(raw).hexdigest(),ufs_native_media_read_verified=False)
 
 def verify_ufs_query(build,raw,prior):
     if prior.get('source_commit')!=build or not prior.get('ufs_owned_nop_verified') or not prior.get('ufs_dma_verified'):raise ValueError('QUERY requires a matching verified owned NOP')
@@ -188,11 +237,13 @@ def main():
     p.add_argument('--ufs-inventory',action='store_true',help='also collect the read-only candidate stream/queue inventory')
     p.add_argument('--ufs-nop',action='store_true',help='verify the cached single owned-queue NOP result')
     p.add_argument('--ufs-query',action='store_true',help='verify cached read-only device and unit descriptor results')
+    p.add_argument('--ufs-scsi',action='store_true',help='verify cached INQUIRY and READ CAPACITY PRDT results')
     p.add_argument('--wait',type=float,default=120);a=p.parse_args()
     if not re.fullmatch('[0-9a-f]{40}',a.expected_build):p.error('requires the exact source commit')
     if a.ufs_inventory and not a.ufs_probe:p.error('--ufs-inventory requires --ufs-probe')
     if a.ufs_nop and not a.ufs_inventory:p.error('--ufs-nop requires --ufs-inventory')
     if a.ufs_query and not a.ufs_nop:p.error('--ufs-query requires --ufs-nop')
+    if a.ufs_scsi and not a.ufs_query:p.error('--ufs-scsi requires --ufs-query')
     import usb.core,usb.util
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False)
     report=dict(passed=False,physical_polaris=False,source_commit=a.expected_build,transport='native XNU polling USB CDC',
@@ -245,6 +296,10 @@ def main():
             raw=exchange('ufs-query',lambda d:b'POLARIS_UFS_QUERY_END\n' in d)
             (out/'ufs-query.raw').write_bytes(raw)
             report.update(verify_ufs_query(a.expected_build,raw,report))
+        if a.ufs_scsi:
+            raw=exchange('ufs-scsi',lambda d:b'POLARIS_UFS_SCSI_END\n' in d)
+            (out/'ufs-scsi.raw').write_bytes(raw)
+            report.update(verify_ufs_scsi(a.expected_build,raw,report))
         values=verify_response(a.expected_build,nonce,pong,echo,status,log)
         report.update(values,passed=True,physical_polaris=True,nonce=nonce,
                       native_enumeration_verified=True,bidirectional_roundtrip_verified=True,build_identity_verified=True,

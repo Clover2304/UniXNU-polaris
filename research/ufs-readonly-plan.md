@@ -149,3 +149,23 @@ doorbell 在第 2 次轮询中归零，这只是功能完成记录，不作为�
 | USB / 日志 | 命令错误、回复溢出和丢失均为 0；最终日志 5,100 字节 |
 
 两次后续 USB 采样读取同一启动缓存，不会重发设备查询。该结果证明 QUERY 响应中的元数据路径，不能替代 PRDT 数据负载、SCSI READ CAPACITY 或实际扇区读回。下一轮分别引入带 PRDT 的只读 SCSI 识别/容量命令和有界块读取，再用已写入的 ESP 固定内容做哈希比对；继续使用 RAM 根，保留本轮成功镜像。
+
+
+## 第五轮候选：SCSI 元数据与 PRDT 数据负载
+
+增加独立 `--ufs-scsi`，须同时启用并通过 probe/inventory/NOP/QUERY。
+复用已停止的 16 KiB 自有队列分配，在 +0x1400 放置唯一 PRDT 项，
+指向 +0x2000 的独立数据页。两条命令固定为标准 INQUIRY（36 字节）与
+READ CAPACITY(10)（8 字节），LUN/tag 0，无 VPD、PMI 或任意 CDB 接口。
+返回类型、状态、residual/溢出、sense、PRDT 内容及所有非返回区均检查；
+容量必须与 UNIT 0 描述符一致。非 GOOD、超时或状态变化即停止，不重试，
+请求停止队列，页面保留到重启。故障诊断和缓存结果由 USB `ufs-scsi` 取回。
+
+本地主机 70 项 unittest、定时器和加载窗口检查通过，其中新的独立
+CPU/device DMA 模型核对字节级 UTRD/CDB/PRDT，模拟数据页未 invalidate、
+数据未返回、坏 PRDT/保护区、CHECK CONDITION、错误 residual、超时及清理失败。
+当前候选仍待完整 CI 与真机验收，不能提前记为 PRDT 或容量验证通过。
+这一轮仍不读取扇区，不写介质。后续使用已知 ESP 数据做有界扇区读回。
+
+真机部署沿用 [默认 edk2 与 USB 文件更新](uefi-usb-update.md)，保留当前成功
+`9feeaca` 镜像，通过 Mass Storage 更新 EFI 文件后普通重启，不再依赖每轮 fastboot。

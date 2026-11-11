@@ -70,6 +70,7 @@ class RootPayloadTests(unittest.TestCase):
             self.assertNotIn('polaris-ufs-inventory=1', entry['args'].split())
             self.assertNotIn('polaris-ufs-nop=1', entry['args'].split())
             self.assertNotIn('polaris-ufs-query=1', entry['args'].split())
+            self.assertNotIn('polaris-ufs-scsi=1', entry['args'].split())
             payloads = esp / 'EFI/UniXNU/Payloads'
             nodes, _ = decode((payloads / 'kernel.macho.adt').read_bytes())
             self.assertEqual(nodes['/chosen/memory-map']['RAMDisk'], bytes(16))
@@ -131,6 +132,16 @@ class RootPayloadTests(unittest.TestCase):
                 '--kernel', kernel, '--efi', root, '--out', root / 'esp', '--ufs-query'],capture_output=True,text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('UFS QUERY requires', result.stderr)
+            self.assertFalse((root / 'esp').exists())
+
+    def test_ufs_scsi_requires_explicit_query_and_source_support(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kernel, _ = self.inputs(root)
+            result = subprocess.run([sys.executable, ROOT / 'scripts/make-payload-esp.py',
+                '--kernel', kernel, '--efi', root, '--out', root / 'esp', '--ufs-scsi'],capture_output=True,text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('UFS SCSI requires', result.stderr)
             self.assertFalse((root / 'esp').exists())
 
     def test_old_platform_kernel_is_rejected_before_replacing_output(self):

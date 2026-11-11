@@ -20,6 +20,7 @@
 #include "UfsInventory.h"
 #include "UfsNop.h"
 #include "UfsQuery.h"
+#include "UfsScsi.h"
 
 #ifndef POLARIS_USB_BUILD_ID
 #define POLARIS_USB_BUILD_ID "local-unqualified"
@@ -63,6 +64,10 @@ struct TerminalSession {
     unsigned ufsQueryCount=0;
     bool ufsQueryEnabled=false,ufsQuerySmmuUnchanged=false;
     uint32_t ufsQueryFaultBefore[2]{},ufsQueryFaultAfter[2]{};
+    PolarisUfsScsiResult ufsScsi[2];
+    unsigned ufsScsiCount=0;
+    bool ufsScsiEnabled=false,ufsScsiSmmuUnchanged=false;
+    uint32_t ufsScsiFaultBefore[2]{},ufsScsiFaultAfter[2]{};
     PolarisBytes<131072> reply;
     PolarisLine input;
     uint8_t tx[DMA_EP3_MAX_CHUNK]{};
@@ -212,6 +217,51 @@ static void ufsQueryText(TerminalSession &s,bool response) {
     snprintf(text,sizeof(text),"POLARIS_UFS_QUERY_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x\nPOLARIS_UFS_QUERY_END\n",
         s.ufsQueryFaultBefore[0],s.ufsQueryFaultBefore[1],s.ufsQueryFaultAfter[0],s.ufsQueryFaultAfter[1]);emit();
 }
+static void runUfsScsi(TerminalSession &s,bool enabled) {
+    s.ufsScsiEnabled=enabled;
+    if(!enabled || s.ufsQueryCount!=2 || !s.ufsQuerySmmuUnchanged ||
+       s.ufsDescriptors[0].state!=PolarisUfsDescriptor::Success || s.ufsDescriptors[1].state!=PolarisUfsDescriptor::Success)return;
+    unsigned cb=(s.ufsInventory.pages+2u)*4096u;
+    if(!ufsSmmuRead(&s,0x48,&s.ufsScsiFaultBefore[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsScsiFaultBefore[1]) ||
+       polaris_ufs_nop_fault(s.ufsScsiFaultBefore[0],s.ufsScsiFaultBefore[1]))return;
+    const PolarisUfsScsiKind kinds[]={PolarisUfsScsiKind::Inquiry,PolarisUfsScsiKind::Capacity10};
+    for(unsigned i=0;i<2;i++) {
+        s.ufsScsiCount++;
+        s.ufsScsi[i]=polaris_ufs_scsi_read({&s,ufsNopRead,ufsNopWrite,ufsNopDelay,ufsNopCache},
+            s.ufsNop,s.ufsDescriptors[1],s.ufsDma,s.ufsDmaPhys,kinds[i],true);
+        if(s.ufsScsi[i].state!=PolarisUfsScsiResult::Success)break;
+    }
+    auto after=polaris_ufs_inventory({&s,ufsRead},{&s,ufsSmmuRead},true,true);
+    s.ufsScsiSmmuUnchanged=polaris_ufs_nop_same_smmu(s.ufsInventory,after);
+    if(!ufsSmmuRead(&s,0x48,&s.ufsScsiFaultAfter[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsScsiFaultAfter[1]) ||
+       polaris_ufs_nop_fault(s.ufsScsiFaultAfter[0],s.ufsScsiFaultAfter[1]))s.ufsScsiSmmuUnchanged=false;
+}
+static void ufsScsiText(TerminalSession &s,bool response) {
+    char text[512],hex[69];auto emit=[&](){if(response)respond(s,text);else console("%s",text);};
+    unsigned writes=0,doorbells=0;bool ok=s.ufsScsiCount==2 && s.ufsScsiSmmuUnchanged;
+    for(unsigned i=0;i<s.ufsScsiCount;i++){const auto &r=s.ufsScsi[i];writes+=r.writes;doorbells+=r.doorbells;ok&=r.state==PolarisUfsScsiResult::Success;}
+    snprintf(text,sizeof(text),"POLARIS_UFS_SCSI build=%s state=%s count=%u writes=%u doorbells=%u smmu_unchanged=%u prdt_entries=1 sector_commands=0 media_writes=0 smmu_writes=0 retained=%u pa=%016llx\n",
+        POLARIS_USB_BUILD_ID,!s.ufsScsiEnabled?"disabled":ok?"ok":"failed",s.ufsScsiCount,writes,doorbells,s.ufsScsiSmmuUnchanged,s.ufsDmaDesc!=nullptr,s.ufsDmaPhys);emit();
+    for(unsigned i=0;i<s.ufsScsiCount;i++) {
+        const auto &r=s.ufsScsi[i];queryHex(r.upiu,34,hex);
+        snprintf(text,sizeof(text),"POLARIS_UFS_SCSI_CMD n=%u kind=%s opcode=%02x lun=00 state=%s ocs=%u response=%02x status=%02x flags=%02x bytes=%u residual=%u segment=%u sense_len=%u guards=%u stopped=%u polls=%u run=%08x db=%08x is=%08x upiu=%s\n",
+            i,r.kind==PolarisUfsScsiKind::Inquiry?"inquiry":"capacity10",r.kind==PolarisUfsScsiKind::Inquiry?0x12:0x25,
+            polaris_ufs_scsi_state(r.state),r.ocs,r.response,r.status,r.flags,r.bytes,r.residual,r.segment,r.senseLength,r.guards,r.stopped,r.polls,r.finalRun,r.finalDb,r.isAfter,hex);emit();
+        queryHex(r.prdt,16,hex);
+        snprintf(text,sizeof(text),"POLARIS_UFS_SCSI_DMA n=%u data_pa=%016llx prdt=%s\n",i,r.dataPa,hex);emit();
+        for(unsigned offset=0;offset<r.bytes && offset<36;offset+=32) {
+            unsigned bytes=r.bytes-offset;if(bytes>32)bytes=32;queryHex(r.data+offset,bytes,hex);
+            snprintf(text,sizeof(text),"POLARIS_UFS_SCSI_DATA n=%u offset=%u hex=%s\n",i,offset,hex);emit();
+        }
+        if(r.senseLength){queryHex(r.sense,r.senseLength,hex);snprintf(text,sizeof(text),"POLARIS_UFS_SCSI_SENSE n=%u hex=%s\n",i,hex);emit();}
+    }
+    const auto &capacity=s.ufsScsi[1];
+    snprintf(text,sizeof(text),"POLARIS_UFS_SCSI_CAPACITY last_lba=%016llx block_bytes=%u logical_blocks=%llu bytes=%llu query_match=%u\n",
+        capacity.lastLba,capacity.blockBytes,capacity.state==PolarisUfsScsiResult::Success?capacity.lastLba+1:0,
+        capacity.capacityBytes,capacity.state==PolarisUfsScsiResult::Success);emit();
+    snprintf(text,sizeof(text),"POLARIS_UFS_SCSI_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x\nPOLARIS_UFS_SCSI_END\n",
+        s.ufsScsiFaultBefore[0],s.ufsScsiFaultBefore[1],s.ufsScsiFaultAfter[0],s.ufsScsiFaultAfter[1]);emit();
+}
 static void handleCommand(TerminalSession &s,const char *command) {
     polaris_usb_stats[5]=polaris_usb_stats[5]+1;
     char text[512];
@@ -249,7 +299,8 @@ static void handleCommand(TerminalSession &s,const char *command) {
     else if(!strcmp(command,"ufs-map"))ufsInventoryText(s,true);
     else if(!strcmp(command,"ufs-nop"))ufsNopText(s,true);
     else if(!strcmp(command,"ufs-query"))ufsQueryText(s,true);
-    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map ufs-nop ufs-query help\n");
+    else if(!strcmp(command,"ufs-scsi"))ufsScsiText(s,true);
+    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map ufs-nop ufs-query ufs-scsi help\n");
     else respond(s,"ERR unknown-command\n");
 }
 #include "UsbEvents.h"
@@ -419,6 +470,9 @@ static void worker(void *,wait_result_t) {
     unsigned queryEnable=0;
     bool query=nop && PE_parse_boot_argn("polaris-ufs-query",&queryEnable,sizeof(queryEnable)) && queryEnable==1;
     runUfsQueries(*s,query);if(query)ufsQueryText(*s,false);
+    unsigned scsiEnable=0;
+    bool scsi=query && PE_parse_boot_argn("polaris-ufs-scsi",&scsiEnable,sizeof(scsiEnable)) && scsiEnable==1;
+    runUfsScsi(*s,scsi);if(scsi)ufsScsiText(*s,false);
     uint64_t started=nowMs(),next=started+5000;bool fallback=s->hw.phyInitMode!=0;
     for(;;) {
         pollUsbEvents(*s);
