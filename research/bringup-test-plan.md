@@ -4,13 +4,14 @@
 
 ## 当前基线与证据
 
-- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令与运行时日志取回，以及 UFS 控制器/队列/SMMU 只读盘点、自有队列上的单次 NOP 与描述符/响应 DMA。
+- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令与运行时日志取回，以及 UFS 控制器/队列/SMMU 只读盘点、自有队列 NOP 与 DEVICE/UNIT 0 描述符查询；另已验证默认 edk2 启动和固件辅助的 USB 文件更新。
 - 配置：6 GB 机型配置；当前仅启用 1 CPU，内核限制在受控的 1 GiB 内存窗口。完整 RAM 和 SMP 未验证。
 - 十轮启动和重连已验证的 USB 源码基线：`7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`。此前 USB 基线 `638a344d865375c209f13f6109484eee7fd7d5fe`、压力测试基线 `c4081260dd52a6ccdbd3b4f99128b1f4e9c4025e` 及其他成功镜像均保留。
-- 当前 UFS NOP 源码 `1d38b03539ec26b146ceda717c6cf831ab572cec` 已通过 [完整 CI 与模拟器运行](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43004883497)、57 项主机 unittest、定时器/加载窗口检查和一轮真机启动。首轮 c5dbce2、只读盘点 9f1401c 和前置检查误拦 5670f6c 的镜像/记录均保留。QEMU 不模拟 SDM845 USB/UFS；相应外设取证来自真机。
+- 保留的 UFS NOP 源码 `1d38b03539ec26b146ceda717c6cf831ab572cec` 已通过 [完整 CI 与模拟器运行](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43004883497)、57 项主机 unittest、定时器/加载窗口检查和一轮真机启动。首轮 c5dbce2、只读盘点 9f1401c 和前置检查误拦 5670f6c 的镜像/记录均保留。QEMU 不模拟 SDM845 USB/UFS；相应外设取证来自真机。
 - 真机证据：用户先确认 USB_RUN 和 Windows CDC 枚举，随后主机通过原生 USB 完成 ping、随机 nonce 往返、精确构建身份核对，并取回包含 TMP_CHILD_OK、TMP_OK、CHILD_OK、PROC_OK、STRESS_OK/CLEAN 和变化心跳的运行日志。主机保存了原始 USB 响应及部分外设寄存器诊断；内部进程/task/内存页计数仍仅在 QEMU 取证。
 - 保留的 USB 工作区基线：`/root/projects/xnu-polaris/artifacts/usb-reset-ready/`，ESP SHA256：`0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47`。USB 证据在 `artifacts/usb-native-check-7e3fa6f/`、`artifacts/usb-reconnect-7e3fa6f-10/`、`artifacts/usb-control-stall-7e3fa6f/`、`artifacts/usb-continuous-7e3fa6f/`。整机启动计数单独保存在 `artifacts/usb-boot-series-7e3fa6f/index.json`。
 - 当前 NOP 镜像在 `artifacts/ufs-nop-format-ready/`，ESP SHA256 `495a3a4b2b9cbf162654c44750952089114fbd45076075eb1e52119e2d219493`；[NOP 证据](ufs-nop-result.json)、[队列/SMMU 证据](ufs-queue-smmu-snapshot.json)和[后续计划](ufs-readonly-plan.md)已保存。
+- 当前运行内核源码为 `9feeaca4f7e9d0b8352c2ce0c86434824c681114`，完整 CI、60 项主机 unittest 与 UFS 描述符查询真机通过。已按用户明确选择将同一已验证 edk2 固件安装至 boot；普通重启进入更新后的 UniXNU/XNU，并再次通过原生 USB、基线自检和 UFS 查询。固件辅助 USB 文件更新、原 boot 备份及恢复步骤见 [说明](uefi-usb-update.md)；它不计作 XNU 原生介质读写。
 - 当前根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。尚无 Apple 用户态、交互输入、UFS 介质访问或完整可写文件系统。
 - 目标 Apple 镜像先固定为 arm64 iPadOS 17.7.11（21H461，iPad7,1）；自制程序通过不等于该系统已兼容。
 
@@ -21,12 +22,13 @@
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
 | A1 | 固定源码、工具链与配置，保存哈希并可重复构建 | CI 通过 |
-| A2 | 固件、UniXNU、DarwinBoot 到 XNU 交接 | 真机通过 |
+| A2 | 固件、UniXNU、DarwinBoot 到 XNU 交接 | 临时 fastboot 路径与新默认 edk2 普通重启路径均真机通过 |
 | A3 | ADT、加载地址、内存窗口与越界拒绝 | 正常路径真机通过；异常输入主机/模拟通过 |
 | A4 | 内核初始化、当前配置 corecrypto POST、BSD/IOKit 初始化 | 真机通过 |
 | A5 | RAM 根挂载并启动 PID 1 | 真机通过 |
 | A6 | 返回 fastboot，保留成功镜像与恢复材料 | fastboot 真机通过；完整系统还原未实测 |
 | A7 | 10 次重复启动，覆盖冷启动和热启动 | 同一镜像 10/10 轮通过；按热启动指令完成 8 轮，用户确认冷启动 1 轮；USB 重连单独计数 |
+| A8 | 默认 edk2 与 USB 更新 EFI 文件后启动 | 一轮普通重启真机通过；boot 完整备份和安装回读通过，USB 文件更新回读及原生自检通过；恢复备份工具已准备，实际恢复未测 |
 
 ## B. CPU、内存与异常
 

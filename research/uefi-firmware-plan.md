@@ -1,5 +1,10 @@
 # polaris UEFI firmware plan (research note, 2026-10-24)
 
+This is the historical 2026-10-24 research note. The tested edk2 firmware is now
+installed as the default boot payload, with USB file updates and normal-restart
+acceptance recorded in [the current workflow](uefi-usb-update.md). The original
+boot backup and recovery instructions are recorded there.
+
 What is missing from this port before any phone boot: the UEFI firmware that
 UniXNU's boot chain expects (`boot.img → BootShim → firmware volume →
 UniXNU/DarwinBoot → payload kernel.macho`). This note inventories what

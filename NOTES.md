@@ -1,5 +1,33 @@
 # UniXNU-polaris handoff notes
 
+
+## 2026-11-11: default edk2 startup and USB file updates verified
+
+The user explicitly selected installing the already-tested edk2 image to boot.
+This is now done; a power-only normal restart reaches edk2 → the USB-updated
+UniXNU menu → the same source kernel `9feeaca`. Native USB, runtime self-checks,
+heartbeat and UFS descriptor queries pass on that path. Historical temporary
+fastboot-only instructions below describe the earlier milestones.
+
+Use SimpleInit → Mass Storage (`05f9:1234`) to expose the phone for host file
+updates, then restart normally. The bundled Linux helper exports storage only,
+without a fastboot/reboot interface; XNU also has no USB reboot command yet.
+Routine updates no longer require entering Android fastboot or flashing the
+whole ESP. Current ESP SHA256 is
+`87deb85d398cc846fb72d8486b7803403151dce7a35f95017dbff730126887a2`.
+The host-side current image is
+`../private/edk2-usb-menu-test/file-update/updated-esp.img`.
+
+The original full boot backup is
+`../private/edk2-default-boot/original-boot.img`, SHA256
+`9044bba9778f5291d4cc58842e401fa6eeb362b9b2e0739b41653b8272d60681`.
+The installed 64 MiB boot image has SHA256
+`1578f00d31f66e894eaca3593d8ad1fbd2a2ad0a0c8de2a33700cbf45dee3b92`.
+Recovery was not modified. Read [the current workflow](research/uefi-usb-update.md)
+for the guarded update/install/restore tools and scope. Full system restoration
+has not been performed; original boot and candidate hashes were independently
+verified before installation, and installation/direct readback passed.
+
 ## 2026-10-24: platform stage created, nothing hardware-tested
 
 This repository transfers the polaris (Xiaomi Mi MIX 2S, SDM845) port from the

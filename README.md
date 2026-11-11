@@ -116,6 +116,17 @@ cache. [Input and static prelink results](research/apple-userland-reuse.md)
 confirm the pinned cache and absolute-pointer plan; component ABI, loading and
 Apple userspace execution remain unverified.
 
+
+**Default edk2 boot and USB EFI-file updates are now verified** (2026-11-11).
+With the user's explicit choice, the tested firmware was installed to `boot`
+and its complete partition read back; the original 64 MiB boot is backed up and
+recovery is unchanged. A power-only restart reached the updated UniXNU menu
+and the same `9feeaca` XNU, with native USB, self-checks, heartbeat and UFS
+queries passing. SimpleInit's Mass Storage launches a bundled Linux helper
+(`05f9:1234`) for host-side file replacement; it is separate from native XNU
+storage. [Workflow, tools and rollback](research/uefi-usb-update.md) replace
+routine fastboot/whole-ESP flashing with USB file updates and normal restart.
+
 ## English
 
 ### What "transfer from ABL" means here
