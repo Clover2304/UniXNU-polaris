@@ -173,4 +173,6 @@ QEMU 在短暂让出 CPU 后按固定里程碑读取真实进程、task、回收
 
 下一候选保留 SMR/S2CR，检查 bank 4 没有其他已映射设备后，设置该 USB 上下文 SCTLR=0、CBA2R=1、CBAR=0x10000，采用上下文旁路；任何共享、地址宽度不符或读回失败均中止，并输出 IDR 和上下文诊断。主机测试涵盖上述固件行为、共享拒绝和失败恢复；这些测试不代替真机 DMA 和 USB 验证。E5/F3 仍未验收。
 
+该候选 `e65132961eb477e590317c8f4595ec19892ff9a6` 的 [CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42961833349) 已通过，真机回报 `error=7 bank=4 sctlr=000000e0`、stage 4：检测到 bank 4 共享，未写入 SMMU。提前退出时 CBAR/CBA2R 诊断仍是默认零，不能视为实测值。下一版先按 SCTLR.M 位而非整个寄存器为零判断已旁路状态；若原共享 bank 不能直接复用，则仅检查 Linux 高通旁路方案采用的末尾 apps context bank。该 bank 必须已旁路，或未被前 128 个可靠 stream group 引用且转换关闭，才允许只重定向 USB 的 CBNDX；拒绝占用和读回不符，保留 bank 4 及其他设备映射。高通固件对扩展 stream group 的可见性限制仍在，不宣称完整 SMMU 所有权已建立。诊断拆为短行，显示原 bank、目标 bank、共享数、重定向状态及实际上下文值。等待新候选真机测试。
+
 D6/D7 基本可写 RAM 文件系统 → C5/H2 进程回收压力 → E5 日志和 F3 交互通道 → F2 原生存储。G 组可与部分硬件驱动并行，启动 Apple 用户态不要求先完成相机、蓝牙等全部外设。

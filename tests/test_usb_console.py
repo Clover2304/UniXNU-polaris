@@ -14,17 +14,21 @@ class UsbTests(unittest.TestCase):
 struct Hardware {
  uint32_t regs[0x100000/4]{};
  std::vector<std::pair<unsigned,uint32_t>> writes;
- bool rejectCbar=false;
+ bool rejectCbar=false,rejectRemap=false,corruptRemap=false,failRestore=false;
  Hardware(){regs[0x20/4]=(1u<<30)|128;regs[0x24/4]=(6u<<28)|80;regs[0x28/4]=0x1222;
   regs[(0x800+7*4)/4]=0x80000740;regs[(0xc00+7*4)/4]=4;
   regs[0x84000/4]=0x79;regs[(0x1000+16)/4]=0;regs[(0x1800+16)/4]=0;
   regs[(0x800+2*4)/4]=0x80000060;regs[(0xc00+2*4)/4]=5;regs[0x85000/4]=0x7d;
  }
- static uint32_t read(void *p,unsigned off){assert(!(off%4)&&off<0x100000);return ((Hardware*)p)->regs[off/4];}
+ static uint32_t read(void *p,unsigned off){assert(!(off%4)&&off<0x100000);
+  assert(!(off>=0xa00&&off<0xc00));assert(!(off>=0xe00&&off<0x1000));
+  return ((Hardware*)p)->regs[off/4];}
  static void write(void *p,unsigned off,uint32_t value){auto &h=*(Hardware*)p;h.writes.emplace_back(off,value);
   // Model the documented QHEE quirk: direct BYPASS would become FAULT.
   if(off>=0xc00&&off<0xe00&&(value&0x30000)==0x10000)value=(value&~0x30000)|0x20000;
   if(h.rejectCbar&&off==0x1010)return;
+  if(h.failRestore&&off==0xc1c){if(value!=4)h.regs[off/4]=value|0x08000000u;return;}
+  if(h.rejectRemap&&off==0xc1c&&value!=4){if(h.corruptRemap)h.regs[off/4]=3;return;}
   h.regs[off/4]=value;
  }
  PolarisSmmuIo io(){return {this,read,write};}
@@ -37,7 +41,40 @@ int main(){
  for(auto w:h->writes)assert(w.first==0x84000||w.first==0x1010||w.first==0x1810);
  h->writes.clear();r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(!r.error&&h->writes.empty());delete h;
  h=new Hardware();h->regs[(0xc00+2*4)/4]=4;
- r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==7&&h->writes.empty()&&h->regs[0x84000/4]==0x79);delete h;
+ h->regs[0x84000/4]=0xe0;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);
+ assert(!r.error&&r.bank==79&&r.originalBank==4&&r.remapped&&r.shared==1);
+ assert(h->regs[0x84000/4]==0xe0&&h->regs[0xc08/4]==4&&h->regs[0xc1c/4]==79);
+ assert(h->regs[0xcf000/4]==0&&h->regs[0x113c/4]==0x10000&&h->regs[0x193c/4]==1);
+ assert(h->writes.size()==4);for(auto w:h->writes)assert(w.first==0xcf000||w.first==0x113c||w.first==0x193c||w.first==0xc1c);
+ delete h;
+ // Reuse an existing shared bypass without clearing fault/interrupt flags.
+ h=new Hardware();h->regs[0xc08/4]=4;h->regs[0x84000/4]=0xe0;h->regs[0x1010/4]=0x1f300;h->regs[0x1810/4]=1;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(!r.error&&r.bank==4&&!r.remapped&&h->writes.empty()&&r.after==0xe0);delete h;
+ // An occupied or enabled final bank is never repurposed.
+ h=new Hardware();h->regs[0xc08/4]=4;h->regs[0x80c/4]=0x80000123;h->regs[0xc0c/4]=79;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==7&&h->writes.empty());delete h;
+ h=new Hardware();h->regs[0xc08/4]=4;h->regs[0xcf000/4]=1;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==7&&h->writes.empty());delete h;
+ // USB mapping refusal restores the candidate bank, preserving shared bank 4.
+ for(bool corrupt:{false,true}) {
+  h=new Hardware();h->regs[0xc08/4]=4;h->rejectRemap=true;h->corruptRemap=corrupt;
+  h->regs[0xcf000/4]=0xe0;h->regs[0x113c/4]=0x123;h->regs[0x193c/4]=0x40000;
+  r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);
+  assert(r.error==11&&h->regs[0xc1c/4]==4&&h->regs[0x84000/4]==0x79&&h->regs[0xc08/4]==4);
+  assert(h->regs[0xcf000/4]==0xe0&&h->regs[0x113c/4]==0x123&&h->regs[0x193c/4]==0x40000);delete h;
+ }
+ // Failed restoration must leave the candidate bypass usable, never clobber peers.
+ h=new Hardware();h->regs[0xc08/4]=4;h->failRestore=true;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==12);
+ assert((h->regs[0xc1c/4]&255)==79&&h->regs[0x113c/4]==0x10000&&h->regs[0x193c/4]==1);
+ assert(h->regs[0x84000/4]==0x79&&h->regs[0xc08/4]==4);delete h;
+ // Reuse a final bypass shared by another device, without writes to that bank.
+ h=new Hardware();h->regs[0xc08/4]=4;h->regs[0xc1c/4]=0x08000004;
+ h->regs[0x80c/4]=0x80000123;h->regs[0xc0c/4]=79;
+ h->regs[0xcf000/4]=0xe0;h->regs[0x113c/4]=0x10000;h->regs[0x193c/4]=1;
+ r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(!r.error&&r.remapped&&h->writes.size()==1);
+ assert(h->regs[0xc1c/4]==0x0800004f&&h->regs[0xcf000/4]==0xe0&&h->regs[0xc08/4]==4);delete h;
  h=new Hardware();h->regs[(0x800+7*4)/4]=0x80010740;
  r=polaris_usb_smmu(h->io(),0x1023aa000ULL,65536);assert(r.error==3&&h->writes.empty());delete h;
  h=new Hardware();h->regs[0x28/4]=0x1000;

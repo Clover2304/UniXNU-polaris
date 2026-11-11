@@ -11,7 +11,7 @@ struct PolarisSmmuIo {
     void (*write)(void *,unsigned,uint32_t);
 };
 struct PolarisSmmuResult {
-    unsigned error=0,bank=0;
+    unsigned error=0,bank=0,originalBank=0,slot=0,pages=0,shared=0,remapped=0;
     uint32_t smr=0,s2cr=0,before=0,after=0,cbar=0,cba2r=0,idr0=0,idr1=0,idr2=0;
 };
 static inline unsigned polaris_smmu_bits(unsigned code) {
@@ -38,27 +38,64 @@ static inline PolarisSmmuResult polaris_usb_smmu(const PolarisSmmuIo &io,uint64_
         slot=i;r.smr=smr;r.s2cr=read(0xc00+4*i);
     }
     if(!matches) {r.error=(read(0)&(1u<<10))?4:0;return r;}
+    r.slot=slot;r.pages=pages;
     unsigned type=(r.s2cr>>16)&3u;
     if(type==1)return r; // Already a hardware bypass; leave it untouched.
     if(type!=0){r.error=5;return r;}
-    r.bank=r.s2cr&255u;
+    r.bank=r.originalBank=r.s2cr&255u;
     if(r.bank>=banks){r.error=6;return r;}
-    unsigned cb=(pages+r.bank)*4096u,cbar=0x1000+4*r.bank,cba2r=0x1800+4*r.bank;
-    r.before=read(cb);uint32_t oldCbar=read(cbar),oldCba2r=read(cba2r);
-    bool ready=r.before==0 && oldCbar==0x10000u && oldCba2r==1;
-    if(!ready) {
+    auto references=[&](unsigned bank) {
+        unsigned n=0;
         for(unsigned i=0;i<count;i++) {
             if(i==slot || !(read(0x800+4*i)&0x80000000u))continue;
             uint32_t s2cr=read(0xc00+4*i);
-            if(((s2cr>>16)&3u)==0 && (s2cr&255u)==r.bank){r.error=7;return r;}
+            if(((s2cr>>16)&3u)==0 && (s2cr&255u)==bank)++n;
         }
+        return n;
+    };
+    auto snapshot=[&]() {
+        r.before=r.after=read((pages+r.bank)*4096u);
+        r.cbar=read(0x1000+4*r.bank);r.cba2r=read(0x1800+4*r.bank);
+    };
+    auto bypass=[&]() {
+        // M, rather than the unrelated fault/interrupt flags, enables translation.
+        return !(r.after&1u) && ((r.cbar>>16)&3u)==1 && (r.cba2r&1u);
+    };
+    snapshot();r.shared=references(r.bank);
+    bool ready=bypass();
+    if(!ready && r.shared) {
+        // Linux's Qualcomm bypass quirk reserves the final apps context bank.
+        // Do not scan arbitrary banks or access extended (>128) match registers
+        // which QHEE does not reliably emulate. Never alter the shared bank.
+        r.bank=banks-1;
+        if(r.bank==r.originalBank){r.error=7;return r;}
+        snapshot();ready=bypass();
+        if(!ready && (references(r.bank) || (r.before&1u))){r.error=7;return r;}
+    }
+    unsigned cb=(pages+r.bank)*4096u,cbar=0x1000+4*r.bank,cba2r=0x1800+4*r.bank;
+    uint32_t oldCbar=r.cbar,oldCba2r=r.cba2r;
+    auto restoreContext=[&]() {if(!ready){write(cbar,oldCbar);write(cba2r,oldCba2r);write(cb,r.before);}};
+    if(!ready) {
         if(!(r.idr0&(1u<<30)) || !(r.idr2&(1u<<12))){r.error=8;return r;}
         write(cb,0);write(cba2r,1);write(cbar,0x10000u);
     }
     r.after=read(cb);r.cbar=read(cbar);r.cba2r=read(cba2r);
-    if(r.after!=0 || r.cbar!=0x10000u || r.cba2r!=1 || read(0x800+4*slot)!=r.smr || read(0xc00+4*slot)!=r.s2cr) {
-        if(!ready){write(cbar,oldCbar);write(cba2r,oldCba2r);write(cb,r.before);}
-        r.error=9;
+    if(!bypass() || (!ready && (r.after!=0 || r.cbar!=0x10000u || r.cba2r!=1)) ||
+       read(0x800+4*slot)!=r.smr || read(0xc00+4*slot)!=r.s2cr) {
+        restoreContext();r.error=9;return r;
+    }
+    if(r.bank!=r.originalBank) {
+        // Keep TYPE=TRANSLATE and privilege bits, change only USB's CBNDX.
+        uint32_t target=(r.s2cr&~255u)|r.bank;
+        write(0xc00+4*slot,target);
+        if(read(0xc00+4*slot)!=target || read(0x800+4*slot)!=r.smr) {
+            write(0xc00+4*slot,r.s2cr);
+            // If restoration fails, retain the valid bypass context rather than
+            // disabling a bank the USB stream could still address.
+            if(read(0xc00+4*slot)!=r.s2cr){r.error=12;return r;}
+            restoreContext();r.error=11;return r;
+        }
+        r.remapped=1;
     }
     return r;
 }

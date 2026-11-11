@@ -125,8 +125,10 @@ static bool prepareSmmu(UsbHw &hw) {
     polaris_usb_stats[9]=result.bank;polaris_usb_stats[10]=result.error;
     polaris_usb_stats[11]=result.before;polaris_usb_stats[12]=result.after;
     polaris_usb_stats[13]=result.cbar;polaris_usb_stats[14]=result.cba2r;polaris_usb_stats[15]=result.idr1;
-    console("POLARIS_USB_SMMU error=%u bank=%u smr=%08x s2cr=%08x sctlr=%08x/%08x cbar=%08x cba2r=%08x idr=%08x/%08x/%08x\n",
-        result.error,result.bank,result.smr,result.s2cr,result.before,result.after,result.cbar,result.cba2r,result.idr0,result.idr1,result.idr2);
+    console("POLARIS_USB_SMMU error=%u bank=%u old=%u shared=%u moved=%u\n",result.error,result.bank,result.originalBank,result.shared,result.remapped);
+    console("POLARIS_USB_CONTEXT sctlr=%08x/%08x cbar=%08x cba2r=%08x smr=%08x s2cr=%08x/%08x\n",
+        result.before,result.after,result.cbar,result.cba2r,result.smr,result.s2cr,result.smr?hw.smmu[(0xc00+4*result.slot)/4]:0);
+    console("POLARIS_USB_IDR %08x/%08x/%08x\n",result.idr0,result.idr1,result.idr2);
     return result.error==0;
 }
 

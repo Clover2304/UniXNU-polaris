@@ -21,9 +21,22 @@ Hardware references:
 
 The first hardware candidate stopped at stage 4 with core `5533300a`, HWPARAMS0
 `4020400a`, USB stream `80000740`, S2CR `00000004` and sCR0 `002d0406`.
-The corrected path retains the USB stream's translated mapping and disables
-stage 1 in its existing context bank 4 after checking for other users. Other
-streams and context banks are preserved; readback failures abort the setup.
+The second hardware candidate refused to modify shared context bank 4
+(`error=7`, SCTLR `000000e0`). Its early-return CBAR/CBA2R output was not yet
+populated, so the printed zeros do not establish their hardware values.
+
+The next path recognizes an already bypassed shared context by SCTLR.M=0,
+CBAR.TYPE=S1_TRANS_S2_BYPASS, and CBA2R.VA64=1, preserving other SCTLR flags.
+Otherwise a shared original context is left untouched. Following the Linux
+Qualcomm quirk, only the final apps context bank is considered for USB:
+reuse an existing bypass, or configure it only if disabled and unreferenced
+by the first 128 reliable stream groups. Extended groups are not accessed
+because of the documented QHEE emulation limitation. This is a bounded
+firmware handoff policy, not proof of ownership of inaccessible secure state.
+Only the USB stream's S2CR.CBNDX is redirected; SMRs and other S2CRs stay
+unchanged. Readbacks are checked and a failed remap restores the original
+mapping and candidate context when possible. Failure diagnostics include
+the actual context register values, original bank, sharing and remap status.
 
 This is a polling CDC diagnostic channel, enabled by `polaris-usb=1`.
 The log is a 64 KiB in-memory ring captured after the console opens. It does
