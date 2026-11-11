@@ -1,5 +1,7 @@
 # UniXNU on Xiaomi Mi MIX 2S (polaris)
 
+项目验收、当前证据和后续实施顺序见 [验收与基准测试计划](research/bringup-test-plan.md)。
+
 Device port for SDM845 / Snapdragon 845 / Adreno 630 on UniXNU's Darwin 23
 architecture (XNU 10063, source-kernel platform milestone). The retired
 ABL-shim chain ([ios16_on_polaris_mix2s](https://github.com/luuu20309/ios16_on_polaris_mix2s),
