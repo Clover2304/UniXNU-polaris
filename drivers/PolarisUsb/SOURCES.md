@@ -31,6 +31,26 @@ not establish DMA, stream ownership, link readiness, LUN identity or media I/O.
 Mainline describes stream `0x100` with mask `0xf`; this is a reference for
 later investigation, not a hardware-verified SMMU assignment for this port.
 
+`UfsInventory.h` adds a separately gated `polaris-ufs-inventory=1` cached
+inventory (`ufs-map`). It reads IS/IE, UTRL/UTMRL base addresses, doorbells,
+run/stop, HCS and HCE twice without following the queue pointers. Power and
+clock gates are checked before and after. It also reads the apps SMMU at
+`0x15000000`, already mapped for USB, through a read-only callback. Register
+semantics are checked against the same Linux revision's
+[arm-smmu.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/drivers/iommu/arm/arm-smmu/arm-smmu.h).
+The supported geometry is legacy stream matching, 4 KiB pages and no more
+than 128 banks. At most the first 128 stream groups are scanned; additional
+groups are explicitly marked unobserved. Extended-ID mode is rejected.
+
+Only SMRs intersecting the mainline candidate window `0x100..0x10f` are
+reported with their S2CR and, for translated entries, SCTLR/CBAR/CBA2R.
+Reference counts are scoped to the scanned valid entries. A second read of
+the same registers checks visible stability. No clock, reset, interrupt,
+fault, queue or SMMU register is written; no queue memory, translation tables
+or media are read. Even a stable shared bypass-shaped context and zero
+doorbells do not prove the real UFS stream ID, DMA, exclusive ownership or
+firmware quiescence. Those remain separate transfer/handoff milestones.
+
 The DWC3 transfer state machine, register definitions, DMA cache helpers and
 CDC descriptors are adapted from Denis0x00/UniXNU-j716f at
 `bf2d0f32f706adbe414551e452f1426ed7c4bd19`, files

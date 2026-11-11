@@ -177,6 +177,9 @@ jobs:
       - name: Assemble opt-in UFS register snapshot payload
         if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-ufs-esp --cpus 1 --ram 6 --process-dir out/polaris-stress --usb-console --ufs-probe
+      - name: Assemble read-only UFS queue and candidate stream inventory payload
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-ufs-inventory-esp --cpus 1 --ram 6 --process-dir out/polaris-stress --usb-console --ufs-probe --ufs-inventory
       - uses: actions/upload-artifact@v4
         if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
         with:
@@ -186,6 +189,7 @@ jobs:
             out/polaris-stress/
             out/polaris-usb-esp/
             out/polaris-ufs-esp/
+            out/polaris-ufs-inventory-esp/
             out/stress-check/report.json
             out/stress-check/serial.log
             out/stress-check/qemu.log

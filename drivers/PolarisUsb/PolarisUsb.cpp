@@ -17,6 +17,7 @@
 #include "UsbFifo.h"
 #include "UsbSmmu.h"
 #include "UfsProbe.h"
+#include "UfsInventory.h"
 
 #ifndef POLARIS_USB_BUILD_ID
 #define POLARIS_USB_BUILD_ID "local-unqualified"
@@ -50,6 +51,7 @@ struct TerminalSession {
     OSSharedPtr<IOMemoryMap> ufsMap;
     volatile uint32_t *ufs=nullptr;
     PolarisUfsSnapshot ufsSnapshot;
+    PolarisUfsInventory ufsInventory;
     PolarisBytes<131072> reply;
     PolarisLine input;
     uint8_t tx[DMA_EP3_MAX_CHUNK]{};
@@ -78,6 +80,33 @@ static void ufsText(const TerminalSession &s,char *text,size_t size) {
 }
 static void respond(TerminalSession &s,const char *text) {
     if(!s.reply.append(text,strlen(text)))polaris_usb_stats[8]=polaris_usb_stats[8]+1;
+}
+static bool ufsSmmuRead(void *context,unsigned offset,uint32_t *value) {
+    auto &s=*static_cast<TerminalSession *>(context);
+    if(!s.hw.smmu || offset>=0x100000 || (offset&3u))return false;
+    __asm__ volatile("dsb sy":::"memory");
+    *value=s.hw.smmu[offset/4];
+    __asm__ volatile("dsb sy":::"memory");
+    return true;
+}
+static void ufsInventoryText(TerminalSession &s,bool response) {
+    const auto &r=s.ufsInventory;char text[512];
+    auto emit=[&](){if(response)respond(s,text);else console("%s",text);};
+    snprintf(text,sizeof(text),"POLARIS_UFS_INVENTORY build=%s state=%s gcc_reads=%u controller_reads=%u smmu_reads=%u writes=0 media_commands=0\n",
+        POLARIS_USB_BUILD_ID,polaris_ufs_inventory_state(r.state),r.gccReads,r.controllerReads,r.smmuReads);emit();
+    for(unsigned i=0;i<2;i++) {
+        const auto *q=r.queues[i];
+        snprintf(text,sizeof(text),"POLARIS_UFS_QUEUE sample=%u is=%08x ie=%08x trl=%08x%08x tr_db=%08x tr_run=%08x tmrl=%08x%08x tm_db=%08x tm_run=%08x hcs=%08x hce=%08x\n",
+            i,q[0],q[1],q[3],q[2],q[4],q[5],q[7],q[6],q[8],q[9],q[10],q[11]);emit();
+    }
+    snprintf(text,sizeof(text),"POLARIS_UFS_IOMMU idr0=%08x idr1=%08x idr2=%08x cr0=%08x groups=%u scanned=%u valid=%u pages=%u banks=%u truncated=%u stable=%u queues_stable=%u matches=%u overlap=%u coverage=%04x sid_base=0100 sid_count=16\n",
+        r.idr[0],r.idr[1],r.idr[2],r.cr0,r.groups,r.scanned,r.validGroups,r.pages,r.banks,r.truncated,r.stable,r.queuesStable,r.matches,r.overlap,r.coverage);emit();
+    for(unsigned i=0;i<r.matches;i++) {
+        const auto &m=r.match[i];
+        snprintf(text,sizeof(text),"POLARIS_UFS_MATCH n=%u slot=%u smr=%08x s2cr=%08x coverage=%04x bank=%u shared=%u sctlr=%08x cbar=%08x cba2r=%08x\n",
+            i,m.slot,m.smr,m.s2cr,m.coverage,m.bank,m.shared,m.sctlr,m.cbar,m.cba2r);emit();
+    }
+    snprintf(text,sizeof(text),"POLARIS_UFS_INVENTORY_END\n");emit();
 }
 static void handleCommand(TerminalSession &s,const char *command) {
     polaris_usb_stats[5]=polaris_usb_stats[5]+1;
@@ -113,7 +142,8 @@ static void handleCommand(TerminalSession &s,const char *command) {
         }
         snprintf(text,sizeof(text),"\nPOLARIS_LOG_END end=%llu dropped=%llu\n",head,dropped);respond(s,text);
     } else if(!strcmp(command,"ufs")){ufsText(s,text,sizeof(text));respond(s,text);}
-    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs help\n");
+    else if(!strcmp(command,"ufs-map"))ufsInventoryText(s,true);
+    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map help\n");
     else respond(s,"ERR unknown-command\n");
 }
 #include "UsbEvents.h"
@@ -273,6 +303,10 @@ static void worker(void *,wait_result_t) {
     bool probe=PE_parse_boot_argn("polaris-ufs-probe",&ufsEnable,sizeof(ufsEnable)) && ufsEnable==1;
     s->ufsSnapshot=polaris_ufs_probe({s,ufsRead},probe);
     if(probe){char text[512];ufsText(*s,text,sizeof(text));console("%s",text);}
+    unsigned inventoryEnable=0;
+    bool inventory=probe && PE_parse_boot_argn("polaris-ufs-inventory",&inventoryEnable,sizeof(inventoryEnable)) && inventoryEnable==1;
+    s->ufsInventory=polaris_ufs_inventory({s,ufsRead},{s,ufsSmmuRead},inventory,s->ufsSnapshot.state==PolarisUfsSnapshot::Ready);
+    if(inventory)ufsInventoryText(*s,false);
     uint64_t started=nowMs(),next=started+5000;bool fallback=s->hw.phyInitMode!=0;
     for(;;) {
         pollUsbEvents(*s);
