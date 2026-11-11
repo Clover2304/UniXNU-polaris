@@ -90,8 +90,12 @@ command errors and verified nonce/build/log responses. An unsupported control
 descriptor request stalled, followed by a successful normal descriptor read
 and nonce exchange with no new reset/error. Another 256 echo exchanges over
 about 53 seconds covered 1–250 characters and retained zero command errors
-and reply overflow. This is one phone boot; repeated cold/warm boot and
-long-term qualification remain pending. Earlier bridge reattach delay and
+and reply overflow. That initial acceptance was followed by ten same-image
+phone boots, each verifying native USB identity, self-check markers, changing
+heartbeat and zero command errors. Eight followed warm-restart instructions,
+one was shutdown/power-on per the user, and the first entry method remains
+unclassified. Per-boot hashes are in `research/usb-boot-series.json`.
+Long-term qualification remains pending. Earlier bridge reattach delay and
 the two failing-baseline reconnects are retained in the test plan.
 
 This is a polling CDC diagnostic channel, enabled by `polaris-usb=1`.
