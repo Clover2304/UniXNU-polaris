@@ -4,13 +4,14 @@
 
 ## 当前基线与证据
 
-- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令和运行时日志取回。
+- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令、运行时日志取回和 UFS 控制器只读寄存器识别。
 - 配置：6 GB 机型配置；当前仅启用 1 CPU，内核限制在受控的 1 GiB 内存窗口。完整 RAM 和 SMP 未验证。
-- 当前已验证的 USB 源码基线：`7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`。此前 USB 基线 `638a344d865375c209f13f6109484eee7fd7d5fe`、压力测试基线 `c4081260dd52a6ccdbd3b4f99128b1f4e9c4025e` 及其他成功镜像均保留。
-- [当前完整 CI 与模拟器运行记录](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42973646239)；48 项本地主机 unittest，另有定时器及加载窗口的原生 C/C++ 检查。QEMU 不模拟 SDM845 USB，USB 取证来自真机。
+- 十轮启动和重连已验证的 USB 源码基线：`7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`。此前 USB 基线 `638a344d865375c209f13f6109484eee7fd7d5fe`、压力测试基线 `c4081260dd52a6ccdbd3b4f99128b1f4e9c4025e` 及其他成功镜像均保留。
+- 当前 UFS 探测源码 `c5dbce256e9d6c1fcd3ae60e27abbb0063254565` 已通过 [完整 CI 与模拟器运行](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42988178206)、51 项主机 unittest、定时器/加载窗口检查和一轮真机启动。QEMU 不模拟 SDM845 USB/UFS；相应外设取证来自真机。
 - 真机证据：用户先确认 USB_RUN 和 Windows CDC 枚举，随后主机通过原生 USB 完成 ping、随机 nonce 往返、精确构建身份核对，并取回包含 TMP_CHILD_OK、TMP_OK、CHILD_OK、PROC_OK、STRESS_OK/CLEAN 和变化心跳的运行日志。主机保存了原始 USB 响应及部分外设寄存器诊断；内部进程/task/内存页计数仍仅在 QEMU 取证。
-- 当前工作区镜像：`/root/projects/xnu-polaris/artifacts/usb-reset-ready/`，ESP SHA256：`0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47`。USB 证据在 `artifacts/usb-native-check-7e3fa6f/`、`artifacts/usb-reconnect-7e3fa6f-10/`、`artifacts/usb-control-stall-7e3fa6f/`、`artifacts/usb-continuous-7e3fa6f/`。整机启动计数单独保存在 `artifacts/usb-boot-series-7e3fa6f/index.json`。
-- 当前根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。尚无 Apple 用户态、交互输入、原生 UFS 或完整可写文件系统。
+- 保留的 USB 工作区基线：`/root/projects/xnu-polaris/artifacts/usb-reset-ready/`，ESP SHA256：`0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47`。USB 证据在 `artifacts/usb-native-check-7e3fa6f/`、`artifacts/usb-reconnect-7e3fa6f-10/`、`artifacts/usb-control-stall-7e3fa6f/`、`artifacts/usb-continuous-7e3fa6f/`。整机启动计数单独保存在 `artifacts/usb-boot-series-7e3fa6f/index.json`。
+- 当前 UFS 探测镜像在 `artifacts/ufs-register-ready/`，ESP SHA256 `f9dc918fd72a4328bde48a9b7d1cfcef5f0e28979a14e218f0bc53f9af269655`；[寄存器证据](ufs-register-snapshot.json)与[下一步计划](ufs-readonly-plan.md)已保存。
+- 当前根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。尚无 Apple 用户态、交互输入、UFS 介质访问或完整可写文件系统。
 - 目标 Apple 镜像先固定为 arm64 iPadOS 17.7.11（21H461，iPad7,1）；自制程序通过不等于该系统已兼容。
 
 状态：**真机通过** = 指定功能由真机程序自检、用户回报画面或实际 USB 主机往返与日志取证证实，逐项注明来源；**模拟/主机通过** = 仅相应环境取证；**部分** = 仅列明范围；**待验证** = 无充分证据；**未实现/未接入** = 当前不具备。次数和时长均为建议目标，不是已完成结果。
@@ -86,7 +87,7 @@
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
 | F1 | DMA、缓存一致性、SMMU/IOMMU、设备中断 | USB DMA/缓存维护收发路径真机通过，复用固件 SMMU 旁路；隔离、原生 USB 中断待验证 |
-| F2 | XNU 原生 UFS 识别、读写和持久化 | 未接入；固件读 ESP 不计入此项 |
+| F2 | XNU 原生 UFS 识别、读写和持久化 | 部分：控制器寄存器只读识别真机通过（UFSHCI 2.1）；DMA、链路交接、介质读写与持久化未验证；固件读 ESP 不计入 |
 | F3 | XNU USB 枚举、收发和电脑控制台 | 轮询 CDC 枚举、诊断/日志、十次 USB/IP 重连及控制请求 STALL 恢复真机通过；物理插拔、POSIX 终端、吞吐和挂起恢复待验证 |
 | F4 | 原生显示控制器、面板初始化与刷新 | 未接入；当前继承固件 framebuffer |
 | F5 | Adreno 命令提交、显存管理与图形合成 | 未接入 |
@@ -233,4 +234,4 @@ D6/D7 基本可写 RAM 文件系统 → C5/H2 进程回收压力 → E5 日志�
 
 <!-- polaris-boot-series:end -->
 
-下一实施阶段见 [Polaris 原生 UFS 只读识别准备](ufs-readonly-plan.md)。当前仅完成静态资源盘点；原生 UFS 控制器、介质读写和持久根仍未接入。
+F2 第一阶段已完成：原生 XNU 在一轮真机启动中只读识别 UFSHCI 2.1，完整 RAM 根、进程/文件系统压力自检与持续心跳通过，USB 命令错误、回复溢出及日志丢失均为零。UFS 探测未写 MMIO、未提交介质命令。下一轮先只读核对 SID/SMMU 和固件队列配置，再推进有界传输；见 [UFS 验收记录与计划](ufs-readonly-plan.md)。

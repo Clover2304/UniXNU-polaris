@@ -1,6 +1,6 @@
-# Polaris 原生 UFS 只读识别准备
+# Polaris 原生 UFS 只读识别与后续计划
 
-当前可靠基线是源码 `7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`：RAM 根、自制用户态、USB 诊断和十轮同镜像启动已按[验收计划](bringup-test-plan.md)验证。F2 仍未接入。以下是下一轮实现范围和静态资源盘点，尚未在 XNU 中访问 UFS 控制器或介质。
+源码 `c5dbce256e9d6c1fcd3ae60e27abbb0063254565` 已在真机完成 F2 第一阶段：XNU 只读识别 UFS 控制器寄存器，原有 RAM 根、自制用户态和 USB 自检仍通过。UFS 介质访问尚未实现。十轮同镜像启动的可靠性证据仍属于保留的 `7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b` 基线，本轮新镜像仅验证一轮整机启动。
 
 ## 已知资源
 
@@ -13,10 +13,10 @@
 | 中断 | GIC SPI 265，对应 INTID 297 |
 | 链路 | 每方向 2 lanes |
 | 时钟名称 | core、bus_aggr、iface、unipro、ice、ref，以及 TX lane0、RX lane0/1 sync |
-| 电源与复位 | DT 提供 HBA、VCC、VCCQ2 等电源和 core_reset；实际寄存器与继承状态待核对 |
+| 电源与复位 | DT 提供 HBA、VCC、VCCQ2 等电源和 core_reset；控制器总线电源/时钟继承状态已核对，完整 PHY/介质供电仍待验证 |
 | DMA stream | 该旧版控制器节点没有 `iommus` 属性，SID 尚未建立；USB 的 SID `0x740` 只用于 USB |
 
-寄存器语义参考固定 Linux 修订版的 [include/ufs/ufshci.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufshci.h)。后续还需核对同版本 Qualcomm UFS、GCC 和 PHY 实现。
+寄存器语义参考固定 Linux 修订版的 [include/ufs/ufshci.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufshci.h)。GCC、GDSC 与主线设备树已交叉核对；后续传输还需核对 Qualcomm UFS 和 PHY 初始化实现。
 
 ## 第一轮：控制器寄存器识别
 
@@ -37,8 +37,24 @@
 
 GCC 检查使用内部 UFS PHY 域：BCR `0x77000`、GDSCR `0x77004`、CFG_GDSCR `0x77008`、AXI/AHB `0x7700c/10`、aggregate AXI `0x82024`。必须无 collapse、无 reset、CFG power-up-complete 有效，并且三个总线分支已开启且未 halt，才映射和读取控制器。快照后再次检查 GCC 是否变化。该检查依赖固件保留的稳定可访问状态，不能恢复总线访问异常。寄存器及来源详见 [SOURCES.md](../drivers/PolarisUsb/SOURCES.md)。
 
-主机 ASan/UBSan 测试覆盖关闭探测、供电/复位/时钟拦截、控制器地址白名单、映射失败、状态变化、无效寄存器，以及原始 USB 证据的构建身份和计数校验。状态不满足时只记录跳过，不算控制器识别通过。当前候选尚待 CI 和真机验证。
+主机 ASan/UBSan 测试覆盖关闭探测、供电/复位/时钟拦截、控制器地址白名单、映射失败、状态变化、无效寄存器，以及原始 USB 证据的构建身份和计数校验。状态不满足时只记录跳过，不算控制器识别通过。当前候选已通过 51 项主机 unittest、定时器/加载窗口检查、完整 CI 和一轮真机验收。
+
+## 真机首轮结果（2026-11-11 08:51 UTC）
+
+[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42988178206)通过；打包镜像在关闭 USB/UFS 参数的本地 QEMU 中显示 STRESS_OK/CLEAN，tick 5→8。新 ESP 写入 userdata 后临时启动固件，主机通过原生 CDC 校验精确源码身份、随机 nonce、完整自检日志和两次采样间继续增长的 tick。证据摘要见 [ufs-register-snapshot.json](ufs-register-snapshot.json)，本地原始响应在 `artifacts/ufs-register-phone-c5dbce2/`。
+
+| 项目 | 原始值 |
+| --- | --- |
+| GCC BCR / GDSCR / CFG | `00000000 / f8222000 / 00070400` |
+| GCC AXI / AHB / aggregate AXI | `00004221 / 00000001 / 00000001` |
+| CAP / VER | `1587031f / 00000210` |
+| HCS / HCE | `0000010f / 00000001` |
+| UTRL / UTMRL doorbell | `00000000 / 00000000` |
+
+控制器可识别为 UFSHCI 2.1，CAP 声明 32 个传输槽位与 64 位寻址能力；后者只是能力位，尚未验证 UFS DMA。12 次 GCC 读取（前后各 6 次）一致，控制器仅读取上述 6 个寄存器，UFS MMIO 写入和介质命令提交均为零。缓存快照的 SHA256 为 `bd5af264d9bfcca8dc50b27665f8e2ff0c2f4dbec0b2ebe8e4c8b378d5b0b3aa`。
+
+原有 IO、子进程、`/tmp` 和 1,000 次进程回收自检全部通过；最终日志包含 tick 1～3，第二次采样较第一次继续增长；USB 命令错误、回复溢出和日志丢失均为零。最终运行日志响应 3,126 字节，SHA256 `1560759cc3ff473e50746f29e3c688283ea716ab4bb5e8b48351ac9adc84ad91`。两个 doorbell 为零只表明采样时没有挂起位，不证明队列所有权、固件完全退出或链路可重新初始化。
 
 ## 后续只读传输
 
-建立 UFS 的 SID、SMMU 路径和 DMA 地址能力，确认队列交接后，再实现 NOP、设备描述符查询、LUN/容量识别和有界块读取。已知测试区域可使用当前 ESP 的固定内容作读回与哈希比对；每项单独记录实际设备结果。当前阶段不实现介质写入、RPMB 操作或持久根文件系统。
+下一轮先只读盘点 UFS 的 SID、SMMU 路径及固件队列配置。主线设备树提供 `0x100 / mask 0xf` 线索，尚未作为本机的已验证 SID；不得套用 USB 的 `0x740`。确认队列交接和 DMA 地址能力后，再实现 NOP、设备描述符查询、LUN/容量识别和有界块读取。已知测试区域可使用当前 ESP 的固定内容作读回与哈希比对；每项单独记录实际设备结果。当前阶段不实现介质写入、RPMB 操作或持久根文件系统。

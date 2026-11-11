@@ -64,6 +64,18 @@ The supported commands are `ping`, `echo`, `status`, `log`, `help`.
 The 64 KiB log ring starts when the console opens; early boot and persistent
 crash logs, a POSIX user terminal, USB IRQs and suspend/resume remain unqualified.
 
+**Native UFS controller identification now passes on the phone** (2026-11-11,
+[source/CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42988178206),
+source `c5dbce256e9d6c1fcd3ae60e27abbb0063254565`). An opt-in probe checks
+inherited PHY power/reset/bus clocks and reads six controller registers:
+UFSHCI 2.1, HCE=1, both doorbells zero. The `ufs` command returns the cached
+snapshot. Native USB exact-build/nonce checks and the original RAM-root,
+process/tmp/stress checks pass, with an advancing heartbeat and zero USB
+command errors, reply overflow or lost log bytes. This is one phone boot;
+the ten-boot qualification above remains specific to the older USB baseline.
+[Evidence and next steps](research/ufs-readonly-plan.md) distinguish register
+identification from UFS DMA, link handoff and media I/O, which remain unverified.
+
 ## English
 
 ### What "transfer from ABL" means here
@@ -139,8 +151,9 @@ kernel+QEMU and ESP images. Pinned upstream revisions in
 ### Next stages
 
 The ten-boot and USB reconnect checks have passed on the captured baseline.
-Next is [native read-only UFS controller identification](research/ufs-readonly-plan.md),
-followed by bounded media readback. Apple userland,
+[Read-only UFS controller identification](research/ufs-readonly-plan.md) now passes
+on one phone boot. Next are read-only SMMU/queue discovery and bounded media
+readback. Apple userland,
 prelinked components and native display/touch remain later stages. The full
 history of both chains is in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -159,11 +172,11 @@ RAM 根挂载、固定文件读写、fork/exec/exit/wait、退出状态和单个
 用户已确认真机出现 `STRESS_OK`、`STRESS_CLEAN`，且 tick 持续变化，本轮程序自检通过。
 内核内部资源计数仅在 QEMU 取证；完整内存泄漏排查仍未完成。
 原生 XNU 轮询 USB CDC 已在真机枚举为 `1209:0001`，主机完成 ping、随机串往返、构建身份核对和运行日志取回，包含原有进程与文件系统自检成功标记。
-支持 `ping/echo/status/log/help`。当前镜像在一轮整机启动和十次 USB/IP 重连中命令错误计数保持零，每轮覆盖半条旧命令的清除；不支持的控制请求被 STALL 后，下一条正常控制请求及数据往返恢复，未新增总线复位。
+USB 基线支持 `ping/echo/status/log/help`，UFS 探测版另有 `ufs` 缓存快照命令。当前镜像在一轮整机启动和十次 USB/IP 重连中命令错误计数保持零，每轮覆盖半条旧命令的清除；不支持的控制请求被 STALL 后，下一条正常控制请求及数据往返恢复，未新增总线复位。
 随后约 53 秒完成 256 次、1～250 字符的往返，无新增错误或回复溢出。固件 PHY 未就绪时在端点初始化前恢复 QUSB2。
-同镜像十轮整机启动已通过身份、自检、持续心跳及零 USB 命令错误校验：8 轮按热启动指令执行、1 轮按用户确认关机后上电、首轮进入方式未单独分类。[逐轮日志哈希](research/usb-boot-series.json)已保存；下一阶段为[原生 UFS 只读识别](research/ufs-readonly-plan.md)。
+同镜像十轮整机启动已通过身份、自检、持续心跳及零 USB 命令错误校验：8 轮按热启动指令执行、1 轮按用户确认关机后上电、首轮进入方式未单独分类。[逐轮日志哈希](research/usb-boot-series.json)已保存；该十轮记录仍属于 `7e3fa6f` 基线。新 `c5dbce2` 已完成一轮[原生 UFS 控制器只读识别](research/ufs-readonly-plan.md)：UFSHCI 2.1，原有自检与持续心跳通过，UFS 介质访问仍待实现。
 日志限于控制台打开后的 64 KiB RAM 环，早期启动和持久化崩溃日志未完成。
-Apple 用户态、用户态终端输入、原生 UFS、触摸和 GPU 尚未接入。
+Apple 用户态、用户态终端输入、UFS 介质访问、触摸和 GPU 尚未接入。
 
 ### 本次移植期间发现并修复的两个通用 bug
 
