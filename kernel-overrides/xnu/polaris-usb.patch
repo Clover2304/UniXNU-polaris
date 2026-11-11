@@ -1,0 +1,35 @@
+--- a/bsd/dev/arm/km.c
++++ b/bsd/dev/arm/km.c
+@@ -30,6 +30,8 @@
+ extern void     console_write_char(char);
+ extern void     console_write(char *, int);
+ extern void vcputc(char);
++extern void polaris_usb_start(void) __attribute__((weak_import));
++extern void polaris_usb_capture(const char *,unsigned) __attribute__((weak_import));
+ 
+ 
+ void    kminit(void);
+@@ -69,6 +71,7 @@
+ 	initialize_screen(NULL, kPEReleaseScreen);
+ 	initialize_screen(NULL, kPEAcquireScreen);
+ 	polaris_console_ready = 1;
++	if (polaris_usb_start) polaris_usb_start();
+ }
+ 
+ 
+@@ -277,6 +280,7 @@
+ int
+ kmputc(__unused dev_t dev, char c)
+ {
++	if (polaris_usb_capture) polaris_usb_capture(&c,1);
+ 	if (polaris_console_ready) {
+ 		if (c == '\n') { vcputc('\r'); }
+ 		vcputc(c);
+@@ -390,6 +394,7 @@
+ 			*cp = *cp & 0x7f;
+ 		}
+ 		if (polaris_console_ready) {
++			if (polaris_usb_capture) polaris_usb_capture(buf,(unsigned)cc);
+ 			for (cp = buf; cp < &buf[cc]; cp++) {
+ 				if (*cp == '\n') { vcputc('\r'); }
+ 				vcputc(*cp);

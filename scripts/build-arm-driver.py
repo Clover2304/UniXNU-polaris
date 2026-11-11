@@ -6,6 +6,8 @@ ar; writes only build/<component>/. Does not access a device.
 """
 import argparse
 import json
+import os
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -30,8 +32,8 @@ def main():
         value = arguments[index]
         if value == record['file']:
             command.append(str(source))
-        elif value == '-o':
-            command.extend(['-o', str(destination)])
+        elif value in ('-o','-MF','-MT','-MJ'):
+            if value=='-o':command.extend(['-o', str(destination)])
             index += 1
         elif value == '-Xclang' and arguments[index + 1].startswith('-W'):
             index += 1
@@ -61,7 +63,19 @@ def main():
         raise SystemExit(f'Expected iOS 17 deployment, got {deployment}')
     archive = out / ('lib' + args.component + '.a')
     archive.unlink(missing_ok=True)
-    subprocess.run(['xcrun', 'ar', 'rcs', archive, destination], check=True)
+    objects=[destination]
+    if args.component=='ArmCpu':
+        usb_source=ROOT/'drivers/PolarisUsb/PolarisUsb.cpp';usb_obj=out/'PolarisUsb.o'
+        build_id=os.environ.get('GITHUB_SHA','local-unqualified')
+        if build_id!='local-unqualified' and not re.fullmatch('[0-9a-f]{40}',build_id):
+            raise SystemExit('Invalid USB diagnostic build identity')
+        usb_command=[str(usb_source) if item==str(source) else str(usb_obj) if item==str(destination) else item for item in command]
+        usb_command+=['-mgeneral-regs-only','-DPOLARIS_USB_BUILD_ID="'+build_id+'"']
+        result=subprocess.run(usb_command,cwd=record['directory'],capture_output=True,text=True)
+        (out/'usb-compile.log').write_text(result.stdout+result.stderr)
+        if result.returncode:raise SystemExit(result.stdout+result.stderr)
+        objects.append(usb_obj)
+    subprocess.run(['xcrun', 'ar', 'rcs', archive, *objects], check=True)
     print(f'{args.component}: ARM64/iOS 17 archive built')
 
 

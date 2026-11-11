@@ -40,7 +40,7 @@ def install_late_io_patch_hook(script):
         raise ValueError('Pinned baseline late-patch loop changed')
     line = lines[0]
     suffix = line[len(marker):]
-    additions = ['"$ROOT/patches/xnu/polaris-tmp.patch" ', '"$ROOT/patches/xnu/polaris-process.patch" ', '"$ROOT/patches/xnu/polaris-io.patch" ']
+    additions = ['"$ROOT/patches/xnu/polaris-usb.patch" ', '"$ROOT/patches/xnu/polaris-tmp.patch" ', '"$ROOT/patches/xnu/polaris-process.patch" ', '"$ROOT/patches/xnu/polaris-io.patch" ']
     for token in additions:
         suffix = suffix.replace(token, '')
     replacement = marker + ''.join(additions) + suffix
@@ -84,6 +84,10 @@ def main():
     references = set(cli.REFERENCES['kernel'])
     feeds.fetch(ctx, modules, only=references)
     tree.assemble(ctx, modules)
+    usb_tree=ctx.tree/'drivers/PolarisUsb'
+    if usb_tree.is_symlink():usb_tree.unlink()
+    elif usb_tree.exists():shutil.rmtree(usb_tree)
+    shutil.copytree(ROOT/'drivers/PolarisUsb',usb_tree)
     # UniXNU resolves patch sets as whole directories. Materialize the pinned
     # common set and overlay the reviewed fixes without editing its checkout
     # or accidentally discarding all the other common XNU patches.
@@ -176,6 +180,7 @@ def main():
         if reservation['_polaris_diagnostic_text_end'] - reservation['_polaris_diagnostic_text'] != 8192:
             raise SystemExit('Missing exact retained diagnostic text reservation')
         ram_tree_available = True
+        check.symbols(data, {'_polaris_usb_start','_polaris_usb_capture','_polaris_usb_stats'})
         check.symbols(data, {'_polaris_tmp_ready','_polaris_tmp_creates','_polaris_tmp_unlinks','_polaris_tmp_reads','_polaris_tmp_writes','_polaris_tmp_reuses'})
     prelinked = None
     if do_prelink:
@@ -189,6 +194,8 @@ def main():
               'init_signature_policy': init_signature_policy,
               'ram_io_available': ram_io_available,
               'ram_tree_available': ram_tree_available,
+              'usb_diagnostic_available': source_mockfs,
+              'usb_diagnostic_build_id': os.environ.get('GITHUB_SHA','local-unqualified') if source_mockfs else None,
               'ram_tmp_available': ram_tree_available,
               'process_signature_policy': 'pid1-and-direct-child-exact-cdhash-v1' if ram_tree_available else None,
               'root_checkpoint_available': root_checkpoint,
