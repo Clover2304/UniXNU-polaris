@@ -1,6 +1,30 @@
 # UniXNU-polaris handoff notes
 
 
+## 2026-11-11: bounded READ(10) candidate; stop after file update
+
+Candidate source `996fb95a382530b8d2389e2da2df7588cfe64489` adds an explicit
+`polaris-ufs-read=1` stage after the verified NOP/QUERY/SCSI metadata chain.
+It accepts only LUN 0 and LBA 0..5, one 4096-byte block per READ(10), no retry
+or write API. Raw cached sectors are returned by `ufs-read`, omitted from the
+startup log, and compared against an independent preboot reference. Primary
+GPT CRC, capacity and partition bounds are checked; backup GPT is not read.
+The failure path also bounds sense length before retaining it for diagnostics.
+77 local tests plus ASan/UBSan and complete exact-source CI run 43051897934
+pass. All 15 runtime reports pass, as does the final packaged local QEMU
+screen (CPU=max, heartbeat 5 to 8). The artifact ZIP SHA256 is
+`c0cf85396611eb6d9ab50a4037e88dbe5fe518dfa7686b0343168272c740babc`.
+Ready package: `../artifacts/ufs-read-ready/`.
+See `research/ufs-readonly-plan.md`; this remains unqualified on the phone.
+
+The user explicitly requested stopping after the USB file update and direct
+readback, without rebooting or running the new payload. Respect that boundary.
+The next menu title is `polaris: UFS READ10 GPT`; the final deployment/CI state
+is in workspace `../artifacts/ufs-read-remote-state.json` and
+`../private/ufs-read-deploy/state.json`. Until a confirmed normal restart and
+native USB evidence pass, keep the successful running baseline at `88cf31d`.
+Do not label a file update as native-sector-read success.
+
 ## 2026-11-11: alternate Ubuntu dependency mirrors for the next build
 
 Linux tool preparation now tries MIT, kernel.org and the Ubuntu archive in that
@@ -10,8 +34,9 @@ All pockets, including security, require the Ubuntu archive signing keyring.
 Each apt command is bounded to 180 seconds with a five-second forced-stop grace;
 update/download failures advance to the next mirror. No global apt sources are
 rewritten. Three failure-recovery tests pass, covering update failure, download
-timeout and exhaustion of all mirrors. The actual next CI download remains to
-be verified; historical failed runs keep their recorded status.
+timeout and exhaustion of all mirrors. CI run 43050409573 installed through MIT and passed EFI build/QEMU. On run
+43051897934, MIT timed out and automatic kernel.org fallback succeeded; EFI
+build/QEMU passed again. Historical failed runs keep their recorded status.
 
 ## 2026-11-11: SCSI PRDT metadata and capacity verified
 
