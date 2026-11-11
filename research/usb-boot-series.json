@@ -1,0 +1,75 @@
+{
+  "source_commit": "7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b",
+  "ci_run_id": 42973646239,
+  "target_boots": 10,
+  "qualified_boots": 6,
+  "cold_boots_reported": 0,
+  "warm_boots_as_instructed": 5,
+  "all_ten_with_cold_warm_qualified": false,
+  "usb_reconnects_count_as_phone_boots": false,
+  "esp_sha256": "0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47",
+  "boots": [
+    {
+      "number": 1,
+      "boot_record_utc": "20261111T065419Z",
+      "entry_method": "首轮方式未单独确认",
+      "native_usb_verified": true,
+      "cmd_errors": 0,
+      "log_dropped": 0,
+      "log_bytes": 2282,
+      "log_sha256": "a2ebb5e7a6fd6387b2c2799ec304aecc28fdc928bc6779bee38ecb90c5cd59dd"
+    },
+    {
+      "number": 2,
+      "boot_record_utc": "20261111T075837Z",
+      "entry_method": "按热启动指令执行",
+      "native_usb_verified": true,
+      "cmd_errors": 0,
+      "log_dropped": 0,
+      "log_bytes": 2196,
+      "log_sha256": "f2f246c79708dd526e30eade836d0ea8e8591ff21b9fb465b180165dc6f7cb7d"
+    },
+    {
+      "number": 3,
+      "boot_record_utc": "20261111T080121Z",
+      "entry_method": "按热启动指令执行",
+      "native_usb_verified": true,
+      "cmd_errors": 0,
+      "log_dropped": 0,
+      "log_bytes": 5034,
+      "log_sha256": "8d05ab8a08b6d3662bd4a764035937ff40da997e09e4b1d91ab10cd31f7f2b61"
+    },
+    {
+      "number": 4,
+      "boot_record_utc": "20261111T080425Z",
+      "entry_method": "按热启动指令执行",
+      "native_usb_verified": true,
+      "cmd_errors": 0,
+      "log_dropped": 0,
+      "log_bytes": 2454,
+      "log_sha256": "8bfeb7bc4e4c379d0e7e2f47c831a0067c40a0f83886b5f923eeb1ccd49cccd4",
+      "host_export_note": "Not exported at first 15-second check; available at next observation; no kernel command error observed"
+    },
+    {
+      "number": 5,
+      "boot_record_utc": "20261111T080712Z",
+      "entry_method": "按热启动指令执行",
+      "native_usb_verified": true,
+      "cmd_errors": 0,
+      "log_dropped": 0,
+      "log_bytes": 4303,
+      "log_sha256": "508841caf4ddfae3b6f1df6d216fc0bf855f536d4dae343a35d9439c07092811",
+      "host_export_note": "Initial native sample at STRESS_RUN 800/1000; retained before-stress-complete evidence, then same boot passed full checkpoints without reset"
+    },
+    {
+      "number": 6,
+      "boot_record_utc": "20261111T081038Z",
+      "entry_method": "按热启动指令执行",
+      "native_usb_verified": true,
+      "cmd_errors": 0,
+      "log_dropped": 0,
+      "log_bytes": 1551,
+      "log_sha256": "6a4315ab12984516966fcb7746e701f96b48ad3d7df585ade4a312dfa122cabc"
+    }
+  ]
+}
