@@ -1,0 +1,116 @@
+{
+  "stage": "F2 fixed six-sector READ(10) and primary GPT validation",
+  "source_commit": "996fb95a382530b8d2389e2da2df7588cfe64489",
+  "kernel_ci_run_url": "https://github.com/Clover2304/UniXNU-polaris/actions/runs/43051897934",
+  "board": "Xiaomi MIX 2S / polaris",
+  "ram_profile_gib": 6,
+  "cpus": 1,
+  "boot_method": "normal restart through persistent edk2; USB EFI file update",
+  "source_kernel_sha256": "b9a8c9b1ee3ad5d09b96f486d503003342cc2dfae88f63a50a6e767091681b42",
+  "packaged_kernel_sha256": "70e23b84fc907efd6b6f0a7642421bb45cc797cb875769f187df75a61a934edf",
+  "prepared_esp_sha256": "5ebfc14336fe027fc7c1f5452cf7d4dab3c84ee9b534dd5a874541b7d2eba80d",
+  "physical_updated_esp_sha256": "d71d020afdd694b4fe66fb26cc7e9fc8b7e4ec53c83f374f472b94af86d5b1b5",
+  "runtime_log_sha256": "23e3dd992660b885bf028e2903de9d457d54725500424cae3480ab72146be689",
+  "runtime_log_bytes": 11421,
+  "runtime_log_dropped": 0,
+  "usb_command_errors": 0,
+  "usb_reply_overflow": 0,
+  "baseline_io_proc_tmp_stress_verified": true,
+  "resident_heartbeat_verified": true,
+  "dma_allocation_bytes": 16384,
+  "prdt_entries_per_command": 1,
+  "sector_commands_submitted": 6,
+  "sector_read_bytes": 24576,
+  "sector_mmio_write_operations": 18,
+  "smmu_write_operations": 0,
+  "media_write_commands_submitted": 0,
+  "dma_pages_retained_until_reboot": true,
+  "scope": "LUN 0, READ(10), one 4096-byte block at each LBA 0..5; independent preboot reference; no filesystem mount or media writes",
+  "ci_passed": true,
+  "macos_kernel_ci_passed": true,
+  "remote_linux_ci_passed": true,
+  "acceptance_environment": "Exact-source GitHub Actions: host/EFI/macOS kernel/signature gate/native QEMU; 15 runtime reports passed; local packaged QEMU screen passed with CPU=max and ticks 5->8",
+  "package_origin": "exact-source GitHub Actions ufs-read-stage-results artifact",
+  "efi_provenance": {
+    "source_commit": "996fb95a382530b8d2389e2da2df7588cfe64489",
+    "ci_run_id": 43051897934,
+    "files": {
+      "EFI/BOOT/BOOTAA64.EFI": "aad20205a434770b515722dea25343e08e9ad1b39a9bac4c663226c14b639cf6",
+      "EFI/UniXNU/Payloads/DarwinBoot.efi": "8dbcbd3e535c8013b82b1cf25b43ba2e3a3e221b718dc0a9698e9b9742a45a72"
+    }
+  },
+  "ufs_scsi_capacity": {
+    "last_lba": 14419967,
+    "logical_blocks": 14419968,
+    "block_bytes": 4096,
+    "bytes": 59064188928
+  },
+  "ufs_read_faults": {
+    "global_before": 0,
+    "bank_before": 1024,
+    "global_after": 0,
+    "bank_after": 1024
+  },
+  "ufs_read_sha256": "e22473e43d8e84ac48d2d776a4805f281e5a2cbdce1a2a72f08fe4e8db6b3090",
+  "ufs_read_reference_sha256": "c912b2803eca71f757ae8f17eeb9bc30a1dd2d1e649653dbb67aa8ca68807b3f",
+  "ufs_bounded_read_verified": true,
+  "ufs_native_media_read_verified": true,
+  "primary_gpt_verified": true,
+  "backup_gpt_verified": false,
+  "gpt_header_crc32": 2953519296,
+  "gpt_table_crc32": 3102767257,
+  "gpt_table_sha256": "9413edd591f08582025973a52ad1c7e909db6143dbbd6e2493bec35643f91abc",
+  "media_write_verified": false,
+  "ufs_candidate_sid_hardware_confirmed": false,
+  "ufs_exclusive_firmware_quiescence_verified": false,
+  "read_sectors": [
+    {
+      "lba": 0,
+      "bytes": 4096,
+      "sha256": "d16fbfc5cf333dc088781d6b3c8bc420bed81b18412ec08b44606b543dbe788d",
+      "polls": 2,
+      "data_pa": 4332437504
+    },
+    {
+      "lba": 1,
+      "bytes": 4096,
+      "sha256": "49f0e4b1d35966cd4599ba9be849995f7ffc75167dec34c1ff63498eda30c27d",
+      "polls": 2,
+      "data_pa": 4332437504
+    },
+    {
+      "lba": 2,
+      "bytes": 4096,
+      "sha256": "9413edd591f08582025973a52ad1c7e909db6143dbbd6e2493bec35643f91abc",
+      "polls": 4,
+      "data_pa": 4332437504
+    },
+    {
+      "lba": 3,
+      "bytes": 4096,
+      "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7",
+      "polls": 4,
+      "data_pa": 4332437504
+    },
+    {
+      "lba": 4,
+      "bytes": 4096,
+      "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7",
+      "polls": 2,
+      "data_pa": 4332437504
+    },
+    {
+      "lba": 5,
+      "bytes": 4096,
+      "sha256": "f43db8eb75cfafc00ff2efe09f7200164c74a679f554fe63ec68400f2e1f8992",
+      "polls": 2,
+      "data_pa": 4332437504
+    }
+  ],
+  "runtime_usb_capture_count": 2,
+  "last_tick": 7,
+  "qualified_phone_boot_count": 1,
+  "continuous_media_read_stress_verified": false,
+  "filesystem_mount_verified": false,
+  "apple_userland_booted": false
+}

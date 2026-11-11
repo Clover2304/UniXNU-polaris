@@ -1,6 +1,24 @@
 # UniXNU-polaris handoff notes
 
 
+## 2026-11-11: native six-sector READ(10) and primary GPT verified
+
+Current verified source is `996fb95a382530b8d2389e2da2df7588cfe64489`.
+After the requested stop following file update, the user restarted normally.
+Native CDC exact-build/nonce checks and two independent captures passed.
+Six LUN-0 READ(10) commands at LBA 0..5 returned 24 KiB matching the independent
+preboot reference byte for byte; primary GPT CRC and partition bounds pass.
+Baseline checks and changing heartbeat pass with zero USB errors/log loss.
+No media writes, backup GPT or filesystem mount are qualified.
+See `research/ufs-read-result.json` and `research/ufs-readonly-plan.md`.
+
+Current phone ESP: `../private/ufs-read-deploy/update/updated-esp.img`, SHA256
+`d71d020afdd694b4fe66fb26cc7e9fc8b7e4ec53c83f374f472b94af86d5b1b5`.
+Ready package: `../artifacts/ufs-read-ready/`; raw private evidence:
+`../artifacts/ufs-read-phone-996fb95/`. The pending-update instructions below
+are historical and were satisfied. Next: known ESP-file readback, then a
+read-only block/filesystem interface; retain RAM root until separately proven.
+
 ## 2026-11-11: bounded READ(10) candidate; stop after file update
 
 Candidate source `996fb95a382530b8d2389e2da2df7588cfe64489` adds an explicit
@@ -15,7 +33,7 @@ pass. All 15 runtime reports pass, as does the final packaged local QEMU
 screen (CPU=max, heartbeat 5 to 8). The artifact ZIP SHA256 is
 `c0cf85396611eb6d9ab50a4037e88dbe5fe518dfa7686b0343168272c740babc`.
 Ready package: `../artifacts/ufs-read-ready/`.
-See `research/ufs-readonly-plan.md`; this remains unqualified on the phone.
+See `research/ufs-readonly-plan.md`; the subsequent native result is recorded above.
 
 The user explicitly requested stopping after the USB file update and direct
 readback, without rebooting or running the new payload. Respect that boundary.
@@ -40,7 +58,7 @@ build/QEMU passed again. Historical failed runs keep their recorded status.
 
 ## 2026-11-11: SCSI PRDT metadata and capacity verified
 
-Current running source is `88cf31dc88bcdc966824c3ecfbfc7eec4ed32081`.
+The preserved metadata-only source is `88cf31dc88bcdc966824c3ecfbfc7eec4ed32081`.
 A normal restart after the USB file update passed INQUIRY and READ CAPACITY(10)
 via a one-entry PRDT and separate data page above 4 GiB. Unit 0 has 14,419,968
 4 KiB blocks (59,064,188,928 bytes); baseline checks and heartbeat pass with
@@ -53,7 +71,7 @@ kernel and the unchanged EFI binaries from the previous successful CI. This
 is not recorded as complete CI success. The rejected NUL-padding attempt is
 preserved separately.
 
-Current phone ESP: `../private/ufs-scsi-padding-deploy/update/updated-esp.img`,
+Preserved metadata-only ESP: `../private/ufs-scsi-padding-deploy/update/updated-esp.img`,
 SHA256 `6d80d80a7d40e5f958560c57fd29976d099e228dd02b0ad8c40dca60314a2f4b`.
 Ready package: `../artifacts/ufs-scsi-padding-ready/`. The older images below
 are historical baselines. Continue with bounded READ(10) and GPT readback.

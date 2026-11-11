@@ -4,15 +4,15 @@
 
 ## 当前基线与证据
 
-- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令与运行时日志取回，以及 UFS 控制器/队列/SMMU 只读盘点、自有队列 NOP、DEVICE/UNIT 0 描述符查询，以及独立 PRDT 数据页上的 SCSI INQUIRY/READ CAPACITY；另已验证默认 edk2 启动和固件辅助的 USB 文件更新。
+- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令与运行时日志取回，以及 UFS 控制器/队列/SMMU 只读盘点、自有队列 NOP、DEVICE/UNIT 0 描述符查询，以及独立 PRDT 数据页上的 SCSI INQUIRY/READ CAPACITY、LUN 0 前六个 4 KiB 扇区原生读取与主 GPT 校验；另已验证默认 edk2 启动和固件辅助的 USB 文件更新。
 - 配置：6 GB 机型配置；当前仅启用 1 CPU，内核限制在受控的 1 GiB 内存窗口。完整 RAM 和 SMP 未验证。
 - 十轮启动和重连已验证的 USB 源码基线：`7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`。此前 USB 基线 `638a344d865375c209f13f6109484eee7fd7d5fe`、压力测试基线 `c4081260dd52a6ccdbd3b4f99128b1f4e9c4025e` 及其他成功镜像均保留。
 - 保留的 UFS NOP 源码 `1d38b03539ec26b146ceda717c6cf831ab572cec` 已通过 [完整 CI 与模拟器运行](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43004883497)、57 项主机 unittest、定时器/加载窗口检查和一轮真机启动。首轮 c5dbce2、只读盘点 9f1401c 和前置检查误拦 5670f6c 的镜像/记录均保留。QEMU 不模拟 SDM845 USB/UFS；相应外设取证来自真机。
 - 真机证据：用户先确认 USB_RUN 和 Windows CDC 枚举，随后主机通过原生 USB 完成 ping、随机 nonce 往返、精确构建身份核对，并取回包含 TMP_CHILD_OK、TMP_OK、CHILD_OK、PROC_OK、STRESS_OK/CLEAN 和变化心跳的运行日志。主机保存了原始 USB 响应及部分外设寄存器诊断；内部进程/task/内存页计数仍仅在 QEMU 取证。
 - 保留的 USB 工作区基线：`/root/projects/xnu-polaris/artifacts/usb-reset-ready/`，ESP SHA256：`0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47`。USB 证据在 `artifacts/usb-native-check-7e3fa6f/`、`artifacts/usb-reconnect-7e3fa6f-10/`、`artifacts/usb-control-stall-7e3fa6f/`、`artifacts/usb-continuous-7e3fa6f/`。整机启动计数单独保存在 `artifacts/usb-boot-series-7e3fa6f/index.json`。
 - 保留的 NOP 镜像在 `artifacts/ufs-nop-format-ready/`，ESP SHA256 `495a3a4b2b9cbf162654c44750952089114fbd45076075eb1e52119e2d219493`；[NOP 证据](ufs-nop-result.json)、[队列/SMMU 证据](ufs-queue-smmu-snapshot.json)和[后续计划](ufs-readonly-plan.md)已保存。
-- 当前运行内核源码为 `88cf31dc88bcdc966824c3ecfbfc7eec4ed32081`，一轮真机 INQUIRY/READ CAPACITY、70 项本地主机 unittest 与 15 项本地运行验收通过。macOS CI 编译及实际签名门检查通过；同轮 Linux CI 因软件源 DNS 故障未通过，不能记为完整 CI 通过。EFI 复用未变更的上一轮成功 CI 二进制，来源见 [PRDT/容量证据](ufs-scsi-result.json)。已按用户明确选择将同一已验证 edk2 固件安装至 boot；普通重启进入更新后的 UniXNU/XNU，并再次通过原生 USB、基线自检和 UFS 查询、PRDT 元数据传输。固件辅助 USB 文件更新、原 boot 备份及恢复步骤见 [说明](uefi-usb-update.md)；它不计作 XNU 原生介质读写。
-- 当前根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。尚无 Apple 用户态、交互输入、UFS 介质访问或完整可写文件系统。
+- 当前运行内核源码为 `996fb95a382530b8d2389e2da2df7588cfe64489`，已通过 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43051897934)、77 项本地主机测试和 15 项运行验收报告；最终打包 QEMU 画面自检通过，心跳 5→8。用户普通重启后，原生 USB 精确身份、两个独立采样、基线自检与持续心跳通过；六个 4 KiB 扇区逐字节匹配预启动参考，保护 MBR、主 GPT 头/表 CRC 与分区边界通过。见 [扇区读取证据](ufs-read-result.json)。此前 `88cf31d` 的 Linux CI DNS 故障和 EFI 来源仍保留在 [元数据阶段记录](ufs-scsi-result.json)，不影响当前源码的独立完整 CI 结果。默认 edk2 和 USB 文件更新方式见 [说明](uefi-usb-update.md)。
+- 当前根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。尚无 Apple 用户态、交互输入、通用 UFS 块设备/文件系统或完整可写文件系统；当前原生介质读取仅限定前六个扇区。
 - 目标 Apple 镜像先固定为 arm64 iPadOS 17.7.11（21H461，iPad7,1）；自制程序通过不等于该系统已兼容。
 
 状态：**真机通过** = 指定功能由真机程序自检、用户回报画面或实际 USB 主机往返与日志取证证实，逐项注明来源；**模拟/主机通过** = 仅相应环境取证；**部分** = 仅列明范围；**待验证** = 无充分证据；**未实现/未接入** = 当前不具备。次数和时长均为建议目标，不是已完成结果。
@@ -21,7 +21,7 @@
 
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
-| A1 | 固定源码、工具链与配置，保存哈希并可重复构建 | 既有基线完整 CI 通过；当前内核 Mac CI、本地主机和 15 项运行验收通过，Linux CI 基础设施故障单独记录 |
+| A1 | 固定源码、工具链与配置，保存哈希并可重复构建 | 当前源码完整 CI、77 项本地主机测试及 15 项运行验收报告通过；此前源码的 CI 故障单独保留 |
 | A2 | 固件、UniXNU、DarwinBoot 到 XNU 交接 | 临时 fastboot 路径与新默认 edk2 普通重启路径均真机通过 |
 | A3 | ADT、加载地址、内存窗口与越界拒绝 | 正常路径真机通过；异常输入主机/模拟通过 |
 | A4 | 内核初始化、当前配置 corecrypto POST、BSD/IOKit 初始化 | 真机通过 |
@@ -88,8 +88,8 @@
 
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
-| F1 | DMA、缓存一致性、SMMU/IOMMU、设备中断 | USB 收发、UFS NOP/QUERY 和单项 PRDT 的 INQUIRY/容量元数据 DMA、缓存维护真机通过，复用原有旁路；扇区负载、隔离和原生设备中断待验证 |
-| F2 | XNU 原生 UFS 识别、读写和持久化 | 部分：UFSHCI 2.1 识别、候选 SMMU 盘点、自有队列交接、单次 NOP、DEVICE/UNIT 0 描述符查询、单项 PRDT INQUIRY/READ CAPACITY（含 >4 GiB 数据页 DMA）真机通过；实际扇区读写和持久化未验证；固件读 ESP 不计入 |
+| F1 | DMA、缓存一致性、SMMU/IOMMU、设备中断 | USB 收发、UFS NOP/QUERY 和单项 PRDT 的 INQUIRY/容量元数据及六个 4 KiB 扇区 DMA、缓存维护真机通过，复用原有旁路；隔离、长期独占和原生设备中断待验证 |
+| F2 | XNU 原生 UFS 识别、读写和持久化 | 部分：UFSHCI 2.1 识别、候选 SMMU 盘点、自有队列交接、单次 NOP、DEVICE/UNIT 0 描述符查询、单项 PRDT INQUIRY/READ CAPACITY、固定 LUN 0/LBA 0～5 原生读取及主 GPT 校验（含 >4 GiB 数据页 DMA）真机通过；更大范围/通用块设备、文件系统挂载、介质写入和持久化未验证；固件读 ESP 不计入 |
 | F3 | XNU USB 枚举、收发和电脑控制台 | 轮询 CDC 枚举、诊断/日志、十次 USB/IP 重连及控制请求 STALL 恢复真机通过；物理插拔、POSIX 终端、吞吐和挂起恢复待验证 |
 | F4 | 原生显示控制器、面板初始化与刷新 | 未接入；当前继承固件 framebuffer |
 | F5 | Adreno 命令提交、显存管理与图形合成 | 未接入 |
@@ -238,6 +238,17 @@ D6/D7 基本可写 RAM 文件系统 → C5/H2 进程回收压力 → E5 日志�
 
 <!-- polaris-boot-series:end -->
 
-F2 已完成控制器/队列/SMMU 盘点和自有队列单次 NOP：在 `0x1023bc000` 的 16 KiB 新分配中验证描述符、请求及 NOP IN 响应 DMA，OCS=0、tag 匹配、保护区完整，最终 UTRL run-stop=0、doorbell=0。候选 bank 2 配置未改；首轮误把 FSR FORMAT 当故障的问题已按 `0xc00001fe` 掩码修正并保存记录。原有自检与变化心跳通过，USB 错误、回复溢出和日志丢失均为零。查询源码 `9feeaca` 已进一步通过 DEVICE/UNIT 0 READ_DESCRIPTOR：UFS 2.1、4 KiB 块、59,064,188,928 字节容量线索，原有自检/持续心跳和 USB 正常；当前 `88cf31d` 已完成单项 PRDT INQUIRY 与 READ CAPACITY，容量一致，原有自检/心跳通过且 USB 错误/丢失均为零。下一轮验证固定范围的扇区读回；见 [UFS 计划和结果](ufs-readonly-plan.md)。
+F2 已完成控制器/队列/SMMU 盘点和自有队列单次 NOP：在 `0x1023bc000` 的 16 KiB 新分配中验证描述符、请求及 NOP IN 响应 DMA，OCS=0、tag 匹配、保护区完整，最终 UTRL run-stop=0、doorbell=0。候选 bank 2 配置未改；首轮误把 FSR FORMAT 当故障的问题已按 `0xc00001fe` 掩码修正并保存记录。原有自检与变化心跳通过，USB 错误、回复溢出和日志丢失均为零。查询源码 `9feeaca` 已进一步通过 DEVICE/UNIT 0 READ_DESCRIPTOR：UFS 2.1、4 KiB 块、59,064,188,928 字节容量线索，原有自检/持续心跳和 USB 正常；当前 `88cf31d` 已完成单项 PRDT INQUIRY 与 READ CAPACITY，容量一致，原有自检/心跳通过且 USB 错误/丢失均为零。随后 `996fb95` 已在一轮普通重启中完成六个 4 KiB 扇区读回和主 GPT 校验，逐字节匹配参考；下一轮先扩展到已知 ESP 范围内的只读文件读回，再接通用只读块设备/文件系统。见 [UFS 计划和结果](ufs-readonly-plan.md)。
 
-当前成功包：`artifacts/ufs-scsi-padding-ready/`；实际启动卷：`private/ufs-scsi-padding-deploy/update/updated-esp.img`，SHA256 `6d80d80a7d40e5f958560c57fd29976d099e228dd02b0ad8c40dca60314a2f4b`。本轮仅一次普通重启；十轮可靠性资格仍属于原 USB 基线。
+当前成功包：`artifacts/ufs-read-ready/`；实际启动卷：`private/ufs-read-deploy/update/updated-esp.img`，SHA256 `d71d020afdd694b4fe66fb26cc7e9fc8b7e4ec53c83f374f472b94af86d5b1b5`。本轮仅一次普通重启；十轮可靠性资格仍属于原 USB 基线。
+
+
+### F2 首次原生扇区读取验收
+
+源码 `996fb95`、一轮用户普通重启：6 条 READ(10)，LUN 0/LBA 0～5，各 4096 字节，
+共 24,576 字节，经高于 4 GiB 的独立数据页返回，逐字节匹配预启动独立参考。
+保护 MBR、主 GPT 头和表 CRC、容量及分区边界检查通过。两个后续 USB 采样读取
+相同启动缓存，不会再次提交存储命令；采样间心跳继续增长。原有 IO/PROC/TMP/
+1,000 次进程自检通过，USB 命令错误、回复溢出和日志丢失均为零。
+SMMU 故障位无新增、配置未改，无介质写命令。未读取备 GPT，未挂载 UFS 文件系统，
+没有 Apple 用户态；本轮不是持续读取压力或性能基准。[证据](ufs-read-result.json)。

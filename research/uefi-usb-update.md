@@ -67,4 +67,4 @@ fastboot flash boot /path/to/original-boot.img
 
 ## 当前运行镜像
 
-最新成功源码 `88cf31d` 已通过同一路径更新并普通重启，PRDT INQUIRY/READ CAPACITY 及基线自检、心跳、USB 通过。当前 expected image 为工作区 `private/ufs-scsi-padding-deploy/update/updated-esp.img`，SHA256 `6d80d80a7d40e5f958560c57fd29976d099e228dd02b0ad8c40dca60314a2f4b`；后续更新必须匹配这份实际启动卷。内核 Mac CI、本地 15 项运行验收与未变更 EFI 的来源见 [结果](ufs-scsi-result.json)，同轮 Linux CI 的 DNS 故障不记为完整 CI 成功。
+最新成功源码 `996fb95` 已通过同一路径更新并普通重启，固定六个原生扇区读取、主 GPT 校验及基线自检、心跳、USB 通过。当前 expected image 为工作区 `private/ufs-read-deploy/update/updated-esp.img`，SHA256 `d71d020afdd694b4fe66fb26cc7e9fc8b7e4ec53c83f374f472b94af86d5b1b5`；后续更新必须匹配这份实际启动卷。[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43051897934)、77 项本地主机测试、15 项运行验收和最终打包画面通过，来源见 [结果](ufs-read-result.json)。固件辅助文件更新与 XNU 原生读取分别取证；当前仍无 XNU 介质写入或通用文件系统挂载。
