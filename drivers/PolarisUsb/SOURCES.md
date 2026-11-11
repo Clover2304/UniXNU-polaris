@@ -219,7 +219,7 @@ little-endian DBC is exactly transfer bytes minus one; no data overlaps the
 request, response, PRDT or protection ranges. UTRD CT=1, DD=DEVICE_TO_HOST,
 interrupt bit enabled, crypto disabled; command UPIU uses READ, LUN/tag 0.
 Only standard INQUIRY (36 bytes, EVPD=0) and READ CAPACITY(10) (8 bytes, PMI=0)
-are available. No arbitrary CDB, READ sector, WRITE, flag/attribute mutation,
+are issued by this metadata stage. No arbitrary CDB, WRITE, flag/attribute mutation,
 RPMB or host-triggered command re-execution is exposed.
 
 Every command has one bounded submission, full allocation cache maintenance,
@@ -236,3 +236,25 @@ Wire and PRDT layouts are cross-checked against fixed Linux
 [ufs.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufs.h),
 [ufshci.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufshci.h),
 [ufshcd.c](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/drivers/ufs/core/ufshcd.c).
+
+
+## Fixed six-sector READ(10) candidate
+
+`UfsRead.h` adds an independent `polaris-ufs-read=1` opt-in after INQUIRY and
+READ CAPACITY succeed. Only LUN 0, one 4096-byte block and LBA 0..5 are accepted;
+no runtime LBA, CDB or write API exists. The READ(10) CDB carries the LBA at
+bytes 2..5 and transfer count one at bytes 7..8, cross-checked against Linux
+[sd.c](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/drivers/scsi/sd.c).
+The existing PRDT/cache/timeout/guard/stop path is reused, with full-block DBC=4095
+and UPIU expected transfer length=4096. Fault and mapping snapshots are checked
+after each command; any failure stops the stage without retry. Owned DMA pages
+remain retained until restart. Each completed sector is copied into a separate
+retained CPU buffer after invalidation and stopped-queue validation.
+
+`ufs-read` only returns the boot-time cache. Raw GPT sectors are omitted from
+the startup log; the bounded full response fits the 128 KiB reply ring and is
+saved privately by the host. Qualification requires all 24 KiB to match an
+independent preboot storage-export reference, followed by protective MBR,
+primary GPT header/table CRC, capacity and partition-boundary checks. Backup
+GPT, unrestricted block access, filesystem mount and media writes remain outside
+this candidate. A GOOD SCSI status by itself does not qualify data freshness.

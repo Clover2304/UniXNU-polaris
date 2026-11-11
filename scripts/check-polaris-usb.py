@@ -4,8 +4,81 @@
 Requires PyUSB and libusb. This talks to the XNU 1209:0001 diagnostic device;
 it does not use fastboot/ADB and does not submit a reboot or memory-write command.
 """
-import argparse,hashlib,json,re,secrets,time,struct
+import argparse,hashlib,json,re,secrets,time,struct,zlib
 from pathlib import Path
+
+def verify_primary_gpt(data,capacity):
+    if len(data)!=6*4096 or capacity['block_bytes']!=4096:raise ValueError('requires six 4-KiB sectors')
+    last=capacity['last_lba']
+    if data[510:512]!=b'\x55\xaa' or not any(data[446+16*n+4]==0xee for n in range(4)):
+        raise ValueError('protective MBR missing')
+    h=data[4096:8192]
+    if h[:8]!=b'EFI PART':raise ValueError('GPT signature missing')
+    revision,length,crc,reserved=struct.unpack_from('<4I',h,8)
+    if revision!=0x10000 or not 92<=length<=4096 or reserved:raise ValueError('GPT header fields invalid')
+    clean=bytearray(h[:length]);clean[16:20]=bytes(4)
+    if zlib.crc32(clean)!=crc:raise ValueError('GPT header CRC mismatch')
+    here,alternate,first,end=struct.unpack_from('<4Q',h,24)
+    table,count,stride,table_crc=struct.unpack_from('<Q3I',h,72)
+    if here!=1 or alternate!=last or not 2<=first<=end<last:raise ValueError('GPT header LBAs disagree with capacity')
+    if not 1<=count<=128 or not 128<=stride<=1024 or stride%128:raise ValueError('GPT entry geometry invalid')
+    extent=count*stride;table_blocks=(extent+4095)//4096
+    if table<2 or table+table_blocks>6 or table+table_blocks>first:raise ValueError('GPT table outside fixed read range')
+    entries=data[table*4096:table*4096+extent]
+    if len(entries)!=extent or zlib.crc32(entries)!=table_crc:raise ValueError('GPT table CRC mismatch')
+    partitions=[];guids=set()
+    for n in range(count):
+        entry=entries[n*stride:(n+1)*stride]
+        if not any(entry[:16]):continue
+        guid=entry[16:32];start,stop=struct.unpack_from('<2Q',entry,32)
+        name=entry[56:128].decode('utf-16-le').rstrip('\0')
+        if not any(guid) or guid in guids or not first<=start<=stop<=end:raise ValueError('GPT partition GUID/bounds invalid')
+        if any(start<=p['last_lba'] and stop>=p['first_lba'] for p in partitions):raise ValueError('GPT partitions overlap')
+        guids.add(guid);partitions.append(dict(number=n+1,name=name,first_lba=start,last_lba=stop,bytes=(stop-start+1)*4096))
+    if len([p for p in partitions if p['name']=='userdata'])!=1:raise ValueError('GPT userdata partition missing or duplicated')
+    return dict(primary_gpt_verified=True,backup_gpt_verified=False,gpt_header_crc32=crc,gpt_table_crc32=table_crc,
+                gpt_table_sha256=hashlib.sha256(entries).hexdigest(),gpt_partitions=partitions)
+
+def verify_ufs_read(build,raw,prior,reference):
+    if prior.get('source_commit')!=build or not prior.get('ufs_scsi_capacity_verified') or not prior.get('ufs_prdt_payload_verified'):
+        raise ValueError('sector reads require matching verified SCSI capacity/PRDT')
+    if len(reference)!=6*4096:raise ValueError('reference must be exactly six 4-KiB sectors')
+    lines=raw.splitlines();pa=prior['ufs_nop_dma']['pa'];cursor=1;sectors=[];all_data=bytearray()
+    header=(f'POLARIS_UFS_READ build={build} state=ok count=6 writes=18 doorbells=6 smmu_unchanged=1 prdt_entries=1 sector_commands=6 media_writes=0 smmu_writes=0 retained=1 pa={pa:016x}').encode()
+    if len(raw)>131072 or not lines or lines[0]!=header or not raw.endswith(b'\n') or lines[-1]!=b'POLARIS_UFS_READ_END':
+        raise ValueError('invalid or incomplete bounded READ stage')
+    for n in range(6):
+        pattern=(rb'POLARIS_UFS_READ_CMD n='+str(n).encode()+rb' lba='+str(n).encode()+
+            rb' opcode=28 lun=00 blocks=1 state=ok ocs=0 response=00 status=00 flags=([0-9a-f]{2}) bytes=4096 residual=0 segment=(0|2) sense_len=0 guards=1 stopped=1 polls=(\d+) run=00000000 db=00000000 is=([0-9a-f]{8}) upiu=([0-9a-f]{68})')
+        if cursor>=len(lines):raise ValueError('missing sector command')
+        m=re.fullmatch(pattern,lines[cursor]);cursor+=1
+        if not m:raise ValueError('READ command failed status, bounds, guards or cleanup')
+        flags,segment,polls,is_value=int(m[1],16),int(m[2]),int(m[3]),int(m[4],16);upiu=bytes.fromhex(m[5].decode())
+        if flags&0x60 or not 1<=polls<=5000 or is_value&0x71884 or upiu[0]!=0x21 or upiu[1]!=flags or any(upiu[i] for i in (2,3,6,7,8)) or int.from_bytes(upiu[10:12],'big')!=segment or any(upiu[12:16]) or (segment and any(upiu[32:34])):
+            raise ValueError('READ UPIU flags/residual/sense invalid')
+        if cursor>=len(lines):raise ValueError('missing READ PRDT')
+        m=re.fullmatch(rb'POLARIS_UFS_READ_DMA n='+str(n).encode()+rb' data_pa=([0-9a-f]{16}) prdt=([0-9a-f]{32})',lines[cursor]);cursor+=1
+        if not m:raise ValueError('READ PRDT missing')
+        data_pa=int(m[1],16);prdt=bytes.fromhex(m[2].decode())
+        if data_pa!=pa+0x2000 or struct.unpack('<QII',prdt)!=(data_pa,0,4095):raise ValueError('READ PRDT target/length invalid')
+        data=bytearray()
+        while len(data)<4096:
+            if cursor>=len(lines):raise ValueError('sector data truncated')
+            m=re.fullmatch(rb'POLARIS_UFS_READ_DATA n='+str(n).encode()+rb' offset='+str(len(data)).encode()+rb' hex=([0-9a-f]{64})',lines[cursor]);cursor+=1
+            if not m:raise ValueError('sector data is missing, duplicated or out of order')
+            data.extend(bytes.fromhex(m[1].decode()))
+        if data!=reference[n*4096:(n+1)*4096]:raise ValueError('native sector differs from independent read-only reference')
+        all_data.extend(data);sectors.append(dict(lba=n,bytes=4096,sha256=hashlib.sha256(data).hexdigest(),polls=polls,data_pa=data_pa,prdt_hex=prdt.hex(),upiu_hex=upiu.hex()))
+    if cursor+2!=len(lines):raise ValueError('unexpected READ records')
+    m=re.fullmatch(rb'POLARIS_UFS_READ_FAULT global_before=([0-9a-f]{8}) bank_before=([0-9a-f]{8}) global_after=([0-9a-f]{8}) bank_after=([0-9a-f]{8})',lines[cursor])
+    if not m:raise ValueError('READ fault snapshot missing')
+    faults=dict(zip(('global_before','bank_before','global_after','bank_after'),[int(x,16) for x in m.groups()]))
+    if faults['global_before'] or faults['global_after'] or (faults['bank_before']|faults['bank_after'])&0xc00001fe:raise ValueError('SMMU fault around sector reads')
+    result=verify_primary_gpt(bytes(all_data),prior['ufs_scsi_capacity'])
+    result.update(ufs_native_media_read_verified=True,ufs_bounded_read_verified=True,ufs_read_sectors=sectors,
+                  ufs_read_faults=faults,ufs_read_sha256=hashlib.sha256(raw).hexdigest(),
+                  ufs_read_reference_sha256=hashlib.sha256(reference).hexdigest(),media_write_verified=False)
+    return result
 
 def verify_ufs_scsi(build,raw,prior):
     if prior.get('source_commit')!=build or not prior.get('ufs_descriptor_queries_verified') or not prior.get('ufs_owned_nop_verified'):
@@ -243,6 +316,8 @@ def main():
     p.add_argument('--ufs-inventory',action='store_true',help='also collect the read-only candidate stream/queue inventory')
     p.add_argument('--ufs-nop',action='store_true',help='verify the cached single owned-queue NOP result')
     p.add_argument('--ufs-query',action='store_true',help='verify cached read-only device and unit descriptor results')
+    p.add_argument('--ufs-read',action='store_true',help='verify six cached fixed READ(10) sectors against independent reference')
+    p.add_argument('--ufs-read-reference',type=Path,help='six 4-KiB sectors captured independently before boot')
     p.add_argument('--ufs-scsi',action='store_true',help='verify cached INQUIRY and READ CAPACITY PRDT results')
     p.add_argument('--wait',type=float,default=120);a=p.parse_args()
     if not re.fullmatch('[0-9a-f]{40}',a.expected_build):p.error('requires the exact source commit')
@@ -250,6 +325,7 @@ def main():
     if a.ufs_nop and not a.ufs_inventory:p.error('--ufs-nop requires --ufs-inventory')
     if a.ufs_query and not a.ufs_nop:p.error('--ufs-query requires --ufs-nop')
     if a.ufs_scsi and not a.ufs_query:p.error('--ufs-scsi requires --ufs-query')
+    if a.ufs_read and (not a.ufs_scsi or not a.ufs_read_reference):p.error('--ufs-read requires --ufs-scsi and --ufs-read-reference')
     import usb.core,usb.util
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False)
     report=dict(passed=False,physical_polaris=False,source_commit=a.expected_build,transport='native XNU polling USB CDC',
@@ -306,6 +382,10 @@ def main():
             raw=exchange('ufs-scsi',lambda d:b'POLARIS_UFS_SCSI_END\n' in d)
             (out/'ufs-scsi.raw').write_bytes(raw)
             report.update(verify_ufs_scsi(a.expected_build,raw,report))
+        if a.ufs_read:
+            raw=exchange('ufs-read',lambda d:b'POLARIS_UFS_READ_END\n' in d,30)
+            (out/'ufs-read.raw').write_bytes(raw)
+            report.update(verify_ufs_read(a.expected_build,raw,report,a.ufs_read_reference.read_bytes()))
         values=verify_response(a.expected_build,nonce,pong,echo,status,log)
         report.update(values,passed=True,physical_polaris=True,nonce=nonce,
                       native_enumeration_verified=True,bidirectional_roundtrip_verified=True,build_identity_verified=True,

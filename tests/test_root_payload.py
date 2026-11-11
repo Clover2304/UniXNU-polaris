@@ -134,6 +134,16 @@ class RootPayloadTests(unittest.TestCase):
             self.assertIn('UFS QUERY requires', result.stderr)
             self.assertFalse((root / 'esp').exists())
 
+    def test_ufs_read_requires_explicit_scsi_and_source_support(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kernel, _ = self.inputs(root)
+            result = subprocess.run([sys.executable, ROOT / 'scripts/make-payload-esp.py',
+                '--kernel', kernel, '--efi', root, '--out', root / 'esp', '--ufs-read'],capture_output=True,text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('UFS READ requires', result.stderr)
+            self.assertFalse((root / 'esp').exists())
+
     def test_ufs_scsi_requires_explicit_query_and_source_support(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

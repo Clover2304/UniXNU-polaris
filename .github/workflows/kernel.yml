@@ -421,3 +421,34 @@ jobs:
             out/init-unsigned-check/report.json
             out/root-check/report.json
             out/platform-check/report.json
+
+      - name: Assemble bounded READ(10) six-sector payload
+        if: env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        run: python3 scripts/make-payload-esp.py --kernel out/kernel/kernel.macho --efi out/efi --out out/polaris-ufs-read-esp --cpus 1 --ram 6 --process-dir out/polaris-stress --usb-console --ufs-probe --ufs-inventory --ufs-nop --ufs-query --ufs-scsi --ufs-read
+      - uses: actions/upload-artifact@v4
+        if: always() && env.POLARIS_DEFCONFIG == 'polaris_ramdisk_defconfig'
+        with:
+          name: ufs-read-stage-results
+          retention-days: 7
+          path: |
+            out/kernel/apple-signature-gate.json
+            out/polaris-stress/
+            out/polaris-ufs-read-esp/
+            out/stress-check/report.json
+            out/stress-check/serial.log
+            out/stress-check/qemu.log
+            out/stress-check/screen.ppm
+            out/tmp-check/report.json
+            out/process-check/report.json
+            out/process-wrong-hash-check/report.json
+            out/process-damaged-check/report.json
+            out/process-unsigned-check/report.json
+            out/process-cached-init-check/report.json
+            out/io-check/report.json
+            out/io-missing-file-check/report.json
+            out/init-check/report.json
+            out/init-wrong-hash-check/report.json
+            out/init-damaged-code-check/report.json
+            out/init-unsigned-check/report.json
+            out/root-check/report.json
+            out/platform-check/report.json

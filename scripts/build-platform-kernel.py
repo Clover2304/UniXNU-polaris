@@ -187,6 +187,8 @@ def main():
             raise SystemExit('Missing opt-in read-only UFS inventory')
         if b'POLARIS_UFS_NOP' not in data or b'polaris-ufs-nop' not in data:
             raise SystemExit('Missing opt-in owned-queue UFS NOP')
+        if b'POLARIS_UFS_READ' not in data or b'polaris-ufs-read' not in data:
+            raise SystemExit('Missing opt-in bounded UFS READ(10) support')
         if b'POLARIS_UFS_SCSI' not in data or b'polaris-ufs-scsi' not in data:
             raise SystemExit('Missing opt-in read-only SCSI PRDT support')
         if b'POLARIS_UFS_QUERY' not in data or b'polaris-ufs-query' not in data:
@@ -210,6 +212,7 @@ def main():
               'ufs_owned_nop_available': source_mockfs,
               'ufs_read_descriptor_available': source_mockfs,
               'ufs_scsi_prdt_available': source_mockfs,
+              'ufs_bounded_read_available': source_mockfs,
               'usb_diagnostic_build_id': os.environ.get('GITHUB_SHA','local-unqualified') if source_mockfs else None,
               'ram_tmp_available': ram_tree_available,
               'process_signature_policy': 'pid1-and-direct-child-exact-cdhash-v1' if ram_tree_available else None,

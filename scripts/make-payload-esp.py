@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--ufs-probe',action='store_true',help='opt in to a read-only UFS register snapshot; requires USB diagnostics')
     parser.add_argument('--ufs-inventory',action='store_true',help='add read-only firmware queue and candidate SID inventory; requires --ufs-probe')
     parser.add_argument('--ufs-nop',action='store_true',help='install an owned transfer queue and issue one bounded NOP; requires --ufs-inventory')
+    parser.add_argument('--ufs-read',action='store_true',help='six fixed READ(10) sectors on LUN 0; requires --ufs-scsi')
     parser.add_argument('--ufs-scsi',action='store_true',help='bounded read-only INQUIRY and READ CAPACITY using PRDT; requires --ufs-query')
     parser.add_argument('--ufs-query',action='store_true',help='read device and unit-0 descriptors after the owned NOP; requires --ufs-nop')
     roots = parser.add_mutually_exclusive_group()
@@ -68,6 +69,8 @@ def main():
     kernel = args.kernel.resolve()
     data = kernel.read_bytes()
     report = json.loads(kernel.with_suffix('.json').read_text())
+    if args.ufs_read and (not args.ufs_scsi or report.get('ufs_bounded_read_available') is not True):
+        parser.error('UFS READ requires --ufs-scsi and source bounded-read support')
     if args.ufs_scsi and (not args.ufs_query or report.get('ufs_scsi_prdt_available') is not True):
         parser.error('UFS SCSI requires --ufs-query and source PRDT support')
     if args.ufs_query and (not args.ufs_nop or report.get('ufs_read_descriptor_available') is not True):
@@ -167,13 +170,14 @@ def main():
         if process_bundle:
             kernel_args += ['polaris-process=1', 'polaris-child-cdhash=' + process_bundle['child']['cdhash']]
             if process_bundle['tmp_enabled']:kernel_args += ['polaris-tmp=1']
-    kernel_args=[arg for arg in kernel_args if not arg.startswith(('polaris-usb=','polaris-ufs-probe=','polaris-ufs-inventory=','polaris-ufs-nop=','polaris-ufs-query=','polaris-ufs-scsi='))]
+    kernel_args=[arg for arg in kernel_args if not arg.startswith(('polaris-usb=','polaris-ufs-probe=','polaris-ufs-inventory=','polaris-ufs-nop=','polaris-ufs-query=','polaris-ufs-scsi=','polaris-ufs-read='))]
     if args.usb_console:kernel_args+=['polaris-usb=1']
     if args.ufs_probe:kernel_args+=['polaris-ufs-probe=1']
     if args.ufs_inventory:kernel_args+=['polaris-ufs-inventory=1']
     if args.ufs_nop:kernel_args+=['polaris-ufs-nop=1']
     if args.ufs_query:kernel_args+=['polaris-ufs-query=1']
     if args.ufs_scsi:kernel_args+=['polaris-ufs-scsi=1']
+    if args.ufs_read:kernel_args+=['polaris-ufs-read=1']
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
     prefix = load_module('cpu_prefix', ROOT / 'scripts/check-cpu-prefix.py')
@@ -244,6 +248,7 @@ def main():
         'ufs_owned_nop_enabled': args.ufs_nop,
         'ufs_read_descriptor_enabled': args.ufs_query,
         'ufs_scsi_prdt_enabled': args.ufs_scsi,
+        'ufs_bounded_read_enabled': args.ufs_read,
         'sources': report.get('sources', {}),
     }, indent=2) + '\n', encoding='utf-8')
     print(f'{out}: payload ESP assembled; cpus={args.cpus}, ram={args.ram} GiB; host-verified only')
