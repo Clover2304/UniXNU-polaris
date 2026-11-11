@@ -6,10 +6,10 @@
 
 - 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令和运行时日志取回。
 - 配置：6 GB 机型配置；当前仅启用 1 CPU，内核限制在受控的 1 GiB 内存窗口。完整 RAM 和 SMP 未验证。
-- 当前已验证的 USB 源码基线：`638a344d865375c209f13f6109484eee7fd7d5fe`。先前压力测试基线 `c4081260dd52a6ccdbd3b4f99128b1f4e9c4025e`，以及 `/tmp`、多进程镜像均保留。
-- [当前完整 CI 与模拟器运行记录](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42969364633)；46 项本地主机 unittest，另有定时器及加载窗口的原生 C/C++ 检查。QEMU 不模拟 SDM845 USB，USB 取证来自真机。
+- 当前已验证的 USB 源码基线：`7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`。此前 USB 基线 `638a344d865375c209f13f6109484eee7fd7d5fe`、压力测试基线 `c4081260dd52a6ccdbd3b4f99128b1f4e9c4025e` 及其他成功镜像均保留。
+- [当前完整 CI 与模拟器运行记录](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42973646239)；48 项本地主机 unittest，另有定时器及加载窗口的原生 C/C++ 检查。QEMU 不模拟 SDM845 USB，USB 取证来自真机。
 - 真机证据：用户先确认 USB_RUN 和 Windows CDC 枚举，随后主机通过原生 USB 完成 ping、随机 nonce 往返、精确构建身份核对，并取回包含 TMP_CHILD_OK、TMP_OK、CHILD_OK、PROC_OK、STRESS_OK/CLEAN 和变化心跳的运行日志。主机保存了原始 USB 响应及部分外设寄存器诊断；内部进程/task/内存页计数仍仅在 QEMU 取证。
-- 当前工作区镜像：`/root/projects/xnu-polaris/artifacts/usb-clock-ready/`，ESP SHA256：`38df6123c30c02fa6129c0bdde00d678a3e6ae76bc12f6ee49786d242403dc08`。USB 证据在 `artifacts/usb-native-check-638a344/` 与 `artifacts/usb-native-steady-638a344/`。旧压力、`/tmp` 和多进程镜像继续保留。
+- 当前工作区镜像：`/root/projects/xnu-polaris/artifacts/usb-reset-ready/`，ESP SHA256：`0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47`。USB 证据在 `artifacts/usb-native-check-7e3fa6f/`、`artifacts/usb-reconnect-7e3fa6f-10/`、`artifacts/usb-control-stall-7e3fa6f/`、`artifacts/usb-continuous-7e3fa6f/`。整机启动计数单独保存在 `artifacts/usb-boot-series-7e3fa6f/index.json`。
 - 当前根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。尚无 Apple 用户态、交互输入、原生 UFS 或完整可写文件系统。
 - 目标 Apple 镜像先固定为 arm64 iPadOS 17.7.11（21H461，iPad7,1）；自制程序通过不等于该系统已兼容。
 
@@ -25,7 +25,7 @@
 | A4 | 内核初始化、当前配置 corecrypto POST、BSD/IOKit 初始化 | 真机通过 |
 | A5 | RAM 根挂载并启动 PID 1 | 真机通过 |
 | A6 | 返回 fastboot，保留成功镜像与恢复材料 | fastboot 真机通过；完整系统还原未实测 |
-| A7 | 10 次重复启动，覆盖冷启动和热启动 | 待验证 |
+| A7 | 10 次重复启动，覆盖冷启动和热启动 | 同一新镜像 1/10 轮通过；冷/热进入方式尚未单独确认，第二轮准备中；USB 重连单独计数 |
 
 ## B. CPU、内存与异常
 
@@ -87,7 +87,7 @@
 | --- | --- | --- |
 | F1 | DMA、缓存一致性、SMMU/IOMMU、设备中断 | USB DMA/缓存维护收发路径真机通过，复用固件 SMMU 旁路；隔离、原生 USB 中断待验证 |
 | F2 | XNU 原生 UFS 识别、读写和持久化 | 未接入；固件读 ESP 不计入此项 |
-| F3 | XNU USB 枚举、收发和电脑控制台 | 轮询 CDC 枚举、诊断命令往返和运行日志取回真机通过；POSIX 终端、吞吐、重连压力及挂起恢复待验证 |
+| F3 | XNU USB 枚举、收发和电脑控制台 | 轮询 CDC 枚举、诊断/日志、十次 USB/IP 重连及控制请求 STALL 恢复真机通过；物理插拔、POSIX 终端、吞吐和挂起恢复待验证 |
 | F4 | 原生显示控制器、面板初始化与刷新 | 未接入；当前继承固件 framebuffer |
 | F5 | Adreno 命令提交、显存管理与图形合成 | 未接入 |
 | F6 | 触摸、按键和输入事件 | 未接入 |
@@ -196,5 +196,18 @@ E5/F3 首批功能已真机通过：复用 BSD-2-Clause-Patent 的 UniXNU-j716f 
 在已验证的 `638a344` 真机仍运行时，完成两次 USB/IP 导出设备的 detach/attach。原会话及两次重新枚举后的 nonce、构建编号和完整运行日志校验均通过；configured 始终为 1、无回复队列溢出。但 resets 为 2→4→6，cmd_errors 为 3→5→7；这证明收发可恢复，也暴露了随复位增长的命令错误，尚未逐条定位。证据在 `artifacts/usb-reconnect-638a344/`。这两次属于同一运行内核的远程 USB 重连，不计为手机重复启动或物理插拔，A7 仍待验证。
 
 下一候选按 Linux DWC3 控制端点路径调整：处于 SETUP 阶段时保留已有 EP0 传输，其他阶段才执行 STALL/restart；控制端点恢复省去 CLEARSTALL。复位和断开清除半条输入、未发送回复及旧 DTR 状态，避免带入新会话。每次命令错误保存事件上下文、端点、命令及原始状态，供 status/log 取证。同时在首条端点命令前检查 QUSB2 CORE_READY，若固件状态未就绪则先使用已有的有界 PHY 恢复，避免已知的启动超时。48 项本地主机 unittest、原生检查和 ARM64 语法检查通过；新候选等待 CI 及真机验证。
+
+### EP0 复位修正版验收结果
+
+- 修正版源码 `7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b` 的 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42973646239) 已通过。最终打包镜像在关闭 USB 参数的 QEMU 检查中出现 STRESS_OK/CLEAN，心跳 4→7；2026-11-11 06:54 UTC 写入 ESP 并临时启动真机。
+- 首次原生主机检查通过 nonce、精确构建身份和日志校验；日志包含完整进程和文件系统自检成功标记。固件 QUSB2 未就绪，先恢复后初始化端点，未再观测到启动端点超时。初次 status 为 resets=2、cmd_errors=0、reply_overflow=0、last_error=none，使用 bank 4 原有旁路。
+- 首次重连脚本在 detach 后立即 attach，遇到 Windows 共享暂未重新导出的 `Device not found`。该失败记录保留在 `artifacts/usb-reconnect-7e3fa6f/`；设备随后重新可见，接入后 nonce/构建/日志仍通过、cmd_errors=0。脚本补上最长 30 秒、最多 20 次的受限等待，每次失败日志保留；这次桥接释放时序问题不作为内核成功或失败证据。
+- 随后完成正式十轮 USB/IP detach/attach。每轮先注入未换行的 `echo stale-prefix`，重连后首条 ping、随机串、精确源码身份和完整日志校验均通过。正式序列 resets=4→24，cmd_errors 始终 0，reply_overflow=0，日志覆盖丢失计数 0；约 22 秒完成。证据 `artifacts/usb-reconnect-7e3fa6f-10/report.json`。半条旧命令未污染下一会话。这十轮不计为手机重启或物理插拔。
+- 不支持的 GET_DESCRIPTOR 类型 0x99 正确返回 STALL，随后正常 device descriptor 读取和随机串往返成功；resets 保持 24、cmd_errors 保持 0、配置未丢失。证据 `artifacts/usb-control-stall-7e3fa6f/report.json`，证明此类 EP0 控制请求拒绝后的恢复。
+- 新镜像连续约 52.734 秒完成 256 次随机数据往返，长度覆盖 1、49、50、51、113、114、115、241、242、243、249、250 字符；测试包含回复长度跨 64/128/256 字节边界。cmd_errors=0、resets=24 均未增长，无回复队列溢出。证据 `artifacts/usb-continuous-7e3fa6f/report.json`。旧基线此前同类 256 次测试也通过，错误保持 7；旧基线问题主要随重连增长。两轮均是功能与短时稳定性检查，未建立吞吐或延迟性能基线。
+- 首次日志响应 2,282 字节，截止序号 2,123、覆盖丢失计数 0，SHA256 `a2ebb5e7a6fd6387b2c2799ec304aecc28fdc928bc6779bee38ecb90c5cd59dd`；十轮重连末轮日志 SHA256 `0195b23127bdb58b53da25c25158e6a832f460559bfd6d5d935ba01e5f3aae9e`。
+- 原始内核 SHA256 `722a10ca1c708f85e7175e8057a9e58d9d86e06d2f8e3c234a3a6d303791d023`，打包内核 `dfe2b6ec3b73736e53c2b105b775ca4032a72ec9d7354e4d48c7ab400e4130bb`，128 MiB ESP `0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47`。镜像及报告在 `artifacts/usb-reset-ready/`。
+
+当前同一镜像完成一轮整机启动；十轮 USB 重连已通过，但 A7 的十轮整机冷/热启动尚未完成，第二轮需用户重新进入 fastboot。后续同镜像启动可以复用已记录、身份一致的 ESP，并在每轮原生 USB 日志中重新核对构建身份和自检结果。完整 RAM、SMP、USB 中断、持久日志和 UFS 仍按原条目分别验收。
 
 D6/D7 基本可写 RAM 文件系统 → C5/H2 进程回收压力 → E5 日志和 F3 交互通道 → F2 原生存储。G 组可与部分硬件驱动并行，启动 Apple 用户态不要求先完成相机、蓝牙等全部外设。

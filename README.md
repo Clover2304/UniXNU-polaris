@@ -45,15 +45,18 @@ changing tick on the phone after temporary boot. Internal kernel resource
 counts are QEMU evidence; the physical acceptance uses the program's self-checks.
 
 **Native XNU USB diagnostics now work on the phone** (2026-11-11,
-[source/CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42969364633),
-source `638a344d865375c209f13f6109484eee7fd7d5fe`). The polling CDC channel
+[source/CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42973646239),
+source `7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`). The polling CDC channel
 enumerates as `1209:0001`. The host verified ping, a random nonce round-trip,
-the exact build identity and an 11,100-byte runtime log response with zero
-overwritten bytes, including the process and filesystem self-check markers.
-Ten more nonce/status samples over about ten seconds kept the command-error
-count at 3 with no reply overflow. Startup required one bounded QUSB2 recovery;
-the remaining historical command errors and repeated-boot reliability need
-follow-up. The supported commands are `ping`, `echo`, `status`, `log`, `help`.
+the exact build identity and runtime logs containing the process and filesystem
+self-check markers. On one phone boot, startup and ten USB/IP reconnect cycles
+kept the command-error count at zero. Each cycle included an unfinished old
+command to verify session cleanup. An unsupported descriptor request stalled
+correctly and the next control request recovered without a reset; 256 further
+echo exchanges over about 53 seconds covered 1–250 character payloads with no
+new errors or reply overflow. QUSB2 is restored before endpoint initialization
+when firmware leaves it unready. The ten-boot cold/warm series remains pending.
+The supported commands are `ping`, `echo`, `status`, `log`, `help`.
 The 64 KiB log ring starts when the console opens; early boot and persistent
 crash logs, a POSIX user terminal, USB IRQs and suspend/resume remain unqualified.
 
@@ -150,8 +153,9 @@ RAM 根挂载、固定文件读写、fork/exec/exit/wait、退出状态和单个
 1,000 次进程创建/执行/回收（200 串行、800 个分批子进程）已通过 CI 和 QEMU，覆盖 0～63 号父进程描述符、退出时临时文件回收和四个 COW 页抽样。
 用户已确认真机出现 `STRESS_OK`、`STRESS_CLEAN`，且 tick 持续变化，本轮程序自检通过。
 内核内部资源计数仅在 QEMU 取证；完整内存泄漏排查仍未完成。
-原生 XNU 轮询 USB CDC 已在真机枚举为 `1209:0001`，主机完成 ping、随机串往返、构建身份核对，取回 11,100 字节运行日志响应，覆盖丢失计数为零，包含原有进程与文件系统自检成功标记。
-支持 `ping/echo/status/log/help`；约 10 秒的十次附加往返中命令错误计数保持 3，无回复溢出。启动使用了一次 QUSB2 恢复，历史命令错误与重复启动可靠性仍待排查。
+原生 XNU 轮询 USB CDC 已在真机枚举为 `1209:0001`，主机完成 ping、随机串往返、构建身份核对和运行日志取回，包含原有进程与文件系统自检成功标记。
+支持 `ping/echo/status/log/help`。当前镜像在一轮整机启动和十次 USB/IP 重连中命令错误计数保持零，每轮覆盖半条旧命令的清除；不支持的控制请求被 STALL 后，下一条正常控制请求及数据往返恢复，未新增总线复位。
+随后约 53 秒完成 256 次、1～250 字符的往返，无新增错误或回复溢出。固件 PHY 未就绪时在端点初始化前恢复 QUSB2；同镜像十轮冷/热启动仍待完成。
 日志限于控制台打开后的 64 KiB RAM 环，早期启动和持久化崩溃日志未完成。
 Apple 用户态、用户态终端输入、原生 UFS、触摸和 GPU 尚未接入。
 

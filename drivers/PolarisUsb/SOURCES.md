@@ -82,7 +82,17 @@ The next candidate follows that behavior, clears incomplete session input
 and unsent replies at reset/disconnect, and records the most recent command
 error with its event context. It also checks QUSB2 CORE_READY before issuing
 the first endpoint command; the same bounded PHY restore is used if not ready.
-These follow-up changes await their own hardware acceptance.
+These follow-up changes passed hardware acceptance on source
+`7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`: startup reported no endpoint
+command errors after restoring the unready PHY before endpoint setup.
+Ten USB/IP reconnect cycles with partial command injection retained zero
+command errors and verified nonce/build/log responses. An unsupported control
+descriptor request stalled, followed by a successful normal descriptor read
+and nonce exchange with no new reset/error. Another 256 echo exchanges over
+about 53 seconds covered 1–250 characters and retained zero command errors
+and reply overflow. This is one phone boot; repeated cold/warm boot and
+long-term qualification remain pending. Earlier bridge reattach delay and
+the two failing-baseline reconnects are retained in the test plan.
 
 This is a polling CDC diagnostic channel, enabled by `polaris-usb=1`.
 The log is a 64 KiB in-memory ring captured after the console opens. It does
