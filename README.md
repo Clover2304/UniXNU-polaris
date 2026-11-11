@@ -26,8 +26,14 @@ phone screen: `POLARIS_CHILD_OK pid=2 ppid=1`,
 then init reaps exit status 42 and checks private-memory copy-on-write.
 [Source build and rejection checks](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42943892037)
 passed before the temporary physical boot. The tree has ten boot-defined entries
-(five directories, five files); only one fixed 4 KiB state file is writable.
-Runtime file creation and a general-purpose writable filesystem are not implemented.
+(five directories, five files). The bounded `/tmp` stage passes
+[CI and QEMU](https://github.com/Clover2304/UniXNU-polaris/actions/runs/42950190208):
+runtime regular-file creation, readdir, seek, append, truncate, unlink with
+open descriptors, and capacity recovery. There are 32 RAM slots of 4 KiB,
+with at most 16 linked names. The user also confirmed `POLARIS_TMP_CHILD_OK`,
+`POLARIS_TMP_OK` and a continuously changing tick on the phone after temporary boot.
+Runtime directories, rename,
+concurrent filesystem qualification and persistent storage remain unverified.
 
 ## English
 
@@ -111,12 +117,14 @@ history of both chains is in [docs/HISTORY.md](docs/HISTORY.md).
 
 ### 现状
 
-**平台阶段已在真机验证**(2026-10-24,经用户批准的 `fastboot boot` 临时
-引导):Renegade edk2-msm 固件 → userdata ESP 上的 UniXNU 菜单 →
-DarwinBoot 交接(上 bank 内存窗、真板 1080×2160 GOP)→ XNU 入口 → 调度
-器、timer 中断、corecrypto FIPS 自检、BSD init、IOKit——一路跑到平台阶
-段的设计边界(无根内核按设计 panic 在 root mount)。内核在此树上无用户
-态、无触摸/显示/GPU,不是日用系统。
+**已在真机运行自制 PID 1 和独立子程序**（2026-11-11，`fastboot boot` 临时引导）。
+RAM 根挂载、固定文件读写、fork/exec/exit/wait、退出状态和单个 COW 自检已由用户回报画面通过，心跳持续变化。
+当前为单核、受控的 1 GiB 内存窗口；标准输入仍为自测管道，显示继承固件 framebuffer。
+
+新增 `/tmp` 动态普通文件已通过 CI 和 QEMU，包括创建、目录遍历、追加、截断、删除后保留打开的描述符和容量回收。
+用户已确认真机出现 `TMP_CHILD_OK`、`TMP_OK`，且 tick 持续变化；本轮自检通过。
+完整清单和证据见[验收与基准测试计划](research/bringup-test-plan.md)。
+Apple 用户态、交互输入、原生 UFS、触摸和 GPU 尚未接入。
 
 ### 本次移植期间发现并修复的两个通用 bug
 
