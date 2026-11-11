@@ -24,8 +24,10 @@ are historical baselines. Continue with bounded READ(10) and GPT readback.
 Linux tool preparation now reuses installed versioned LLVM, installs only missing
 packages with bounded apt operations and bypasses the broken runner mirror
 indirection while preserving package signature verification. The independent
-`ci/polaris-linux-tools` run 43043993659 passed host checks; its EFI job remains
-pending. This does not replace the failed Linux jobs of the kernel build run.
+`ci/polaris-linux-tools` run 43043993659 passed host checks; its EFI job failed
+at missing-package download because archive.ubuntu.com also could not resolve.
+The bounded timeout stopped it. This does not replace the failed Linux jobs of
+the kernel build run.
 
 ## 2026-11-11: default edk2 startup and USB file updates verified
 
