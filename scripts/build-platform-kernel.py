@@ -181,6 +181,8 @@ def main():
             raise SystemExit('Missing exact retained diagnostic text reservation')
         ram_tree_available = True
         check.symbols(data, {'_polaris_usb_start','_polaris_usb_capture','_polaris_usb_stats'})
+        if b'POLARIS_UFS_SNAPSHOT' not in data or b'polaris-ufs-probe' not in data:
+            raise SystemExit('Missing opt-in UFS register probe')
         check.symbols(data, {'_polaris_tmp_ready','_polaris_tmp_creates','_polaris_tmp_unlinks','_polaris_tmp_reads','_polaris_tmp_writes','_polaris_tmp_reuses'})
     prelinked = None
     if do_prelink:
@@ -195,6 +197,7 @@ def main():
               'ram_io_available': ram_io_available,
               'ram_tree_available': ram_tree_available,
               'usb_diagnostic_available': source_mockfs,
+              'ufs_register_probe_available': source_mockfs,
               'usb_diagnostic_build_id': os.environ.get('GITHUB_SHA','local-unqualified') if source_mockfs else None,
               'ram_tmp_available': ram_tree_available,
               'process_signature_policy': 'pid1-and-direct-child-exact-cdhash-v1' if ram_tree_available else None,

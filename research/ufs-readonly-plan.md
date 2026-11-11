@@ -33,6 +33,12 @@
 
 第一轮仅做状态读取；若供电、时钟或继承状态不明，则报告具体状态并保留现有启动。验收要求：控制器寄存器值合理、USB 日志可取回，原有 PID 1、文件系统和进程压力自检仍通过。达到这一点只记为控制器识别，F2 的介质读取仍待验证。
 
+首版实现位于 `drivers/PolarisUsb/UfsProbe.h`，由现有 USB worker 执行一次，`ufs` 命令只取回缓存快照。`make-payload-esp.py --usb-console --ufs-probe` 才会加入 `polaris-ufs-probe=1`；普通 USB 和 QEMU 验收镜像保持关闭。CI 会额外生成 `polaris-ufs-esp`。
+
+GCC 检查使用内部 UFS PHY 域：BCR `0x77000`、GDSCR `0x77004`、CFG_GDSCR `0x77008`、AXI/AHB `0x7700c/10`、aggregate AXI `0x82024`。必须无 collapse、无 reset、CFG power-up-complete 有效，并且三个总线分支已开启且未 halt，才映射和读取控制器。快照后再次检查 GCC 是否变化。该检查依赖固件保留的稳定可访问状态，不能恢复总线访问异常。寄存器及来源详见 [SOURCES.md](../drivers/PolarisUsb/SOURCES.md)。
+
+主机 ASan/UBSan 测试覆盖关闭探测、供电/复位/时钟拦截、控制器地址白名单、映射失败、状态变化、无效寄存器，以及原始 USB 证据的构建身份和计数校验。状态不满足时只记录跳过，不算控制器识别通过。当前候选尚待 CI 和真机验证。
+
 ## 后续只读传输
 
 建立 UFS 的 SID、SMMU 路径和 DMA 地址能力，确认队列交接后，再实现 NOP、设备描述符查询、LUN/容量识别和有界块读取。已知测试区域可使用当前 ESP 的固定内容作读回与哈希比对；每项单独记录实际设备结果。当前阶段不实现介质写入、RPMB 操作或持久根文件系统。

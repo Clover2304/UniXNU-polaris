@@ -45,6 +45,7 @@ def main():
                         help='CPUs described by the ADT and requested by the command line (1..8)')
     parser.add_argument('--owned-memory-size', type=lambda v: int(v, 0), default=0x40000000)
     parser.add_argument('--usb-console',action='store_true',help='enable the SDM845 polling CDC diagnostic channel on the phone')
+    parser.add_argument('--ufs-probe',action='store_true',help='opt in to a read-only UFS register snapshot; requires USB diagnostics')
     roots = parser.add_mutually_exclusive_group()
     roots.add_argument('--initrd', type=Path,
                         help='raw mount-only RAM disk; requires a newly built mockfs/checkpoint kernel')
@@ -63,6 +64,8 @@ def main():
     kernel = args.kernel.resolve()
     data = kernel.read_bytes()
     report = json.loads(kernel.with_suffix('.json').read_text())
+    if args.ufs_probe and (not args.usb_console or report.get('ufs_register_probe_available') is not True):
+        parser.error('UFS register probe requires --usb-console and the source UFS probe kernel')
     if args.usb_console and (not args.process_dir or report.get('usb_diagnostic_available') is not True):
         parser.error('USB diagnostics require the source USB kernel and a process bundle')
     if report.get('kernel_sha256') != hashlib.sha256(data).hexdigest():
@@ -152,8 +155,9 @@ def main():
         if process_bundle:
             kernel_args += ['polaris-process=1', 'polaris-child-cdhash=' + process_bundle['child']['cdhash']]
             if process_bundle['tmp_enabled']:kernel_args += ['polaris-tmp=1']
-    kernel_args=[arg for arg in kernel_args if not arg.startswith('polaris-usb=')]
+    kernel_args=[arg for arg in kernel_args if not arg.startswith(('polaris-usb=','polaris-ufs-probe='))]
     if args.usb_console:kernel_args+=['polaris-usb=1']
+    if args.ufs_probe:kernel_args+=['polaris-ufs-probe=1']
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
     prefix = load_module('cpu_prefix', ROOT / 'scripts/check-cpu-prefix.py')
@@ -219,6 +223,7 @@ def main():
         'user_init': user_init,
         'process_bundle': process_bundle,
         'usb_diagnostic_enabled': args.usb_console,
+        'ufs_register_probe_enabled': args.ufs_probe,
         'sources': report.get('sources', {}),
     }, indent=2) + '\n', encoding='utf-8')
     print(f'{out}: payload ESP assembled; cpus={args.cpus}, ram={args.ram} GiB; host-verified only')

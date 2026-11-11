@@ -7,6 +7,28 @@ it does not use fastboot/ADB and does not submit a reboot or memory-write comman
 import argparse,hashlib,json,re,secrets,time
 from pathlib import Path
 
+def verify_ufs(build,raw):
+    pattern=(rb'POLARIS_UFS_SNAPSHOT build='+build.encode()+rb' state=([a-z-]+) gcc_reads=(\d+) controller_reads=(\d+) writes=0 media_reads=0\n'
+             rb'POLARIS_UFS_GATE bcr=([0-9a-f]{8}) gdsc=([0-9a-f]{8}) cfg=([0-9a-f]{8}) axi=([0-9a-f]{8}) ahb=([0-9a-f]{8}) aggre=([0-9a-f]{8})\n'
+             rb'POLARIS_UFS_REG cap=([0-9a-f]{8}) ver=([0-9a-f]{8}) hcs=([0-9a-f]{8}) hce=([0-9a-f]{8}) utrl=([0-9a-f]{8}) utmrl=([0-9a-f]{8})\nPOLARIS_UFS_END\n')
+    m=re.fullmatch(pattern,raw)
+    if not m:raise ValueError('incomplete UFS snapshot or wrong build identity')
+    state=m[1].decode();gcc_reads=int(m[2]);controller_reads=int(m[3])
+    gates=dict(zip(('bcr','gdsc','cfg','axi','ahb','aggre'),[int(v,16) for v in m.groups()[3:9]]))
+    regs=dict(zip(('cap','ver','hcs','hce','utrl','utmrl'),[int(v,16) for v in m.groups()[9:15]]))
+    if state=='snapshot':
+        if gcc_reads!=12 or controller_reads!=6:raise ValueError('inconsistent UFS snapshot counts')
+        if gates['gdsc']==0xffffffff or gates['cfg']==0xffffffff or gates['gdsc']&1 or not gates['cfg']&0x10000 or gates['bcr']&1 or any(not gates[k]&1 or gates[k]&0x80000000 for k in ('axi','ahb','aggre')):
+            raise ValueError('UFS snapshot without ready power/reset/clock gate')
+        if regs['cap'] in (0,0xffffffff) or regs['ver'] not in (0x100,0x101,0x110,0x200,0x210,0x300,0x310,0x400) or regs['hcs']==0xffffffff or regs['hce']&~3:
+            raise ValueError('invalid UFS controller register values')
+    elif state in ('power-not-ready','reset-asserted','clocks-not-ready'):
+        if gcc_reads!=6 or controller_reads or any(regs.values()):raise ValueError('unsafe or inconsistent skipped UFS probe')
+    else:raise ValueError('UFS probe did not yield a valid snapshot or safe readiness skip: '+state)
+    return dict(ufs_probe_received=True,ufs_probe_state=state,ufs_controller_registers_verified=state=='snapshot',
+                ufs_native_media_read_verified=False,ufs_gate=gates,ufs_registers=regs,
+                ufs_snapshot_sha256=hashlib.sha256(raw).hexdigest())
+
 def verify_response(build,nonce,pong,echo,status,log):
     if pong.strip()!=b'POLARIS_PONG':raise ValueError('wrong ping response')
     if echo.strip()!=b'POLARIS_ECHO '+nonce.encode():raise ValueError('nonce did not round-trip')
@@ -23,6 +45,7 @@ def verify_response(build,nonce,pong,echo,status,log):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--expected-build',required=True);p.add_argument('--out',type=Path,required=True)
+    p.add_argument('--ufs-probe',action='store_true',help='collect and validate the opt-in cached UFS snapshot')
     p.add_argument('--wait',type=float,default=120);a=p.parse_args()
     if not re.fullmatch('[0-9a-f]{40}',a.expected_build):p.error('requires the exact source commit')
     import usb.core,usb.util
@@ -61,6 +84,10 @@ def main():
         log=exchange('log',lambda d:re.search(rb'\nPOLARIS_LOG_END end=\d+ dropped=\d+\n',d),20)
         for name,data in [('ping',pong),('echo',echo),('status',status),('log',log)]:
             (out/(name+'.raw')).write_bytes(data)
+        if a.ufs_probe:
+            raw=exchange('ufs',lambda d:b'POLARIS_UFS_END\n' in d)
+            (out/'ufs.raw').write_bytes(raw)
+            report.update(verify_ufs(a.expected_build,raw))
         values=verify_response(a.expected_build,nonce,pong,echo,status,log)
         report.update(values,passed=True,physical_polaris=True,nonce=nonce,
                       native_enumeration_verified=True,bidirectional_roundtrip_verified=True,build_identity_verified=True,

@@ -16,6 +16,7 @@
 #include "UsbBuffers.h"
 #include "UsbFifo.h"
 #include "UsbSmmu.h"
+#include "UfsProbe.h"
 
 #ifndef POLARIS_USB_BUILD_ID
 #define POLARIS_USB_BUILD_ID "local-unqualified"
@@ -46,12 +47,35 @@ static void logStage(const char *text) {console("POLARIS_USB %s\n",text);}
 #include "UsbTransfers.h"
 struct TerminalSession {
     UsbHw hw;
+    OSSharedPtr<IOMemoryMap> ufsMap;
+    volatile uint32_t *ufs=nullptr;
+    PolarisUfsSnapshot ufsSnapshot;
     PolarisBytes<131072> reply;
     PolarisLine input;
     uint8_t tx[DMA_EP3_MAX_CHUNK]{};
     uint8_t logScratch[4096]{};
     size_t pending=0;
 };
+static bool ufsRead(void *context,bool controller,unsigned offset,uint32_t *value) {
+    auto &s=*static_cast<TerminalSession *>(context);
+    if(controller && !s.ufs)
+        s.ufs=reinterpret_cast<volatile uint32_t *>(mapRangeUncached(0x01d84000,0x2500,s.ufsMap));
+    volatile uint32_t *base=controller?s.ufs:s.hw.gcc;
+    if(!base)return false;
+    __asm__ volatile("dsb sy":::"memory");
+    *value=base[offset/4];
+    __asm__ volatile("dsb sy":::"memory");
+    return true;
+}
+static void ufsText(const TerminalSession &s,char *text,size_t size) {
+    const auto &u=s.ufsSnapshot;
+    snprintf(text,size,"POLARIS_UFS_SNAPSHOT build=%s state=%s gcc_reads=%u controller_reads=%u writes=0 media_reads=0\n"
+        "POLARIS_UFS_GATE bcr=%08x gdsc=%08x cfg=%08x axi=%08x ahb=%08x aggre=%08x\n"
+        "POLARIS_UFS_REG cap=%08x ver=%08x hcs=%08x hce=%08x utrl=%08x utmrl=%08x\nPOLARIS_UFS_END\n",
+        POLARIS_USB_BUILD_ID,polaris_ufs_state(u.state),u.gccReads,u.controllerReads,
+        u.gate[0],u.gate[1],u.gate[2],u.gate[3],u.gate[4],u.gate[5],
+        u.regs[0],u.regs[1],u.regs[2],u.regs[3],u.regs[4],u.regs[5]);
+}
 static void respond(TerminalSession &s,const char *text) {
     if(!s.reply.append(text,strlen(text)))polaris_usb_stats[8]=polaris_usb_stats[8]+1;
 }
@@ -88,7 +112,8 @@ static void handleCommand(TerminalSession &s,const char *command) {
             cursor+=bytes;
         }
         snprintf(text,sizeof(text),"\nPOLARIS_LOG_END end=%llu dropped=%llu\n",head,dropped);respond(s,text);
-    } else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log help\n");
+    } else if(!strcmp(command,"ufs")){ufsText(s,text,sizeof(text));respond(s,text);}
+    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs help\n");
     else respond(s,"ERR unknown-command\n");
 }
 #include "UsbEvents.h"
@@ -244,6 +269,10 @@ static void worker(void *,wait_result_t) {
         }
     }
     if(!ok){diagnostic();thread_terminate(current_thread());return;}
+    unsigned ufsEnable=0;
+    bool probe=PE_parse_boot_argn("polaris-ufs-probe",&ufsEnable,sizeof(ufsEnable)) && ufsEnable==1;
+    s->ufsSnapshot=polaris_ufs_probe({s,ufsRead},probe);
+    if(probe){char text[512];ufsText(*s,text,sizeof(text));console("%s",text);}
     uint64_t started=nowMs(),next=started+5000;bool fallback=s->hw.phyInitMode!=0;
     for(;;) {
         pollUsbEvents(*s);

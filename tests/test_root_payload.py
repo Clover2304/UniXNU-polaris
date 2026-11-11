@@ -66,6 +66,7 @@ class RootPayloadTests(unittest.TestCase):
             self.assertEqual(entry['initrd'], 'Payloads/root.img')
             self.assertIn('rd=md0', entry['args'].split())
             self.assertIn('polaris-root-check=1', entry['args'].split())
+            self.assertNotIn('polaris-ufs-probe=1', entry['args'].split())
             payloads = esp / 'EFI/UniXNU/Payloads'
             nodes, _ = decode((payloads / 'kernel.macho.adt').read_bytes())
             self.assertEqual(nodes['/chosen/memory-map']['RAMDisk'], bytes(16))
@@ -85,6 +86,17 @@ class RootPayloadTests(unittest.TestCase):
             self.assertNotIn('initrd', entry)
             self.assertNotIn('rd=md0', entry['args'].split())
             self.assertFalse((esp / 'EFI/UniXNU/Payloads/root.img').exists())
+
+    def test_ufs_requires_explicit_usb_and_source_probe_support(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kernel, _ = self.inputs(root)
+            result = subprocess.run([sys.executable, ROOT / 'scripts/make-payload-esp.py',
+                '--kernel', kernel, '--efi', root, '--out', root / 'esp', '--ufs-probe'],
+                capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('UFS register probe requires', result.stderr)
+            self.assertFalse((root / 'esp').exists())
 
     def test_old_platform_kernel_is_rejected_before_replacing_output(self):
         with tempfile.TemporaryDirectory() as directory:

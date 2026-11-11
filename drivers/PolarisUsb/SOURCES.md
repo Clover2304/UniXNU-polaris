@@ -1,5 +1,36 @@
 # Polaris USB diagnostic transport
 
+## Opt-in UFS register snapshot
+
+`UfsProbe.h` is an original bounded read-only probe, carried by the existing
+USB worker so it can return one cached snapshot without a second transport.
+It has a read callback and no hardware-write or command-submission interface.
+`polaris-ufs-probe=1` is independent of USB enablement and defaults off. The
+`ufs` command returns the cached boot snapshot; it does not repeat MMIO.
+
+Resources and semantics are cross-checked against the owned Lineage DTB above
+and Linux `067c5c24cef23d913b67eaaf71ae67e7169a6620`:
+
+- [sdm845.dtsi](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/arch/arm64/boot/dts/qcom/sdm845.dtsi):
+  internal UFS at `0x01d84000`, span `0x2500`, UFS PHY clocks/domain/reset.
+- [gcc-sdm845.c](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/drivers/clk/qcom/gcc-sdm845.c):
+  GCC base `0x00100000`; PHY BCR/GDSCR/CFG/AXI/AHB offsets
+  `0x77000/04/08/0c/10`, aggregate PHY AXI `0x82024`.
+  The distinct UFS CARD domain at `0x75000` is not used.
+- [gdsc.c](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/drivers/clk/qcom/gdsc.c):
+  `POLL_CFG_GDSCR` power-up-complete at GDSCR+4 bit 16; SW_COLLAPSE bit 0.
+- [ufshci.h](https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/ufs/ufshci.h):
+  CAP/VER/HCS/HCE and the two doorbells. These six registers alone are read.
+
+The probe conservatively requires all three AXI/AHB branches enabled and
+not halted. It skips controller MMIO otherwise, rather than modifying power,
+reset, clocks, interrupts, queues or SMMU. A second GCC snapshot detects a
+changed handoff. This assumes firmware leaves a stable accessible domain;
+it is not an exception-recovery mechanism. A valid register snapshot does
+not establish DMA, stream ownership, link readiness, LUN identity or media I/O.
+Mainline describes stream `0x100` with mask `0xf`; this is a reference for
+later investigation, not a hardware-verified SMMU assignment for this port.
+
 The DWC3 transfer state machine, register definitions, DMA cache helpers and
 CDC descriptors are adapted from Denis0x00/UniXNU-j716f at
 `bf2d0f32f706adbe414551e452f1426ed7c4bd19`, files
