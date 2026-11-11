@@ -1,6 +1,7 @@
 """Actual signed programs, root-table parser bounds and scoped exec admission."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import struct
@@ -38,6 +39,25 @@ class ProcessFixtureTests(unittest.TestCase):
         parent=set(report['init']['addresses'].values())|set(report['init']['io_symbols'].values())|set(report['init']['process_symbols'].values())
         child=set(report['child']['probe_symbols'].values())
         self.assertFalse(parent&child)
+
+    def test_actual_arm64_assembly_reserves_zero_executable_text(self):
+        patch=(ROOT/'kernel-overrides/xnu/polaris-process.patch').read_text()
+        added='\n'.join(line[1:] for line in patch.splitlines() if line.startswith('+') and not line.startswith('+++'))
+        source=re.search(r'__asm__\(.*?\);',added,re.S).group(0)+'\nvoid fixture(void){}\n'
+        with tempfile.TemporaryDirectory() as temporary:
+            out=Path(temporary);(out/'reserve.c').write_text(source)
+            subprocess.run([shutil.which('clang'),'--target=arm64-apple-ios17.0','-c',out/'reserve.c','-o',out/'reserve.o'],check=True,capture_output=True)
+            data=(out/'reserve.o').read_bytes();at=32;found=False
+            for _ in range(struct.unpack_from('<I',data,16)[0]):
+                command,size=struct.unpack_from('<II',data,at)
+                if command==0x19:
+                    for i in range(struct.unpack_from('<I',data,at+64)[0]):
+                        section=at+72+i*80
+                        if data[section:section+16].rstrip(b'\0')==b'__text':
+                            length,offset=struct.unpack_from('<QI',data,section+40)
+                            self.assertGreaterEqual(length,8192);self.assertEqual(data[offset:offset+8192],bytes(8192));found=True
+                at+=size
+            self.assertTrue(found)
 
     def test_child_code_corruption_cannot_be_packaged_as_a_valid_bundle(self):
         with tempfile.TemporaryDirectory() as temporary:

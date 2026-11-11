@@ -172,6 +172,9 @@ def main():
         check.symbols(data, {'_polaris_tree_enabled', '_polaris_tree_nodes',
                              '_polaris_child_signature_accepted', '_polaris_child_signature_rejected',
                              '_polaris_process_exec_checks'})
+        reservation = check.symbols(data, {'_polaris_diagnostic_text', '_polaris_diagnostic_text_end'})
+        if reservation['_polaris_diagnostic_text_end'] - reservation['_polaris_diagnostic_text'] != 8192:
+            raise SystemExit('Missing exact retained diagnostic text reservation')
         ram_tree_available = True
     prelinked = None
     if do_prelink:

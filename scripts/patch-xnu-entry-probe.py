@@ -280,6 +280,19 @@ def find_zero_window(data, start_va, size, limit_va):
     raise SystemExit(f'no zero window of {size:#x} bytes below {limit_va:#x}; refuse to guess')
 
 
+def reserved_probe_window(data, start, end, entry, required):
+    """Use only the exact zero extent deliberately retained by this source build."""
+    if end - start != 8192 or required > end - start or required <= 0:
+        raise SystemExit('Invalid diagnostic reservation size')
+    segment = next((s for s in SEGMENTS if s[0] <= entry < s[0] + s[3]), None)
+    if segment is None or start < segment[0] or end > segment[0] + min(segment[1], segment[3]):
+        raise SystemExit('Diagnostic reservation is outside retained entry text')
+    offset = file_offset(start)
+    if len(data[offset:offset + 8192]) != 8192 or any(data[offset:offset + 8192]):
+        raise SystemExit('Diagnostic reservation is occupied or truncated')
+    return start
+
+
 def load_segments(data):
     """Read the Mach-O segment table; the file layout differs between kernel builds."""
     magic, _, _, _, ncmds = struct.unpack_from('<IiiII', data, 0)
@@ -406,7 +419,8 @@ def main():
         if word(va) != value:
             raise SystemExit(f'{va:#x} holds {word(va):#010x}, expected {value:#010x}: not the kernel these probes are for')
     global PANIC_CAVE_END
-    if any(any(data[file_offset(va):file_offset(va) + CAVE_SIZE]) for va in CAVES.values()):
+    reserved = kernel_names.get('_polaris_diagnostic_text')
+    if reserved is not None or any(any(data[file_offset(va):file_offset(va) + CAVE_SIZE]) for va in CAVES.values()):
         # This kernel's padding does not sit at the recorded offsets (different
         # link layout). Relocate every cave into verified zero windows in the
         # entry segment instead of guessing at occupied padding.
@@ -423,8 +437,11 @@ def main():
         entry_end = next(va + size for va, _, _, size in SEGMENTS
                          if va <= ENTRY_VA < va + size)
         stages = (1, 2) if args.no_reset else (1, 2, 3, 4)
-        base = find_zero_window(data, AFTER_MMU_VA + 0x400,
-                               len(stages) * CAVE_SIZE + panic_capacity, entry_end)
+        required = len(stages) * CAVE_SIZE + panic_capacity
+        if reserved is not None:
+            base = reserved_probe_window(data, reserved, kernel_names.get('_polaris_diagnostic_text_end', 0), ENTRY_VA, required)
+        else:
+            base = find_zero_window(data, AFTER_MMU_VA + 0x400, required, entry_end)
         CAVES.update({stage: base + index * CAVE_SIZE for index, stage in enumerate(stages)})
         PANIC_CAVE_END = base + len(stages) * CAVE_SIZE + panic_capacity
 

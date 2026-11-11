@@ -215,7 +215,21 @@
  		mp->mnt_flag &= ~MNT_RDONLY;
 --- a/bsd/miscfs/mockfs/mockfs_vnops.c
 +++ b/bsd/miscfs/mockfs/mockfs_vnops.c
-@@ -59,7 +59,7 @@
+@@ -48,6 +48,13 @@
+  * VNOP functions that mockfs implements.  See xnu/bsd/sys/vnode_if.h for information on what
+  *   each function does in generic terms.
+  */
++/* Explicit retained text storage for the boot/panic observers. The packager
++ * validates this symbol, its extent and zero contents before using it.
++ */
++__asm__(".text\n.p2align 4\n.globl _polaris_diagnostic_text\n"
++        "_polaris_diagnostic_text:\n.space 8192,0\n.globl _polaris_diagnostic_text_end\n"
++        "_polaris_diagnostic_text_end:\n.no_dead_strip _polaris_diagnostic_text\n"
++        ".no_dead_strip _polaris_diagnostic_text_end\n");
+ int mockfs_lookup(struct vnop_lookup_args * ap);
+ static int mockfs_readonly_open(struct vnop_open_args *ap)
+ {
+@@ -59,7 +66,7 @@
  static int mockfs_polaris_mmap(struct vnop_mmap_args *ap)
  {
  	mockfs_fsnode_t node = (mockfs_fsnode_t)vnode_fsnode(ap->a_vp);
@@ -224,7 +238,7 @@
  }
  volatile uint64_t polaris_io_file_reads;
  volatile uint64_t polaris_io_file_writes;
-@@ -166,6 +166,26 @@
+@@ -166,6 +173,26 @@
  	op = cnp->cn_nameiop;
  	fsnode = (mockfs_fsnode_t) dvp->v_data;
  	target_fsnode = NULL;
@@ -251,7 +265,7 @@
  
  	if ((op == LOOKUP || !(cnp->cn_flags & ISLASTCN)) && (fsnode->type == MOCKFS_ROOT)) {
  		/*
-@@ -246,8 +266,10 @@
+@@ -246,8 +273,10 @@
  	vap = ap->a_vap;
  	bzero(vap, sizeof(*vap));
  	VATTR_RETURN(vap, va_nlink, 1); /* Simply assert that someone has at least one link to us */
