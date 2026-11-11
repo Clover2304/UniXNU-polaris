@@ -142,7 +142,7 @@ static void runUfsNop(TerminalSession &s,bool enabled) {
     if(!ufsSmmuRead(&s,0x48,&s.ufsFaultBefore[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsFaultBefore[1])) {
         s.ufsNop.state=PolarisUfsNopResult::ReadFailed;return;
     }
-    if(s.ufsFaultBefore[0] || s.ufsFaultBefore[1]){s.ufsNop.state=PolarisUfsNopResult::PreflightFailed;return;}
+    if(polaris_ufs_nop_fault(s.ufsFaultBefore[0],s.ufsFaultBefore[1])){s.ufsNop.state=PolarisUfsNopResult::PreflightFailed;return;}
     s.ufsNop=polaris_ufs_nop({&s,ufsNopRead,ufsNopWrite,ufsNopDelay,ufsNopCache},
         s.ufsSnapshot,s.ufsInventory,s.ufsDma,s.ufsDmaPhys,s.hw.dmaPhys,true);
     if(!s.ufsNop.writes)return;
@@ -151,7 +151,7 @@ static void runUfsNop(TerminalSession &s,bool enabled) {
     const unsigned offsets[]={0x48,cb+0x58,cb+0x60,cb+0x64,cb+0x68};
     for(unsigned i=0;i<5;i++)if(!ufsSmmuRead(&s,offsets[i],&s.ufsFaultAfter[i]))s.ufsNop.smmuUnchanged=false;
     if(s.ufsNop.state==PolarisUfsNopResult::Success &&
-       (!s.ufsNop.smmuUnchanged || s.ufsFaultAfter[0] || s.ufsFaultAfter[1]))s.ufsNop.state=PolarisUfsNopResult::SmmuChanged;
+       (!s.ufsNop.smmuUnchanged || polaris_ufs_nop_fault(s.ufsFaultAfter[0],s.ufsFaultAfter[1])))s.ufsNop.state=PolarisUfsNopResult::SmmuChanged;
     // Descriptor and pages intentionally retained until reboot, including failures.
 }
 static void ufsNopText(TerminalSession &s,bool response) {

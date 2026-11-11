@@ -37,7 +37,8 @@ def verify_ufs_nop(build,raw,prior,status):
         raise ValueError('wrong NOP IN response, task tag or OCS')
     if r['run'] or r['db'] or r['ie'] or r['hce']!=1 or r['hcs']&0xb!=0xb or r['is_after']&0x71884 or r['is_before']!=q['is']:
         raise ValueError('UFS queue did not reach the recorded stopped/healthy state')
-    if any(f[k] for k in ('global_before','bank_before','global_after','bank_after')):raise ValueError('SMMU fault present around the NOP')
+    if f['global_before'] or f['global_after'] or (f['bank_before']|f['bank_after'])&0xc00001fe:
+        raise ValueError('SMMU fault present around the NOP')
     return dict(ufs_owned_nop_verified=True,ufs_owned_queue_handoff_verified=True,ufs_dma_verified=True,
                 ufs_exclusive_firmware_quiescence_verified=False,ufs_native_media_read_verified=False,
                 ufs_nop_polls=int(h[1]),ufs_nop_dma=d,ufs_nop_regs=r,ufs_nop_faults=f,

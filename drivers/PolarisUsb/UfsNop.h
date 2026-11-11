@@ -4,6 +4,12 @@
 #include "UfsInventory.h"
 
 constexpr unsigned UFS_NOP_BYTES=0x4000, UFS_NOP_UCD=0x1000, UFS_NOP_RSP=0x1200;
+// FSR[10:9] is FORMAT, not a fault. Linux ARM_SMMU_CB_FSR_FAULT:
+// MULTI/SS (31:30), UUT/ASF/TLBLKF/TLBMCF/EF/PF/AFF/TF (8:1).
+constexpr uint32_t UFS_NOP_CONTEXT_FAULT_MASK=0xc00001feu;
+static inline bool polaris_ufs_nop_fault(uint32_t global,uint32_t context) {
+    return global || (context&UFS_NOP_CONTEXT_FAULT_MASK);
+}
 struct PolarisUfsNopIo {
     void *context;
     bool (*read)(void *,unsigned,uint32_t *);

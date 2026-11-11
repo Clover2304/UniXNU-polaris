@@ -14,7 +14,7 @@ class UfsNopTests(unittest.TestCase):
         raw=(f'POLARIS_UFS_NOP build={build} state=ok bytes=16384 writes=6 doorbells=1 polls=3 cache_prepared=1 response_read=1 guards=1 stopped=1 smmu_unchanged=1 media_commands=0 smmu_writes=0 retained=1\n'
              'POLARIS_UFS_NOP_DMA pa=0000000102000000 old_base=00000000c989a000 final_base=0000000102000000 usb_pa=0000000103000000 ocs=0 rsp0=20000000 rsp1=00000000 rsp2=00000000\n'
              'POLARIS_UFS_NOP_REG is_before=00000400 is_after=00000401 run=00000000 db=00000000 ie=00000000 hcs=0000010f hce=00000001\n'
-             'POLARIS_UFS_NOP_FAULT global_before=00000000 bank_before=00000000 global_after=00000000 bank_after=00000000 far=0000000000000000 syn=00000000\n'
+             'POLARIS_UFS_NOP_FAULT global_before=00000000 bank_before=00000400 global_after=00000000 bank_after=00000400 far=0000000000000000 syn=00000000\n'
              'POLARIS_UFS_NOP_END\n').encode()
         result=m.verify_ufs_nop(build,raw,prior,status)
         self.assertTrue(result['ufs_owned_nop_verified']);self.assertTrue(result['ufs_dma_verified'])
@@ -25,7 +25,7 @@ class UfsNopTests(unittest.TestCase):
                        raw.replace(b'polls=3',b'polls=5001'),raw.replace(b'smmu_writes=0',b'smmu_writes=1'),
                        raw.replace(b'media_commands=0',b'media_commands=1'),raw.replace(b'rsp0=20000000',b'rsp0=20000001'),
                        raw.replace(b'ocs=0',b'ocs=1'),raw.replace(b'run=00000000',b'run=00000001'),
-                       raw.replace(b'bank_after=00000000',b'bank_after=00000001'),
+                       raw.replace(b'bank_after=00000400',b'bank_after=00000402'),
                        raw.replace(b'final_base=0000000102000000',b'final_base=00000000c989a000'),
                        raw.replace(b'pa=0000000102000000',b'pa=0000000103000000'),raw[:-12]):
             with self.assertRaises(ValueError):m.verify_ufs_nop(build,broken,prior,status)
@@ -104,6 +104,9 @@ struct Fake {
  PolarisUfsNopResult run(bool enabled=true){return polaris_ufs_nop({this,read,write,delay,cache},base,inv,cpu,pa,usb,enabled);}
 };
 int main(){
+ for(uint32_t format=0;format<4;format++)assert(!polaris_ufs_nop_fault(0,format<<9));
+ for(unsigned bit:{1u,2u,3u,4u,5u,6u,7u,8u,30u,31u})assert(polaris_ufs_nop_fault(0,(1u<<bit)|0x400u));
+ assert(polaris_ufs_nop_fault(2,0x400));
  Fake disabled;auto d=disabled.run(false);assert(d.state==PolarisUfsNopResult::Disabled&&disabled.writes.empty()&&!disabled.cacheOps);
  Fake good;auto r=good.run();assert(r.state==PolarisUfsNopResult::Success);
  assert(r.ocs==0&&r.rsp[0]==0x20000000&&r.rsp[1]==0&&r.rsp[2]==0&&r.guards);

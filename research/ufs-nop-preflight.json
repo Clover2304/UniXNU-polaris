@@ -1,0 +1,23 @@
+{
+  "source_commit": "5670f6c4515cb0beb1f9fd02364ab35ee77134e4",
+  "ci_run_url": "https://github.com/Clover2304/UniXNU-polaris/actions/runs/43002112778",
+  "board": "Xiaomi MIX 2S / polaris",
+  "nop_attempted": false,
+  "ufs_register_writes": 0,
+  "ufs_doorbell_submissions": 0,
+  "raw_bank2_fsr": 1024,
+  "fsr_format_field": 2,
+  "architectural_context_fault_mask": 3221225982,
+  "context_fault_bits": 0,
+  "raw_result_sha256": "f26b45529cfb95d16f1f0bb210dfdc2e29635d3cba3e4c2d4151dc279893da79",
+  "baseline_io_proc_tmp_stress_verified": true,
+  "resident_heartbeat_verified": true,
+  "usb_command_errors": 0,
+  "usb_reply_overflow": 0,
+  "runtime_log_sha256": "e327b362bddb99f26a61cdc0de17613f6ebec18c6b8114c0cbfb68ec755d4345",
+  "runtime_log_dropped": 0,
+  "cause": "The first guard incorrectly treated FORMAT bits as a fault; replacement uses ARM_SMMU_CB_FSR_FAULT and preserves raw values",
+  "ufs_nop_verified": false,
+  "ufs_dma_verified": false,
+  "ufs_native_media_read_verified": false
+}

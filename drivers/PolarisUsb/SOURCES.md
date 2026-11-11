@@ -78,6 +78,12 @@ separate CPU/device memory and injects readback, completion, tag, OCS, guard,
 cache and timeout failures. Successful NOP DMA does not qualify media payloads,
 the exact active SID or exclusive firmware quiescence.
 
+The first NOP candidate stopped before any UFS writes because bank-2 FSR read
+`0x400`. The pinned `arm-smmu.h` defines FSR[10:9] as FORMAT; these bits are
+not part of `ARM_SMMU_CB_FSR_FAULT` (`0xc00001fe`). Both kernel and evidence
+grader now test that fault mask while preserving raw FSR values. FORMAT-only
+values 0/0x200/0x400/0x600 are covered alongside every real context fault bit.
+
 The DWC3 transfer state machine, register definitions, DMA cache helpers and
 CDC descriptors are adapted from Denis0x00/UniXNU-j716f at
 `bf2d0f32f706adbe414551e452f1426ed7c4bd19`, files
