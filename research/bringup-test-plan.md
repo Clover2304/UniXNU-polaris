@@ -102,7 +102,7 @@
 
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
-| G1 | 目标 Apple 二进制、签名和代码页兼容 | 部分：静态检查通过；f916ebb 在 QEMU 实际执行原版 dyld 的 32 个字节匹配 PC，关闭模式/损坏页拒绝通过；完整 Apple 信任链、entitlement 与真机执行未验证 |
+| G1 | 目标 Apple 二进制、签名和代码页兼容 | 部分：静态检查通过；f916ebb 在 QEMU 实际执行原版 dyld 的 32 个字节匹配 PC，关闭模式/损坏页拒绝通过；真机按画面回报到 DYLD/1 缺 libSystem；完整 Apple 信任链、entitlement、真机精确 PC/构建取证未验证 |
 | G2 | 必需预链接组件、AMFI/CoreTrust/Sandbox 与存储组件匹配 | 部分静态核对：目标缓存 pin 与 10 个根组件确认；已有工具解析 18 个组件的绝对指针计划；指令重定位、ABI 和实际加载未验证 |
 | G3 | dyld、共享缓存、libSystem、TLS 和动态链接 | 部分：原版 dyld 的 mach_init 正常返回、4K 页全局量与 prepare 入口在 QEMU 通过；53 个 cache/subcache 静态检查通过；实际 cache 装载、libSystem/TLS 和完整动态链接未接入 |
 | G4 | Apple launchd 和基本 Mach 服务 | 未接入 |
@@ -320,9 +320,16 @@ QEMU 模型，已更新并完成全启动卷回读/缓存同步；按用户要�
 
 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43155794427)通过，16 份原有运行报告保留。新增原版 dyld startup、`mach_init` 返回和 `prepare` 入口，以及关闭模式、损坏代码页两组对照全部通过。最终打包内核也重复通过原版 `mach_init` 正向与损坏页拒绝；共 7 组记录，见 [原版执行证据](apple-userspace-runtime.json)。所有正向代码页错误计数为 0，损坏页触发 namespace=3/code=2 和 bad_hash=1；原版文件没有改写。
 
-当前不再是只有静态样本：原版 dyld 的真实 EL0 执行已模拟取证。尚无原版 launchd 主函数、共享缓存实际装载、完整信任链、服务或界面通过。准备好的真机候选保留 `abc75cf` 的旧内核/ADT/RAM 根回退项，FAT 回读与最终打包 QEMU 已通过；后续已由用户准备 Mass Storage，文件写入与完整回读通过；目前停止设备写入，等待用户手动普通重启。
+当前不再是只有静态样本：原版 dyld 的真实 EL0 执行已模拟取证。尚无原版 launchd 主函数、共享缓存实际装载、完整信任链、服务或界面通过。准备好的真机候选保留 `abc75cf` 的旧内核/ADT/RAM 根回退项，FAT 回读与最终打包 QEMU 已通过；后续已由用户准备 Mass Storage，文件写入与完整回读通过；更新后停止设备写入；用户随后普通重启并回报 DYLD/1 缺 libSystem。
 
 
 ### 真机文件更新，运行验收尚待进行
 
-`f916ebb` 的 Apple dyld 候选已通过固件 Mass Storage 写入，12 个文件及 128 MiB ESP 的直接回读通过，见 [部署记录](apple-userland-deploy.json)。旧卷先精确核对，变更只在 userdata 的 ESP 窗口内，boot 和其他分区未写入。保留 `abc75cf` 的原内核/ADT/RAM 根回退项。当前保持 Mass Storage 并等待用户手动重启；G1/G3 的真机项仍未通过，不能以部署成功代替原版程序真实执行。
+`f916ebb` 的 Apple dyld 候选已通过固件 Mass Storage 写入，12 个文件及 128 MiB ESP 的直接回读通过，见 [部署记录](apple-userland-deploy.json)。旧卷先精确核对，变更只在 userdata 的 ESP 窗口内，boot 和其他分区未写入。保留 `abc75cf` 的原内核/ADT/RAM 根回退项。更新时保持 Mass Storage 等待用户手动重启；用户后续画面回报及其限定见下文，不能以部署成功代替运行验收。
+
+
+### 真机 Apple 早期执行：缺库退出已定位
+
+用户启动后回报 namespace=6/code=1 且缺 libSystem，支持真机原版 dyld 到达依赖库解析阶段；证据为用户抄录画面，未取回原生 CDC 日志或核对精确 PC/构建身份。服务器用同一打包内核与 RAM 根继续运行，复现 `/usr/lib/libSystem.B.dylib` 不存在且没有 dyld cache 的 DYLD/1，见 [诊断](apple-dyld-missing-libsystem.json)。原版 launchd 主函数、共享缓存实际装载与系统服务均未通过。
+
+下一阶段：同版本缓存的文件读取/分页映射后端、已有 16K 签名块完整性路径、缓存成员授权，然后推进 libSystem 和真实动态链接。不把复制同名文件、静态缓存审计或预链接配置存在记为运行通过。本轮仅诊断和保存证据，没有再次更新或重启手机。

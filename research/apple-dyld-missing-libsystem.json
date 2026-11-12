@@ -1,0 +1,57 @@
+{
+  "observed_at_utc": "2026-11-12T05:56:56.808343+00:00",
+  "expected_source_commit": "f916ebb123801e2f5956407ccc0fcc51a6aade81",
+  "expected_packaged_kernel_sha256": "8d8e0a277253f2ae371adc475dd58246d98ad14bd0312114e23ffd7c2f8b0ac1",
+  "phone_evidence_source": "user-transcribed screen",
+  "phone_report": {
+    "namespace": 6,
+    "code": 1,
+    "library_name": "libSystem"
+  },
+  "phone_full_library_path_independently_read": false,
+  "phone_cdc_log_captured": false,
+  "phone_exact_build_attested_over_usb": false,
+  "hardware_original_dyld_dependency_resolution_reported": true,
+  "hardware_mach_init_return_independently_verified": false,
+  "hardware_original_launchd_main_executed": false,
+  "ipados_boot_demonstrated": false,
+  "model": {
+    "kernel_sha256": "8d8e0a277253f2ae371adc475dd58246d98ad14bd0312114e23ffd7c2f8b0ac1",
+    "namespace": 6,
+    "code": 1,
+    "description": "Library not loaded: /usr/lib/libSystem.B.dylib\n  Referenced from: <4B525992-8C69-315E-A51A-CC9433E45B51> /sbin/launchd\n  Reason: tried: '/usr/lib/libSystem.B.dylib' (no such file, no dyld cache)",
+    "syscall_events_captured": 152,
+    "raw_report_sha256": "0fb60651cec02a353d38ad20f2093e3a8a4aaed47eaed4e549950dc71d271d26",
+    "console_ready": 1,
+    "bad_code_page_hashes": 0
+  },
+  "dependency_source": {
+    "original_launchd_load_command": "/usr/lib/libSystem.B.dylib",
+    "standalone_library_in_original_os_volume": false,
+    "library_present_in_original_shared_cache": true,
+    "cache_catalog": {
+      "path": "/usr/lib/libSystem.B.dylib",
+      "cache_image_index": 844,
+      "preferred_address": "0x1dd6b9000"
+    }
+  },
+  "cause": "Minimal test root provides launchd and dyld, without libSystem or a readable/mappable shared cache. Original dyld reports a missing library.",
+  "next_required": [
+    "File-backed access and mapping of the matching original dyld shared cache",
+    "Enable and qualify existing native 4K handling of original 16K signature blocks",
+    "Extend explicit cache signature authorization for the original verified System trust-cache members",
+    "Advance to libSystem/ObjC/Swift dependencies and actual launchd main, checking real failures individually"
+  ],
+  "official_definitions": [
+    {
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/d8b80295118ef25ac3a784134bcf95cd8e88109f/bsd/sys/reason.h",
+      "definition": "OS_REASON_DYLD = 6"
+    },
+    {
+      "url": "https://github.com/apple-oss-distributions/dyld/blob/a571176e8e00c47e95b95e3156820ebec0cbd5e6/include/mach-o/dyld_images.h",
+      "definition": "dyld_error_kind_dylib_missing = 1"
+    }
+  ],
+  "phone_written_during_diagnosis": false,
+  "agent_reboot_performed": false
+}

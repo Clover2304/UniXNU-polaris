@@ -1,6 +1,6 @@
 # Apple 用户态启动：现有适配复用盘点
 
-更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，当前真机已验证内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`，候选 `f916ebb` 已通过原版 dyld 的 QEMU 早期执行检查；原版 launchd 主函数和真机 Apple 用户态尚未验证。
+更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，当前真机已验证内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`，候选 `f916ebb` 已通过原版 dyld 的 QEMU 早期执行检查；原版 launchd 主函数尚未验证，真机 dyld 已按用户画面回报到达依赖查找阶段。
 
 ## 结论与基线
 
@@ -124,4 +124,15 @@ RAM fixture 采用当前 N4KROOT v3，保留原版 `/sbin/launchd`、`/usr/lib/d
 
 实际部署 ESP SHA-256 为 `90bce8dfa4b7c93bd43099db7419cb17850a389f900f9a62fa1cd293f963fb6d`。它保留旧卷几何与布局，因而与前述独立制作候选 ESP 的整卷哈希不同；所有已部署文件哈希均与候选清单一致。boot 和其他分区未写入，旧 `abc75cf` 回退内核/ADT/RAM 根及原启动参数保留。
 
-当前停在固件 Mass Storage，未重启。下次用户普通重启后，默认等待 10 秒启动 `polaris: ORIGINAL DYLD PROBE`；`polaris: verified self-tests abc75cf` 为回退项。原版 dyld 的真实手机执行、回退项的手机菜单选择和完整 iPadOS 启动仍未验证；文件写入成功不作为这些运行项通过的证据。
+更新完成时停在固件 Mass Storage，未由代理重启。用户后续普通重启时，默认等待 10 秒启动 `polaris: ORIGINAL DYLD PROBE`；`polaris: verified self-tests abc75cf` 为回退项。更新记录本身不代表原版程序运行通过。用户随后回报的真机依赖查找错误见下文；回退项手机菜单选择和完整 iPadOS 启动仍未验证。
+
+
+## 真机首次启动回报：DYLD/1 缺少 libSystem
+
+用户普通重启后回报 `namespace 6 / code 0x1`，并说明找不到名为 libSystem 的 dylib。官方 XNU 定义 6 为 DYLD，目标 dyld 定义 1 为 `dylib_missing`。服务器未发现可导出的原生 CDC，未获取手机 USB 日志或独立核对真机 PC/构建身份；真机证据来源是用户抄录的错误画面，见 [诊断记录](apple-dyld-missing-libsystem.json)。该回报支持原版 dyld 已执行到依赖库解析，不代表 launchd 主函数或服务已经运行。
+
+对同一最终打包内核与同一 RAM 根继续运行 QEMU，不在 prepare 入口停下，实测也到达 DYLD/1。保留的内核退出说明为 `Library not loaded: /usr/lib/libSystem.B.dylib`，`Referenced from: ... /sbin/launchd`，理由为该路径不存在且没有 dyld cache。捕获 152 次实际 syscall 事件，最后的 abort-with-payload 参数含 namespace=6、code=1；代码页 bad_hash/no_hash 均为 0。它是同一最小输入缺少运行库的模型复现，不替代真机完整日志。
+
+原版 launchd 的 LC_LOAD_DYLIB 明确依赖 `/usr/lib/libSystem.B.dylib`，此外还依赖 ObjC、Sandbox 与 Swift 库。只读检查同一原 OS 卷确认 libSystem、libobjc、libswiftCore 没有独立文件；原共享缓存 image catalog 中可定位 libSystem。当前 1.51 MB RAM fixture 仅含原版 launchd/dyld，未提供共享缓存，因此需要推进存储与动态链接阶段。
+
+下一轮先在服务器验证：复用已有只读卷/缓存加载工具，确定与当前源内核匹配的文件读取和 mmap 路径；接入同版本已校验的 53 个 cache/subcache，并验证已有的原 16K 签名块支持。当前两份精确 CDHash 的诊断授权也需按已核对的原 System trust-cache 成员扩展并验证，不能直接视为整个缓存已获准装载。随后再依据真实缺接口推进 libSystem、ObjC/Swift 和 launchd 主函数。当前 16 条目/32 MiB RAM 根无法容纳约 3.3 GB 缓存，完整缓存接入需要可分页的文件后端；本轮未重编内核或再次写入手机。
