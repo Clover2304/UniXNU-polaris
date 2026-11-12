@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--ufs-probe',action='store_true',help='opt in to a read-only UFS register snapshot; requires USB diagnostics')
     parser.add_argument('--ufs-inventory',action='store_true',help='add read-only firmware queue and candidate SID inventory; requires --ufs-probe')
     parser.add_argument('--ufs-nop',action='store_true',help='install an owned transfer queue and issue one bounded NOP; requires --ufs-inventory')
+    parser.add_argument('--ufs-node',action='store_true',help='read-only fixed devfs file; requires --ufs-esp and node acceptance programs')
     parser.add_argument('--ufs-esp',action='store_true',help='bounded FAT32 read of EFI/UniXNU/READTEST.BIN; requires --ufs-read')
     parser.add_argument('--ufs-read',action='store_true',help='six fixed READ(10) sectors on LUN 0; requires --ufs-scsi')
     parser.add_argument('--ufs-scsi',action='store_true',help='bounded read-only INQUIRY and READ CAPACITY using PRDT; requires --ufs-query')
@@ -70,6 +71,8 @@ def main():
     kernel = args.kernel.resolve()
     data = kernel.read_bytes()
     report = json.loads(kernel.with_suffix('.json').read_text())
+    if args.ufs_node and (not args.ufs_esp or report.get('ufs_node_available') is not True):
+        parser.error('UFS node requires --ufs-esp and source devfs support')
     if args.ufs_esp and (not args.ufs_read or report.get('ufs_fat32_file_available') is not True):
         parser.error('UFS ESP requires --ufs-read and source FAT32 support')
     if args.ufs_read and (not args.ufs_scsi or report.get('ufs_bounded_read_available') is not True):
@@ -173,7 +176,9 @@ def main():
         if process_bundle:
             kernel_args += ['polaris-process=1', 'polaris-child-cdhash=' + process_bundle['child']['cdhash']]
             if process_bundle['tmp_enabled']:kernel_args += ['polaris-tmp=1']
-    kernel_args=[arg for arg in kernel_args if not arg.startswith(('polaris-usb=','polaris-ufs-probe=','polaris-ufs-inventory=','polaris-ufs-nop=','polaris-ufs-query=','polaris-ufs-scsi=','polaris-ufs-read=','polaris-ufs-esp='))]
+    if bool(process_bundle and process_bundle.get('ufs_node_enabled')) != args.ufs_node:
+        parser.error('node boot option and acceptance program must match')
+    kernel_args=[arg for arg in kernel_args if not arg.startswith(('polaris-usb=','polaris-ufs-probe=','polaris-ufs-inventory=','polaris-ufs-nop=','polaris-ufs-query=','polaris-ufs-scsi=','polaris-ufs-read=','polaris-ufs-esp=','polaris-ufs-node=','polaris-ufs-node-model='))]
     if args.usb_console:kernel_args+=['polaris-usb=1']
     if args.ufs_probe:kernel_args+=['polaris-ufs-probe=1']
     if args.ufs_inventory:kernel_args+=['polaris-ufs-inventory=1']
@@ -181,6 +186,7 @@ def main():
     if args.ufs_query:kernel_args+=['polaris-ufs-query=1']
     if args.ufs_scsi:kernel_args+=['polaris-ufs-scsi=1']
     if args.ufs_read:kernel_args+=['polaris-ufs-read=1']
+    if args.ufs_node:kernel_args+=['polaris-ufs-node=1']
     if args.ufs_esp:kernel_args+=['polaris-ufs-esp=1']
 
     adt_tool = load_module('polaris_adt', ROOT / 'scripts/make-polaris-adt.py')
@@ -256,6 +262,7 @@ def main():
         'ufs_scsi_prdt_enabled': args.ufs_scsi,
         'ufs_bounded_read_enabled': args.ufs_read,
         'ufs_fat32_file_enabled': args.ufs_esp,
+        'ufs_node_enabled':args.ufs_node,
         'ufs_esp_fixture_sha256': hashlib.sha256(esp_fixture).hexdigest() if args.ufs_esp else None,
         'sources': report.get('sources', {}),
     }, indent=2) + '\n', encoding='utf-8')

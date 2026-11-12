@@ -23,6 +23,7 @@
 #include "UfsScsi.h"
 #include "UfsRead.h"
 #include "UfsFat.h"
+#include "UfsNode.h"
 
 #ifndef POLARIS_USB_BUILD_ID
 #define POLARIS_USB_BUILD_ID "local-unqualified"
@@ -32,6 +33,9 @@ volatile uint64_t polaris_usb_stats[16];
 void polaris_usb_start(void);
 void polaris_usb_capture(const char *,unsigned);
 int kmputc(int,char);
+int polaris_ufs_node_start(int) __attribute__((weak_import));
+int polaris_ufs_node_copy(uint64_t,unsigned,void *);
+extern volatile uint64_t polaris_node_reads,polaris_node_bytes,polaris_node_opens,polaris_node_denied;
 }
 namespace {
 #include "UsbHw.h"
@@ -82,12 +86,22 @@ struct TerminalSession {
     bool ufsEspEnabled=false,ufsEspGpt=false,ufsEspSmmuUnchanged=false;
     uint64_t ufsEspStarted=0;
     uint32_t ufsEspFaultBefore[2]{},ufsEspFaultAfter[2]{};
+    IOLock *ufsNodeLock=nullptr;
+    PolarisUfsNodeQueue ufsNodeQueue;
+    bool ufsNodeEnabled=false,ufsNodeReady=false,ufsNodeFailed=false,ufsNodeSmmuUnchanged=false;
+    int ufsNodeError=0;
+    uint64_t ufsNodeSubmitted=0,ufsNodeCompleted=0,ufsNodeCancelled=0,ufsNodeBusy=0,ufsNodeErrors=0;
+    PolarisUfsScsiResult ufsNodeCommands[128];
+    uint32_t ufsNodeBlockCrc[128]{},ufsNodeFaultBefore[2]{},ufsNodeFaultAfter[2]{};
+    unsigned ufsNodeCount=0;
+    uint8_t ufsNodeBlock[4096]{};
     PolarisBytes<131072> reply;
     PolarisLine input;
     uint8_t tx[DMA_EP3_MAX_CHUNK]{};
     uint8_t logScratch[4096]{};
     size_t pending=0;
 };
+static TerminalSession *gNodeSession=nullptr;
 static bool ufsRead(void *context,bool controller,unsigned offset,uint32_t *value) {
     auto &s=*static_cast<TerminalSession *>(context);
     if(controller && !s.ufs)
@@ -369,6 +383,82 @@ static void ufsEspText(TerminalSession &s,bool response) {
     snprintf(text,sizeof(text),"POLARIS_UFS_ESP_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x\nPOLARIS_UFS_ESP_END\n",
         s.ufsEspFaultBefore[0],s.ufsEspFaultBefore[1],s.ufsEspFaultAfter[0],s.ufsEspFaultAfter[1]);emit();
 }
+static bool ufsNodePhysical(TerminalSession &s,uint32_t block) {
+    if(block>=UFS_ESP_BLOCKS || s.ufsNodeCount>=128 || !s.ufsNodeSmmuUnchanged)return false;
+    unsigned i=s.ufsNodeCount++;auto &r=s.ufsNodeCommands[i];
+    r=polaris_ufs_scsi_read({&s,ufsNopRead,ufsNopWrite,ufsNopDelay,ufsNopCache},
+        s.ufsNop,s.ufsDescriptors[1],s.ufsDma,s.ufsDmaPhys,PolarisUfsScsiKind::EspRead10,true,UFS_ESP_START+block);
+    auto after=polaris_ufs_inventory({&s,ufsRead},{&s,ufsSmmuRead},true,true);
+    s.ufsNodeSmmuUnchanged=polaris_ufs_nop_same_smmu(s.ufsInventory,after);
+    unsigned cb=(s.ufsInventory.pages+2u)*4096u;
+    if(!ufsSmmuRead(&s,0x48,&s.ufsNodeFaultAfter[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsNodeFaultAfter[1]) ||
+       polaris_ufs_nop_fault(s.ufsNodeFaultAfter[0],s.ufsNodeFaultAfter[1]))s.ufsNodeSmmuUnchanged=false;
+    if(r.state!=PolarisUfsScsiResult::Success || !s.ufsNodeSmmuUnchanged)return false;
+    s.ufsNodeBlockCrc[i]=polaris_fat_crc(s.ufsDma+UFS_SCSI_DATA,4096);
+    for(unsigned n=0;n<4096;n++)s.ufsNodeBlock[n]=s.ufsDma[UFS_SCSI_DATA+n];
+    return true;
+}
+static void serviceUfsNode(TerminalSession &s) {
+    if(!s.ufsNodeLock || !s.ufsNodeReady)return;
+    IOLockLock(s.ufsNodeLock);
+    bool claimed=s.ufsNodeQueue.claim();uint64_t offset=s.ufsNodeQueue.offset;unsigned length=s.ufsNodeQueue.bytes;
+    IOLockUnlock(s.ufsNodeLock);if(!claimed)return;
+    unsigned done=0;int error=0;uint32_t cached=~0u;
+    while(done<length) {
+        uint32_t block=0;unsigned within=0,count=0;
+        if(!polaris_ufs_node_span(s.ufsEspResult,offset+done,length-done,block,within,count)){error=5;break;}
+        if(block!=cached){if(!ufsNodePhysical(s,block)){error=5;break;}cached=block;}
+        for(unsigned i=0;i<count;i++)s.ufsNodeQueue.data[done+i]=s.ufsNodeBlock[within+i];done+=count;
+    }
+    IOLockLock(s.ufsNodeLock);
+    if(error){s.ufsNodeFailed=true;s.ufsNodeError=error;s.ufsNodeErrors++;}
+    s.ufsNodeCompleted++;s.ufsNodeQueue.finish(error);
+    IOLockUnlock(s.ufsNodeLock);
+}
+static int nodeCopy(uint64_t offset,unsigned bytes,void *output) {
+    auto *s=__atomic_load_n(&gNodeSession,__ATOMIC_ACQUIRE);
+    if(!s || !s->ufsNodeLock)return 6;
+    if(!output || !bytes || bytes>4096 || offset>=8193 || bytes>8193-offset)return 22;
+    IOLockLock(s->ufsNodeLock);
+    if(!s->ufsNodeReady || s->ufsNodeFailed){IOLockUnlock(s->ufsNodeLock);return 5;}
+    if(s->ufsNodeSubmitted>=64){IOLockUnlock(s->ufsNodeLock);return 28;}
+    if(!s->ufsNodeQueue.submit(offset,bytes)){s->ufsNodeBusy++;IOLockUnlock(s->ufsNodeLock);return 16;}
+    s->ufsNodeSubmitted++;IOLockUnlock(s->ufsNodeLock);
+    uint64_t deadline=nowMs()+5000;
+    for(;;) {
+        IOLockLock(s->ufsNodeLock);int error=0;
+        bool done=s->ufsNodeQueue.collect(static_cast<uint8_t *>(output),error);
+        if(done){IOLockUnlock(s->ufsNodeLock);return error;}
+        if(nowMs()>=deadline){s->ufsNodeQueue.cancel();s->ufsNodeCancelled++;IOLockUnlock(s->ufsNodeLock);return 60;}
+        IOLockUnlock(s->ufsNodeLock);IOSleep(1);
+    }
+}
+static void runUfsNode(TerminalSession &s,bool enabled) {
+    s.ufsNodeEnabled=enabled;if(!enabled)return;
+    if(s.ufsEspResult.state!=PolarisFatResult::Success || !s.ufsEspSmmuUnchanged || !polaris_ufs_node_start){s.ufsNodeError=6;return;}
+    unsigned cb=(s.ufsInventory.pages+2u)*4096u;
+    if(!ufsSmmuRead(&s,0x48,&s.ufsNodeFaultBefore[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsNodeFaultBefore[1]) ||
+       polaris_ufs_nop_fault(s.ufsNodeFaultBefore[0],s.ufsNodeFaultBefore[1])){s.ufsNodeError=5;return;}
+    s.ufsNodeLock=IOLockAlloc();if(!s.ufsNodeLock){s.ufsNodeError=12;return;}
+    s.ufsNodeSmmuUnchanged=true;s.ufsNodeReady=true;
+    __atomic_store_n(&gNodeSession,&s,__ATOMIC_RELEASE);
+    s.ufsNodeError=polaris_ufs_node_start(0);
+    if(s.ufsNodeError){s.ufsNodeReady=false;__atomic_store_n(&gNodeSession,static_cast<TerminalSession *>(nullptr),__ATOMIC_RELEASE);}
+}
+static void ufsNodeText(TerminalSession &s) {
+    char text[640],hex[69];uint64_t submitted=0,completed=0,cancelled=0,busy=0,errors=0;unsigned state=0;
+    if(s.ufsNodeLock){IOLockLock(s.ufsNodeLock);submitted=s.ufsNodeSubmitted;completed=s.ufsNodeCompleted;cancelled=s.ufsNodeCancelled;busy=s.ufsNodeBusy;errors=s.ufsNodeErrors;state=unsigned(s.ufsNodeQueue.state);IOLockUnlock(s.ufsNodeLock);}
+    bool ok=s.ufsNodeReady && !s.ufsNodeFailed && state==0 && completed && submitted==completed && !cancelled && !errors;
+    snprintf(text,sizeof(text),"POLARIS_UFS_NODE build=%s state=%s mode=hardware ready=%u failed=%u error=%d queue=%u submitted=%llu completed=%llu cancelled=%llu busy=%llu errors=%llu count=%u writes=%u doorbells=%u smmu_unchanged=%u media_writes=0 smmu_writes=0 pa=%016llx\n",
+        POLARIS_USB_BUILD_ID,!s.ufsNodeEnabled?"disabled":ok?"ok":"pending",s.ufsNodeReady,s.ufsNodeFailed,s.ufsNodeError,state,submitted,completed,cancelled,busy,errors,s.ufsNodeCount,3*s.ufsNodeCount,s.ufsNodeCount,s.ufsNodeSmmuUnchanged,s.ufsDmaPhys);respond(s,text);
+    snprintf(text,sizeof(text),"POLARIS_UFS_NODE_VFS opens=%llu reads=%llu bytes=%llu denied=%llu path=/dev/polaris-esp-file size=8193\n",polaris_node_opens,polaris_node_reads,polaris_node_bytes,polaris_node_denied);respond(s,text);
+    for(unsigned i=0;i<s.ufsNodeCount;i++) {
+        const auto &r=s.ufsNodeCommands[i];queryHex(r.upiu,34,hex);
+        snprintf(text,sizeof(text),"POLARIS_UFS_NODE_CMD n=%u lba=%u opcode=28 lun=00 blocks=1 state=%s ocs=%u response=%02x status=%02x flags=%02x bytes=%u residual=%u segment=%u sense_len=%u guards=%u stopped=%u polls=%u run=%08x db=%08x is=%08x upiu=%s\n",i,r.lba,polaris_ufs_scsi_state(r.state),r.ocs,r.response,r.status,r.flags,r.bytes,r.residual,r.segment,r.senseLength,r.guards,r.stopped,r.polls,r.finalRun,r.finalDb,r.isAfter,hex);respond(s,text);
+        queryHex(r.prdt,16,hex);snprintf(text,sizeof(text),"POLARIS_UFS_NODE_DMA n=%u data_pa=%016llx prdt=%s crc32=%08x\n",i,r.dataPa,hex,s.ufsNodeBlockCrc[i]);respond(s,text);
+    }
+    snprintf(text,sizeof(text),"POLARIS_UFS_NODE_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x\nPOLARIS_UFS_NODE_END\n",s.ufsNodeFaultBefore[0],s.ufsNodeFaultBefore[1],s.ufsNodeFaultAfter[0],s.ufsNodeFaultAfter[1]);respond(s,text);
+}
 static void handleCommand(TerminalSession &s,const char *command) {
     polaris_usb_stats[5]=polaris_usb_stats[5]+1;
     char text[512];
@@ -409,7 +499,8 @@ static void handleCommand(TerminalSession &s,const char *command) {
     else if(!strcmp(command,"ufs-scsi"))ufsScsiText(s,true);
     else if(!strcmp(command,"ufs-read"))ufsReadText(s,true);
     else if(!strcmp(command,"ufs-esp"))ufsEspText(s,true);
-    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map ufs-nop ufs-query ufs-scsi ufs-read ufs-esp help\n");
+    else if(!strcmp(command,"ufs-node"))ufsNodeText(s);
+    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map ufs-nop ufs-query ufs-scsi ufs-read ufs-esp ufs-node help\n");
     else respond(s,"ERR unknown-command\n");
 }
 #include "UsbEvents.h"
@@ -588,8 +679,12 @@ static void worker(void *,wait_result_t) {
     unsigned espEnable=0;
     bool esp=read && PE_parse_boot_argn("polaris-ufs-esp",&espEnable,sizeof(espEnable)) && espEnable==1;
     runUfsEsp(*s,esp);if(esp)ufsEspText(*s,false);
+    unsigned nodeEnable=0;
+    bool node=esp && PE_parse_boot_argn("polaris-ufs-node",&nodeEnable,sizeof(nodeEnable)) && nodeEnable==1;
+    runUfsNode(*s,node);
     uint64_t started=nowMs(),next=started+5000;bool fallback=s->hw.phyInitMode!=0;
     for(;;) {
+        serviceUfsNode(*s);
         pollUsbEvents(*s);
         polaris_usb_stats[4]=s->hw.usbEvents;
         if(s->hw.hostReady && s->hw.configured && !s->hw.ep3Busy) {
@@ -610,6 +705,7 @@ static void worker(void *,wait_result_t) {
     }
 }
 } // namespace
+extern "C" int polaris_ufs_node_copy(uint64_t offset,unsigned bytes,void *output){return nodeCopy(offset,bytes,output);}
 extern "C" void polaris_usb_capture(const char *data,unsigned length) {
     IOSimpleLock *lock=gLogLock;if(!lock)return;
     auto state=IOSimpleLockLockDisableInterrupt(lock);

@@ -42,6 +42,10 @@ static void expect_error(struct reply r,s64 error,u64 stage) { if(!ERROR(r)||r.v
 #include "polaris-process-parent.h"
 #endif
 
+#ifdef POLARIS_UFS_NODE_TEST
+#include "polaris-ufs-node.h"
+#endif
+
 /* The raw Darwin process stack carries argc/argv, not a C call frame.
  * Align it before any compiler-generated stack access (real A75 checks SP).
  * Preserve its original address in x0 for diagnostics; this init takes no argv.
@@ -94,6 +98,9 @@ __attribute__((noreturn,used)) void polaris_io_start(u64 initial_sp)
  io_results[0]=100;io_checkpoint();
 #ifdef POLARIS_PROCESS_INIT
  process_run(fd);
+#endif
+#ifdef POLARIS_UFS_NODE_TEST
+ node_run();
 #endif
  static const char ready[]="stdin: pipe verified; file: RAM read/write verified\nPOLARIS_IO_OK pid=1 pagesize=4096\n";
  exact(CALL(4,1,ready,sizeof(ready)-1,0),sizeof(ready)-1,33);

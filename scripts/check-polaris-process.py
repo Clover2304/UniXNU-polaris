@@ -66,6 +66,7 @@ def main():
     p.add_argument('--platform-esp', type=Path, required=True)
     p.add_argument('--process-dir', type=Path, required=True)
     p.add_argument('--out', type=Path, default=ROOT / 'out/process-check')
+    p.add_argument('--ufs-node-model', action='store_true')
     p.add_argument('--cpu', default='cortex-a76')
     p.add_argument('--negative', choices=['wrong-child-cdhash','damaged-child','unsigned-child','cached-init'])
     a = p.parse_args()
@@ -76,6 +77,8 @@ def main():
     bundle = bundle_module.inspect_bundle(a.process_dir)
     tmp_enabled=bundle['tmp_enabled']
     stress_enabled=bundle['stress_enabled']
+    node_enabled=bundle['ufs_node_enabled']
+    if node_enabled != a.ufs_node_model:p.error('node program requires explicit --ufs-node-model')
     child_checks=5 if tmp_enabled else 4
     image = (a.process_dir / 'launchd.macho').read_bytes()
     child = bundle['child']
@@ -106,6 +109,9 @@ def main():
     if stress_enabled:
         counters.update({name:4 for name in ['_nprocs','_tasks_count','_threads_count','_terminated_tasks_count','_terminated_threads_count','_vm_page_free_count','_vm_page_wire_count']})
         counters['_zombproc']=8
+    if node_enabled:
+        if build.get('ufs_node_available') is not True:p.error('missing source devfs node support')
+        counters.update({name:8 for name in ['_polaris_node_opens','_polaris_node_reads','_polaris_node_bytes','_polaris_node_denied']})
     names = set(counters) | {'_panic', '_panic_with_options', '_panic_trap_to_debugger'}
     syms = platform.symbols(data, names)
     out = a.out.resolve();out.mkdir(parents=True, exist_ok=True)
@@ -140,7 +146,7 @@ def main():
     config = esp / 'EFI/UniXNU/unixnu.toml';text = config.read_text()
     if 'polaris-root-check=1' not in text:
         p.error('missing root-check boot contract')
-    config.write_text(text.replace('polaris-root-check=1', f'polaris-init-cdhash={identity["cdhash"]} polaris-child-cdhash={child_hash} polaris-io=1 polaris-process=1'+(' polaris-tmp=1' if tmp_enabled else '')))
+    config.write_text(text.replace('polaris-root-check=1', f'polaris-init-cdhash={identity["cdhash"]} polaris-child-cdhash={child_hash} polaris-io=1 polaris-process=1'+(' polaris-tmp=1' if tmp_enabled else '')+(' polaris-ufs-node-model=1' if node_enabled else '')))
     report = dict(passed=False, milestone='resident PID 1 with bounded RAM-file I/O and stdio',
                   process_verified=False, child_el0_observed=False, child_cdhash=child['cdhash'], tree_entries=bundle['entries'],
                   negative_control=a.negative, kernel_sha256=hashlib.sha256(data).hexdigest(), process_sha256=identity['process_sha256'],
@@ -148,9 +154,10 @@ def main():
                   source_kernel_build=build, cpu=a.cpu, el0_observed=False, io_verified=False,
                   resident_verified=False, physical_polaris_booted=False, apple_userland_booted=False,
                   interactive_input_qualified=False, stdin_source='self-fed pipe', snapshots=[])
+    report.update(ufs_node_model=node_enabled,ufs_node_verified=False,native_ufs_read_verified=False)
     report.update(tmp_enabled=tmp_enabled,tmp_verified=False)
     report.update(stress_enabled=stress_enabled,stress_verified=False,stress_samples=[],global_memory_leak_freedom_qualified=False)
-    user = identity['addresses'];user.update(identity['io_symbols']);user.update(identity['process_symbols']);user.update(identity['tmp_symbols']);user.update(identity['stress_symbols'])
+    user = identity['addresses'];user.update(identity['io_symbols']);user.update(identity['process_symbols']);user.update(identity['tmp_symbols']);user.update(identity['stress_symbols']);user.update(identity['ufs_node_symbols'])
     child_user=child['probe_symbols']
     with tempfile.TemporaryDirectory(prefix='polaris-io-') as temporary:
         work = Path(temporary);qmp_path = work / 'qmp'
@@ -290,8 +297,12 @@ def main():
                                     first,last=report['snapshots'][0],sample
                                     report['resident_verified']=(last['ticks']>first['ticks']>=1 and last['select_returns']>=2 and state['select_result']==0 and
                                         last['elapsed']-first['elapsed']>=1.5 and last['_armcpu_timer_interrupts']>first['_armcpu_timer_interrupts']>0)
+                                    if node_enabled:
+                                        values=list(struct.unpack('<16Q',memory(user['_ufs_node_results'],128)))
+                                        report['ufs_node_results']=values
+                                        report['ufs_node_verified']=(values[:10]==[100,1,8193,1,1,3,2,2,9,1] and last['_polaris_node_opens']==2 and last['_polaris_node_denied']==2 and last['_polaris_node_bytes']==20502 and last['_polaris_node_reads']>=12)
                                     if stress_enabled:report['stress_verified']=grade_stress(report)
-                                    report['passed']=(not a.negative and (not stress_enabled or report['stress_verified']) and (not tmp_enabled or report['tmp_verified']) and report['el0_observed'] and report['io_verified'] and report['resident_verified'] and report['process_verified'] and
+                                    report['passed']=(not a.negative and (not node_enabled or report['ufs_node_verified']) and (not stress_enabled or report['stress_verified']) and (not tmp_enabled or report['tmp_verified']) and report['el0_observed'] and report['io_verified'] and report['resident_verified'] and report['process_verified'] and
                                         last['_polaris_tree_enabled']==1 and last['_polaris_tree_nodes']==len(bundle['entries'])+1 and
                                         last['_polaris_child_signature_accepted']>0 and last['_polaris_process_exec_checks']>=2 and
                                         last['_polaris_process_exec_rejected']==last['_polaris_child_signature_rejected']==0 and

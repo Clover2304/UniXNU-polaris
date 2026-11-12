@@ -187,6 +187,8 @@ def main():
             raise SystemExit('Missing opt-in read-only UFS inventory')
         if b'POLARIS_UFS_NOP' not in data or b'polaris-ufs-nop' not in data:
             raise SystemExit('Missing opt-in owned-queue UFS NOP')
+        if b'POLARIS_UFS_NODE_READY' not in data or b'polaris-ufs-node' not in data:
+            raise ValueError('source kernel lacks fixed read-only devfs node')
         if b'POLARIS_UFS_ESP' not in data or b'polaris-ufs-esp' not in data:
             raise SystemExit('Missing opt-in bounded FAT32 ESP read support')
         if b'POLARIS_UFS_READ' not in data or b'polaris-ufs-read' not in data:
@@ -216,6 +218,7 @@ def main():
               'ufs_scsi_prdt_available': source_mockfs,
               'ufs_bounded_read_available': source_mockfs,
               'ufs_fat32_file_available': source_mockfs,
+              'ufs_node_available':source_mockfs,
               'usb_diagnostic_build_id': os.environ.get('GITHUB_SHA','local-unqualified') if source_mockfs else None,
               'ram_tmp_available': ram_tree_available,
               'process_signature_policy': 'pid1-and-direct-child-exact-cdhash-v1' if ram_tree_available else None,

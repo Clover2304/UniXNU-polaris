@@ -1,23 +1,25 @@
 --- a/bsd/dev/arm/km.c
 +++ b/bsd/dev/arm/km.c
-@@ -30,6 +30,8 @@
+@@ -30,6 +30,9 @@
  extern void     console_write_char(char);
  extern void     console_write(char *, int);
  extern void vcputc(char);
++#include "polaris_ufs_node.h"
 +extern void polaris_usb_start(void) __attribute__((weak_import));
 +extern void polaris_usb_capture(const char *,unsigned) __attribute__((weak_import));
  
  
  void    kminit(void);
-@@ -69,6 +71,7 @@
+@@ -69,6 +72,8 @@
  	initialize_screen(NULL, kPEReleaseScreen);
  	initialize_screen(NULL, kPEAcquireScreen);
  	polaris_console_ready = 1;
++	polaris_ufs_node_model_start();
 +	if (polaris_usb_start) polaris_usb_start();
  }
  
  
-@@ -277,6 +280,7 @@
+@@ -277,6 +282,7 @@
  int
  kmputc(__unused dev_t dev, char c)
  {
@@ -25,7 +27,7 @@
  	if (polaris_console_ready) {
  		if (c == '\n') { vcputc('\r'); }
  		vcputc(c);
-@@ -390,6 +394,7 @@
+@@ -390,6 +396,7 @@
  			*cp = *cp & 0x7f;
  		}
  		if (polaris_console_ready) {
@@ -33,3 +35,79 @@
  			for (cp = buf; cp < &buf[cc]; cp++) {
  				if (*cp == '\n') { vcputc('\r'); }
  				vcputc(*cp);
+
+--- /dev/null
++++ b/bsd/dev/arm/polaris_ufs_node.h
+@@ -0,0 +1,72 @@
++/* SPDX-License-Identifier: BSD-2-Clause-Patent
++ * Fixed read-only character-device file view; data backend owns its buffers.
++ */
++#include <miscfs/devfs/devfs.h>
++#include <kern/kalloc.h>
++#include <pexpert/device_tree.h>
++extern int polaris_ufs_node_copy(uint64_t, unsigned, void *) __attribute__((weak_import));
++static int polaris_node_major = -1, polaris_node_model;
++volatile uint64_t polaris_node_reads, polaris_node_bytes, polaris_node_opens, polaris_node_denied;
++static int polaris_node_open(dev_t dev, int flags, int type, struct proc *p)
++{
++ (void)dev;(void)type;(void)p;
++ if(flags & FWRITE){__atomic_fetch_add(&polaris_node_denied,1,__ATOMIC_RELAXED);return EROFS;}
++ __atomic_fetch_add(&polaris_node_opens,1,__ATOMIC_RELAXED);return 0;
++}
++static int polaris_node_close(dev_t dev, int flags, int type, struct proc *p)
++{(void)dev;(void)flags;(void)type;(void)p;return 0;}
++static int polaris_node_write(dev_t dev,struct uio *uio,int flags)
++{(void)dev;(void)uio;(void)flags;__atomic_fetch_add(&polaris_node_denied,1,__ATOMIC_RELAXED);return EROFS;}
++static int polaris_node_read(dev_t dev,struct uio *uio,int flags)
++{
++ (void)dev;(void)flags;
++ off_t offset=uio_offset(uio);user_ssize_t residual=uio_resid(uio);
++ if(offset<0 || residual<0)return EINVAL;
++ __atomic_fetch_add(&polaris_node_reads,1,__ATOMIC_RELAXED);
++ if(!residual || (uint64_t)offset>=8193)return 0;
++ uint8_t *temporary=kalloc_data(4096,Z_WAITOK);if(!temporary)return ENOMEM;
++ int error=0;
++ while(uio_resid(uio)>0 && (uint64_t)uio_offset(uio)<8193){
++  uint64_t off=(uint64_t)uio_offset(uio),remaining=8193-off;
++  unsigned count=(uint64_t)uio_resid(uio)<remaining?(unsigned)uio_resid(uio):(unsigned)remaining;
++  if(count>4096)count=4096;
++  if(polaris_node_model){for(unsigned i=0;i<count;i++)temporary[i]=(uint8_t)((off+i)*37+((off+i)>>8)*11+0x51);}
++  else if(!polaris_ufs_node_copy){error=ENXIO;break;}
++  else {error=polaris_ufs_node_copy(off,count,temporary);if(error)break;}
++  error=uiomove((caddr_t)temporary,(int)count,uio);if(error)break;
++  __atomic_fetch_add(&polaris_node_bytes,count,__ATOMIC_RELAXED);
++ }
++ kfree_data(temporary,4096);return error;
++}
++static const struct cdevsw polaris_node_switch={
++ .d_open=polaris_node_open,.d_close=polaris_node_close,.d_read=polaris_node_read,
++ .d_write=polaris_node_write,.d_ioctl=eno_ioctl,.d_stop=eno_stop,.d_reset=eno_reset,
++ .d_ttys=NULL,.d_select=eno_select,.d_mmap=eno_mmap,.d_strategy=eno_strat,
++ .d_reserved_1=eno_getc,.d_reserved_2=eno_putc,.d_type=0
++};
++static int polaris_node_is_qemu(void)
++{
++ DTEntry root=NULL;void const *value=NULL;unsigned size=0;
++ return SecureDTLookupEntry(NULL,"/",&root)==kSuccess &&
++  SecureDTGetProperty(root,"compatible",&value,&size)==kSuccess &&
++  size==sizeof("linux,dummy-virt") && !memcmp(value,"linux,dummy-virt",sizeof("linux,dummy-virt"));
++}
++int polaris_ufs_node_start(int model)
++{
++ int enabled=0;
++ if(model){if(!polaris_node_is_qemu() || !PE_parse_boot_argn("polaris-ufs-node-model",&enabled,sizeof(enabled)) || enabled!=1)return EPERM;}
++ else if(!polaris_ufs_node_copy || !PE_parse_boot_argn("polaris-ufs-node",&enabled,sizeof(enabled)) || enabled!=1)return EPERM;
++ if(polaris_node_major>=0)return polaris_node_model==model?0:EBUSY;
++ polaris_node_model=model;
++ int major=cdevsw_add(-1,&polaris_node_switch);if(major<0)return ENXIO;
++ void *node=devfs_make_node(makedev(major,0),DEVFS_CHAR,0,0,0400,"polaris-esp-file");
++ if(!node){cdevsw_remove(major,&polaris_node_switch);return ENOMEM;}
++ polaris_node_major=major;
++ printf("POLARIS_UFS_NODE_READY mode=%s major=%d bytes=8193\n",model?"model":"hardware",major);
++ return 0;
++}
++static void polaris_ufs_node_model_start(void)
++{
++ int enabled=0;
++ if(PE_parse_boot_argn("polaris-ufs-node-model",&enabled,sizeof(enabled)) && enabled==1)(void)polaris_ufs_node_start(1);
++}
