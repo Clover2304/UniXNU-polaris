@@ -61,7 +61,7 @@ def main():
         index+=1
     command+=['-I',str(a.out/'include'),'-I',str(a.tree/'.cache/xnu-work/osfmk'),
         '-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-deprecated-declarations',
-        '-Wno-c99-designator','-Wno-reorder-init-list','-Wno-unnecessary-virtual-specifier',
+        '-Wno-c99-designator','-Wno-reorder-init-list',
         '-Wno-deprecated-enum-enum-conversion']
     (a.out/'compile-command.json').write_text(json.dumps(command,indent=2)+'\n')
     result=subprocess.run(command,cwd=record['directory'],capture_output=True,text=True)
