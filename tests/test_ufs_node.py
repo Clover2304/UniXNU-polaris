@@ -54,3 +54,103 @@ class UfsNodeTests(unittest.TestCase):
                 with self.assertRaises(ValueError):usb.verify_ufs_node(build,broken,prior,image,log)
             with self.assertRaises(ValueError):usb.verify_ufs_node(build,raw,prior,image,b'')
             with self.assertRaises(ValueError):usb.verify_ufs_node(build,raw,{**prior,'ufs_fat32_file_verified':False},image,log)
+
+    def test_actual_frontend_worker_timeout_and_error_paths(self):
+        text=(ROOT/'drivers/PolarisUsb/PolarisUsb.cpp').read_text()
+        actual=text[text.index('static void serviceUfsNode('):text.index('static void runUfsNode(')]
+        source=r'''
+#include "UfsNode.h"
+#include <cassert>
+#include <cstdarg>
+#include <mutex>
+using IOLock=std::mutex;
+static void IOLockLock(IOLock*p){p->lock();}
+static void IOLockUnlock(IOLock*p){p->unlock();}
+static uint64_t clockMs;static unsigned mode,diagnostics;
+static uint64_t nowMs(){return clockMs;}
+volatile uint64_t polaris_ufs_node_progress[4];
+static void nodePhase(uint64_t p){polaris_ufs_node_progress[0]=p;}
+static void console(const char*,...){diagnostics++;}
+struct TerminalSession {
+ IOLock lock;IOLock*ufsNodeLock=&lock;PolarisUfsNodeQueue ufsNodeQueue;
+ bool ufsNodeReady=true,ufsNodeFailed=false;int ufsNodeError=0;
+ uint64_t ufsNodeSubmitted=0,ufsNodeCompleted=0,ufsNodeCancelled=0,ufsNodeBusy=0,ufsNodeErrors=0;
+ PolarisFatResult ufsEspResult;uint8_t ufsNodeBlock[4096];
+ TerminalSession(){auto &f=ufsEspResult;f.state=PolarisFatResult::Success;f.fileBytes=8193;f.sectorsPerCluster=2;f.clusters=130000;f.clusterCount=9;for(unsigned i=0;i<9;i++)f.chain[i]=i+2;}
+};
+static TerminalSession*gNodeSession;
+static bool ufsNodePhysical(TerminalSession &s,uint32_t block){
+ assert(s.lock.try_lock());s.lock.unlock();
+ if(mode==2)return false;
+ for(unsigned i=0;i<4096;i++){uint64_t off=uint64_t(block)*4096+i;s.ufsNodeBlock[i]=uint8_t(off*37+(off>>8)*11+0x51);}
+ return true;
+}
+static void serviceUfsNode(TerminalSession &s);
+static void IOSleep(unsigned ms){
+ clockMs+=ms;assert(clockMs<10001);
+ if(mode==1||mode==2)serviceUfsNode(*gNodeSession);
+ if(mode==3&&gNodeSession->ufsNodeQueue.state==PolarisUfsNodeQueue::Pending)assert(gNodeSession->ufsNodeQueue.claim());
+}
+''' + actual + r'''
+int main(){
+ uint8_t out[4096];
+ for(mode=0;mode<=3;mode++){
+  TerminalSession s;gNodeSession=&s;clockMs=0;diagnostics=0;
+  int error=nodeCopy(0,4096,out);
+  if(mode==1){assert(!error&&s.ufsNodeCompleted==1&&!s.ufsNodeCancelled);for(unsigned i=0;i<4096;i++)assert(out[i]==uint8_t(i*37+(i>>8)*11+0x51));}
+  if(mode==2){assert(error==5&&s.ufsNodeFailed&&s.ufsNodeErrors==1);assert(nodeCopy(0,1,out)==5);assert(s.ufsNodeSubmitted==1);}
+  if(mode==0||mode==3){assert(error==60&&s.ufsNodeCancelled==1&&diagnostics==1);assert(s.ufsNodeCompleted==0);}
+  if(mode==0)assert(s.ufsNodeQueue.state==PolarisUfsNodeQueue::Idle);
+  if(mode==3){assert(s.ufsNodeQueue.state==PolarisUfsNodeQueue::Abandoned);assert(!s.ufsNodeQueue.submit(0,1));s.ufsNodeQueue.finish(0);assert(s.ufsNodeQueue.state==PolarisUfsNodeQueue::Idle);}
+ }
+ TerminalSession s;gNodeSession=&s;s.ufsNodeSubmitted=64;assert(nodeCopy(0,1,out)==28);assert(nodeCopy(8193,1,out)==22);
+ gNodeSession=nullptr;assert(nodeCopy(0,1,out)==6);
+}
+'''
+        with tempfile.TemporaryDirectory() as td:
+            d=Path(td);(d/'worker.cpp').write_text(source)
+            result=subprocess.run([shutil.which('clang++'),'-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',
+                '-I',ROOT/'drivers/PolarisUsb',d/'worker.cpp','-o',d/'worker'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run([d/'worker'],check=True,capture_output=True)
+
+    def test_actual_storage_failure_yields_without_panicking(self):
+        text=(ROOT/'scripts/fixtures/polaris-io-init.c').read_text()
+        function=text[text.index('__attribute__((noreturn,noinline)) void io_failure('):text.index('static s64 must(')]
+        source=r'''
+#include <assert.h>
+#include <stdint.h>
+#include <setjmp.h>
+#include <string.h>
+typedef uint64_t u64;typedef int64_t s64;
+static u64 io_results[32];
+#define STAGE_DIGIT (sizeof("POLARIS_IO_FAILED stage=")-1)
+#define ERROR_DIGIT (sizeof("POLARIS_IO_FAILED stage=00 errno=")-1)
+static char failure[]="POLARIS_IO_FAILED stage=00 errno=000";
+static jmp_buf escape;static unsigned writes,sleeps,panics;
+static long fake_call(long n,long a,long b,long c,long d){
+ (void)d;
+ if(n==4){assert(a==1&&c>0);assert(((const char*)b)[c-1]=='0'||c==1);writes++;}
+ else {assert(n==55&&a==0xc00);panics++;}
+ return 0;
+}
+#define CALL(n,a,b,c,d) fake_call(n,(long)(a),(long)(b),(long)(c),(long)(d))
+static long sc(long n,long a,long b,long c,long d,long timeout,long f){
+ assert(n==93&&!a&&!b&&!c&&!d&&!f&&*(s64*)timeout==10);if(++sleeps==3)longjmp(escape,1);return 0;
+}
+__attribute__((noreturn)) static void reboot_return(void){longjmp(escape,1);}
+#define POLARIS_UFS_NODE_TEST 1
+''' + function + r'''
+int main(void){
+ if(!setjmp(escape))io_failure(81,60);
+ assert(io_results[0]==81&&io_results[1]==60&&!panics&&sleeps==3&&writes==6);
+ assert(!strcmp(failure,"POLARIS_IO_FAILED stage=81 errno=060"));
+ if(!setjmp(escape))io_failure(12,5);
+ assert(panics==1&&sleeps==3&&writes==6);
+}
+'''
+        with tempfile.TemporaryDirectory() as td:
+            d=Path(td);(d/'failure.c').write_text(source)
+            result=subprocess.run([shutil.which('clang'),'-std=c11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',d/'failure.c','-o',d/'failure'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run([d/'failure'],check=True,capture_output=True)

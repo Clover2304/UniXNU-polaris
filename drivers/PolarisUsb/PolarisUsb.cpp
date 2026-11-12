@@ -30,6 +30,8 @@
 #endif
 extern "C" {
 volatile uint64_t polaris_usb_stats[16];
+// phase, loop count, claimed requests, started physical reads; diagnostic only.
+volatile uint64_t polaris_ufs_node_progress[4];
 void polaris_usb_start(void);
 void polaris_usb_capture(const char *,unsigned);
 int kmputc(int,char);
@@ -383,7 +385,9 @@ static void ufsEspText(TerminalSession &s,bool response) {
     snprintf(text,sizeof(text),"POLARIS_UFS_ESP_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x\nPOLARIS_UFS_ESP_END\n",
         s.ufsEspFaultBefore[0],s.ufsEspFaultBefore[1],s.ufsEspFaultAfter[0],s.ufsEspFaultAfter[1]);emit();
 }
+static void nodePhase(uint64_t phase){__atomic_store_n(&polaris_ufs_node_progress[0],phase,__ATOMIC_RELEASE);}
 static bool ufsNodePhysical(TerminalSession &s,uint32_t block) {
+    nodePhase(3);__atomic_fetch_add(&polaris_ufs_node_progress[3],1,__ATOMIC_RELAXED);
     if(block>=UFS_ESP_BLOCKS || s.ufsNodeCount>=128 || !s.ufsNodeSmmuUnchanged)return false;
     unsigned i=s.ufsNodeCount++;auto &r=s.ufsNodeCommands[i];
     r=polaris_ufs_scsi_read({&s,ufsNopRead,ufsNopWrite,ufsNopDelay,ufsNopCache},
@@ -403,6 +407,7 @@ static void serviceUfsNode(TerminalSession &s) {
     IOLockLock(s.ufsNodeLock);
     bool claimed=s.ufsNodeQueue.claim();uint64_t offset=s.ufsNodeQueue.offset;unsigned length=s.ufsNodeQueue.bytes;
     IOLockUnlock(s.ufsNodeLock);if(!claimed)return;
+    nodePhase(2);__atomic_fetch_add(&polaris_ufs_node_progress[2],1,__ATOMIC_RELAXED);
     unsigned done=0;int error=0;uint32_t cached=~0u;
     while(done<length) {
         uint32_t block=0;unsigned within=0,count=0;
@@ -410,6 +415,7 @@ static void serviceUfsNode(TerminalSession &s) {
         if(block!=cached){if(!ufsNodePhysical(s,block)){error=5;break;}cached=block;}
         for(unsigned i=0;i<count;i++)s.ufsNodeQueue.data[done+i]=s.ufsNodeBlock[within+i];done+=count;
     }
+    nodePhase(4);
     IOLockLock(s.ufsNodeLock);
     if(error){s.ufsNodeFailed=true;s.ufsNodeError=error;s.ufsNodeErrors++;}
     s.ufsNodeCompleted++;s.ufsNodeQueue.finish(error);
@@ -429,7 +435,13 @@ static int nodeCopy(uint64_t offset,unsigned bytes,void *output) {
         IOLockLock(s->ufsNodeLock);int error=0;
         bool done=s->ufsNodeQueue.collect(static_cast<uint8_t *>(output),error);
         if(done){IOLockUnlock(s->ufsNodeLock);return error;}
-        if(nowMs()>=deadline){s->ufsNodeQueue.cancel();s->ufsNodeCancelled++;IOLockUnlock(s->ufsNodeLock);return 60;}
+        if(nowMs()>=deadline){
+            unsigned queue=unsigned(s->ufsNodeQueue.state);
+            s->ufsNodeQueue.cancel();s->ufsNodeCancelled++;IOLockUnlock(s->ufsNodeLock);
+            uint64_t progress[4];for(unsigned i=0;i<4;i++)progress[i]=__atomic_load_n(&polaris_ufs_node_progress[i],__ATOMIC_ACQUIRE);
+            console("POLARIS_UFS_NODE_TIMEOUT queue=%u phase=%llu loops=%llu claimed=%llu phys=%llu\n",queue,progress[0],progress[1],progress[2],progress[3]);
+            return 60;
+        }
         IOLockUnlock(s->ufsNodeLock);IOSleep(1);
     }
 }
@@ -684,8 +696,10 @@ static void worker(void *,wait_result_t) {
     runUfsNode(*s,node);
     uint64_t started=nowMs(),next=started+5000;bool fallback=s->hw.phyInitMode!=0;
     for(;;) {
+        nodePhase(1);__atomic_fetch_add(&polaris_ufs_node_progress[1],1,__ATOMIC_RELAXED);
         serviceUfsNode(*s);
-        pollUsbEvents(*s);
+        nodePhase(5);pollUsbEvents(*s);
+        nodePhase(6);
         polaris_usb_stats[4]=s->hw.usbEvents;
         if(s->hw.hostReady && s->hw.configured && !s->hw.ep3Busy) {
             if(!s->pending)s->pending=s->reply.peek(s->tx,sizeof(s->tx));
@@ -697,11 +711,11 @@ static void worker(void *,wait_result_t) {
             console("POLARIS_USB_STATE ev=%u rst=%u cfg=%u cmd=%d dsts=%08x dctl=%08x phy=%08x smmu=%08x/%08x\n",
                 s->hw.usbEvents,s->hw.usbResets,s->hw.configured,s->hw.lastCmdSt,s->hw.rd(DWC3_DSTS),s->hw.rd(DWC3_DCTL),s->hw.prd(0x1a0),s->hw.smmuOrigSmr,s->hw.smmuOrigS2cr);
             if(!fallback && !s->hw.usbEvents) {
-                fallback=true;s->hw.wr(DWC3_DCTL,s->hw.rd(DWC3_DCTL)&~DWC3_DCTL_RUN_STOP);IOSleep(40);
-                if(!initQusb2(s->hw)||!runController(*s)){diagnostic();logStage("fallback-failed");thread_terminate(current_thread());return;}
+                nodePhase(8);fallback=true;s->hw.wr(DWC3_DCTL,s->hw.rd(DWC3_DCTL)&~DWC3_DCTL_RUN_STOP);IOSleep(40);
+                if(!initQusb2(s->hw)||!runController(*s)){nodePhase(9);diagnostic();logStage("fallback-failed");thread_terminate(current_thread());return;}
             }
         }
-        IOSleep(2);
+        nodePhase(7);IOSleep(2);
     }
 }
 } // namespace

@@ -29,6 +29,18 @@ __attribute__((noreturn,noinline)) void io_failure(u64 stage,u64 error)
  io_results[0]=stage;io_results[1]=error;
  failure[STAGE_DIGIT]=(char)('0'+(stage/10)%10);failure[STAGE_DIGIT+1]=(char)('0'+stage%10);
  failure[ERROR_DIGIT]=(char)('0'+(error/100)%10);failure[ERROR_DIGIT+1]=(char)('0'+(error/10)%10);failure[ERROR_DIGIT+2]=(char)('0'+error%10);
+#ifdef POLARIS_UFS_NODE_TEST
+ /* Keep the transport worker schedulable after a storage-test failure.
+  * Panic halts it and makes later USB descriptor requests fail as well. */
+ if(stage>=80 && stage<=94){
+  static const char newline[]="\n";
+  for(;;){
+   (void)CALL(4,1,failure,sizeof(failure)-1,0);(void)CALL(4,1,newline,1,0);
+   struct {s64 seconds;int micros,padding;} timeout={10,0,0};
+   (void)sc(93,0,0,0,0,(s64)&timeout,0);
+  }
+ }
+#endif
  (void)CALL(55,0xc00,failure,0,0);
  reboot_return();
 }
