@@ -67,4 +67,4 @@ fastboot flash boot /path/to/original-boot.img
 
 ## 当前运行镜像
 
-最新成功源码 `996fb95` 已通过同一路径更新并普通重启，固定六个原生扇区读取、主 GPT 校验及基线自检、心跳、USB 通过。当前 expected image 为工作区 `private/ufs-read-deploy/update/updated-esp.img`，SHA256 `d71d020afdd694b4fe66fb26cc7e9fc8b7e4ec53c83f374f472b94af86d5b1b5`；后续更新必须匹配这份实际启动卷。[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43051897934)、77 项本地主机测试、15 项运行验收和最终打包画面通过，来源见 [结果](ufs-read-result.json)。固件辅助文件更新与 XNU 原生读取分别取证；当前仍无 XNU 介质写入或通用文件系统挂载。
+最新成功源码 `2791907` 已通过同一路径更新并普通重启，固定 FAT32 文件读取、六扇区/主 GPT 校验及基线自检、心跳、USB 通过。当前 expected image 为工作区 `private/ufs-fat-deploy/update/updated-esp.img`，SHA256 `722a52712b8b060d681546ee169470365585245d8a6dd0815eb7b16ec032dd81`；后续更新必须匹配这份实际启动卷。[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43126540937)、82 项主机测试、15 项运行验收与最终打包画面通过，来源见 [结果](ufs-fat-result.json)。固件辅助文件更新与 XNU 原生读取分别取证；本轮有限 FAT32 文件读取不代表 VFS 挂载，当前仍无 XNU 介质写入。

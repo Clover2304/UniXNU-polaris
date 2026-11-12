@@ -1,6 +1,24 @@
 # UniXNU-polaris handoff notes
 
 
+## 2026-11-12: native FAT32 known-file read verified
+
+Current verified source is `27919074b4705074b3d89f1ad4669717e5483cf0`.
+The user restarted normally after the requested post-update stop. Native CDC
+identity/nonce, two independent captures, baseline self-checks and heartbeat pass
+with zero USB errors or log loss. The standalone FAT32 reader finds
+`EFI/UniXNU/READTEST.BIN`: 8193 bytes, nine clusters, 30 READ(10) commands.
+Each block CRC32, the chain and complete file bytes/SHA256 match the updated
+ESP and independent mtools. No media writes or VFS mount are qualified.
+See `research/ufs-fat-result.json` and the UFS/test plans.
+
+Current phone ESP: `../private/ufs-fat-deploy/update/updated-esp.img`, SHA256
+`722a52712b8b060d681546ee169470365585245d8a6dd0815eb7b16ec032dd81`.
+Ready package: `../artifacts/ufs-fat-ready/`; raw evidence:
+`../artifacts/ufs-fat-phone-2791907/`. Candidate/update instructions below are
+historical and have been satisfied. Next: a read-only block/VFS interface;
+retain the RAM root and prior qualified images.
+
 ## 2026-11-12: bounded FAT32 ESP file candidate
 
 Candidate source `27919074b4705074b3d89f1ad4669717e5483cf0` adds
@@ -32,7 +50,7 @@ the GPT reference remains `private/ufs-read-reference/gpt-first-six-blocks.bin`.
 
 ## 2026-11-11: native six-sector READ(10) and primary GPT verified
 
-Current verified source is `996fb95a382530b8d2389e2da2df7588cfe64489`.
+The preserved six-sector source is `996fb95a382530b8d2389e2da2df7588cfe64489`.
 After the requested stop following file update, the user restarted normally.
 Native CDC exact-build/nonce checks and two independent captures passed.
 Six LUN-0 READ(10) commands at LBA 0..5 returned 24 KiB matching the independent
@@ -41,7 +59,7 @@ Baseline checks and changing heartbeat pass with zero USB errors/log loss.
 No media writes, backup GPT or filesystem mount are qualified.
 See `research/ufs-read-result.json` and `research/ufs-readonly-plan.md`.
 
-Current phone ESP: `../private/ufs-read-deploy/update/updated-esp.img`, SHA256
+Preserved six-sector ESP: `../private/ufs-read-deploy/update/updated-esp.img`, SHA256
 `d71d020afdd694b4fe66fb26cc7e9fc8b7e4ec53c83f374f472b94af86d5b1b5`.
 Ready package: `../artifacts/ufs-read-ready/`; raw private evidence:
 `../artifacts/ufs-read-phone-996fb95/`. The pending-update instructions below

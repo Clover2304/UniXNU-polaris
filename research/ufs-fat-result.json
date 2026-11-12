@@ -1,0 +1,264 @@
+{
+  "stage": "F2 bounded FAT32 known-file read; no VFS mount",
+  "board": "Xiaomi MIX 2S / polaris",
+  "source_commit": "27919074b4705074b3d89f1ad4669717e5483cf0",
+  "ci_run_url": "https://github.com/Clover2304/UniXNU-polaris/actions/runs/43126540937",
+  "ram_profile_gib": 6,
+  "cpus": 1,
+  "source_kernel_sha256": "2278579cd0f5e5bb3feb3db88ea21ef9b9a7665fe5db170fc333bf4de14df173",
+  "packaged_kernel_sha256": "08edabd3128026eb413a9150c09c5eb7e84e190b3f74b4126bcaa8beb61f44f8",
+  "physical_updated_esp_sha256": "722a52712b8b060d681546ee169470365585245d8a6dd0815eb7b16ec032dd81",
+  "runtime_log_sha256": "afca3e19bc17dc9bbe3f58dfd3d7dbdb0a3fbeb9a919537f4924d020c4e04fd4",
+  "runtime_usb_capture_count": 2,
+  "qualified_phone_boot_count": 1,
+  "runtime_log_dropped": 0,
+  "usb_command_errors": 0,
+  "usb_reply_overflow": 0,
+  "baseline_io_proc_tmp_stress_verified": true,
+  "resident_heartbeat_verified": true,
+  "path": "EFI/UniXNU/READTEST.BIN",
+  "ufs_esp_start_lba": 393216,
+  "ufs_esp_blocks": 32768,
+  "sector_commands_submitted": 30,
+  "sector_mmio_write_operations": 90,
+  "ufs_stage_smmu_write_operations": 0,
+  "media_write_commands_submitted": 0,
+  "continuous_media_read_stress_verified": false,
+  "scope": "Fixed path and 8193-byte file; GPT-authorized 128-MiB ESP; independent mtools lookup, block CRC32 and byte-for-byte file plus SHA256 comparison",
+  "ci_passed": true,
+  "macos_kernel_ci_passed": true,
+  "remote_linux_ci_passed": true,
+  "acceptance_environment": "Exact-source GitHub Actions host/EFI/macOS kernel/signature gate/native QEMU; 15 runtime reports and 82 host tests passed; local packaged QEMU screen CPU=max ticks 3->6; final staged FAT32 layout model passed",
+  "package_origin": "exact-source GitHub Actions ufs-fat-stage-results artifact",
+  "efi_provenance": {
+    "source_commit": "27919074b4705074b3d89f1ad4669717e5483cf0",
+    "ci_run_id": 43126540937,
+    "files": {
+      "EFI/BOOT/BOOTAA64.EFI": "aad20205a434770b515722dea25343e08e9ad1b39a9bac4c663226c14b639cf6",
+      "EFI/UniXNU/Payloads/DarwinBoot.efi": "8dbcbd3e535c8013b82b1cf25b43ba2e3a3e221b718dc0a9698e9b9742a45a72"
+    }
+  },
+  "ufs_fat32_file_verified": true,
+  "ufs_esp_sha256": "95c3c0b672ed20e92e868f698d422d708415be133f3a56df31079de784a8f9c1",
+  "ufs_esp_faults": {
+    "global_before": 0,
+    "bank_before": 1024,
+    "global_after": 0,
+    "bank_after": 1024
+  },
+  "ufs_esp_file_sha256": "6f8f27897d728e935435ada86bf393b8751de163396edcd4c9bf24df56d9da6f",
+  "ufs_esp_file_bytes": 8193,
+  "ufs_esp_geometry": {
+    "sector_bytes": 512,
+    "spc": 2,
+    "reserved": 32,
+    "fat_sectors": 1016,
+    "data_sector": 2064,
+    "root": 2,
+    "clusters": 130040
+  },
+  "ufs_esp_chain": [
+    115527,
+    115528,
+    115529,
+    115530,
+    115531,
+    115532,
+    115533,
+    115534,
+    115535
+  ],
+  "ufs_esp_commands": [
+    {
+      "lba": 393216,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1738150316
+    },
+    {
+      "lba": 393474,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 2414824178
+    },
+    {
+      "lba": 417555,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 3063364411
+    },
+    {
+      "lba": 422355,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1059909281
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 422355,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1059909281
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 422355,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1059909281
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 422356,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1396292722
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 422356,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1396292722
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 422356,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1396292722
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 422356,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1396292722
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 422357,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 710793992
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 422357,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 710793992
+    },
+    {
+      "lba": 393332,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    },
+    {
+      "lba": 393459,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1902322570
+    }
+  ],
+  "ufs_native_media_read_verified": true,
+  "ufs_filesystem_mount_verified": false,
+  "media_write_verified": false,
+  "last_tick": 8,
+  "cluster_count": 9,
+  "file_bytes_match_reference": true,
+  "file_sha256_match_reference": true,
+  "block_crc32_match_reference": true,
+  "cluster_chain_match_independent_mtools": true,
+  "apple_userland_booted": false,
+  "runtime_log_bytes": 10674
+}
