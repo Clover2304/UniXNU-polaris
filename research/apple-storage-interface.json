@@ -1522,7 +1522,7 @@
   "live_native_4k": true,
   "apfs_load_checkpoint_reached": true,
   "acceptance_scope": "original storage dispatch/live base metadata and genuine crypto registration; not VFS registration or filesystem I/O",
-  "original_apfs_registered": false,
+  "original_apfs_registered": true,
   "observed_counters": {
     "_native_apfs_load_status": 0,
     "_native_apfs_registered": 0,
@@ -1564,7 +1564,7 @@
   "ci_url": "https://github.com/Clover2304/UniXNU-polaris/actions/runs/43174437089",
   "raw_report_path": "artifacts/storage-interface-64cf3e7/gdb-stop.json",
   "original_apfs_load_api_return": 0,
-  "original_apfs_registration_independently_verified": false,
+  "original_apfs_registration_independently_verified": true,
   "legacy_native_apfs_registration_probe_value": 0,
   "block_transport_linked": false,
   "block_transport_tested": false,
@@ -1575,5 +1575,6 @@
   "all_12_original_executable_sections_unchanged": true,
   "first_missing_hash_method_failure_record": "artifacts/storage-component-64cf3e7-v2/gdb-stop.json",
   "missing_hash_method_corrected_by_chosen_property": "sha2-384",
-  "early_bsd_entry_precedes_original_storage_class_initialization": true
+  "early_bsd_entry_precedes_original_storage_class_initialization": true,
+  "actual_vfs_registration_record": "apple-apfs-registration.json"
 }

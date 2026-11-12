@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "source_commit": "64cf3e7be7d5f3c2f585b6dffc6c4951aed33741",
+  "candidate_sha256": "d35d168cb631e2c37700018d11fe7b30c2035af17e5e268472c051b6b78b74ee",
+  "original_sha256": "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7",
+  "original_apfs_kmod_start_observed": true,
+  "actual_vfs_fsadd_same_stack_return": 0,
+  "actual_vfs_fsadd_caller_in_original_apfs": true,
+  "returned_table_observed_name": "apfs",
+  "returned_operations_pointer": 18446744005089866696,
+  "operations_match_unchanged_original_table": true,
+  "raw_observation_sha256": "bb6aaaaa57eeb04443cb8e78dcd90fc513865c2482106da3b40e794e7270a2ca",
+  "legacy_native_apfs_registered_counter_reliable_for_this_result": false,
+  "filesystem_mounted": false,
+  "disk_read_tested": false,
+  "hardware_tested": false,
+  "phone_accessed": false,
+  "missing_component_control": {
+    "passed": true,
+    "negative_control": "original APFS component omitted; native code and platform inputs retained",
+    "source_kernel_sha256": "62871f670a5b75695cd8b3b45a05019c208bbed60d3de961f964db3b10598ec8",
+    "candidate_sha256": "9611d9ada0bf6d20de48d9db3a51e7a2bba09bc51e7a4ebfbc8622ed8ee11a36",
+    "counters": {
+      "_native_apfs_load_status": 3691020298,
+      "_native_apfs_registered": 0,
+      "_native_apfs_vfsops": 0,
+      "_crypto_init": 1,
+      "_prng_ready": 1
+    },
+    "original_apfs_present": false,
+    "filesystem_mounted": false,
+    "hardware_tested": false,
+    "raw_observation_sha256": "10cf0e91bbfe66fc0d96235e31b3ab459bffe6d8bd6f35d6f973616cd215b5fe"
+  },
+  "positive_case_directory": "artifacts/storage-vfs-registration-64cf3e7",
+  "negative_case_directory": "artifacts/storage-apfs-missing-64cf3e7"
+}

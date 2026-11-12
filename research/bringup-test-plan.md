@@ -373,3 +373,10 @@ QEMU 模型，已更新并完成全启动卷回读/缓存同步；按用户要�
 [绑定元数据](apple-storage-bindings.json)只包含接口名、地址与哈希，没有 Apple 可执行代码。AES 的共同 168 槽取自当前源 IOService 的真实 vtable，其余 13 项沿用固定 UniXNU ABI 头和绑定记录，并逐项比对原版 vtable；后续还必须检查新编译子类的全部 181 槽并运行 KAT。下一步编译已有 NativeAES/NativeVirtioBlock，组合后验证实际只读设备、两卷 UUID/设备名、挂载与 APFS 上小缓存的映射。完整 cache、libSystem、原版 launchd 主函数和真机通用存储仍未通过。
 
 构建首轮因当前 Apple Clang 不识别一个上游警告抑制选项而失败，源码内核本身已链接成功；已移除该无效选项并保留 -Werror，修正版编译通过。原 RAM 根配置的 [完整回归 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43172241674)也通过；不能将它记为新存储路径通过。
+
+
+### 原版 APFS 实际 VFS 注册及缺组件对照
+
+[真实注册证据](apple-apfs-registration.json)：在同一个 12 组件候选上，观察原版 APFS kmod_start 实际执行，跟随源内核 vfs_fsadd 到原调用栈返回，返回值为 0，返回 PC 位于未改写的原 APFS 可执行区段。输出表含 apfs，操作表指针和捕获的 144 字节与原版表完全一致。省略 APFS 的候选保留相同 native source、平台参数和已初始化原 crypto；真实加载 API 返回非零且未返回注册表，拒绝对照通过。旧 native_apfs_registered 诊断扫描仍为 0，后续以实际调用、返回表和挂载验收，不能用该旧计数器替代结果。
+
+原 APFS 模块启动与 VFS 注册现在为模拟通过，磁盘读取、实际挂载与完整共享缓存仍未通过。NativeAES 和 NativeVirtioBlock 的实际 CI 对象已编译，分别 181 和 190 槽；主机符号比较脚本曾在平台工具的解码结果上失败，保留的原对象改用 LLVM 明确的 no-strip 模式后，所有方法签名比对通过。该修正保持全表检查，新内核仍需重新链接与运行。构建依赖已区分：仅存储辅助脚本/专用配置的变化由存储工作流构建，公共内核、驱动、测试和板配置仍触发完整 RAM 根回归。

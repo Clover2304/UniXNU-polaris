@@ -43,6 +43,8 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --find mig
           xcrun --sdk iphoneos --find iig
+          STORAGE_LLVM_TOOLS="$(brew --prefix llvm)/bin"
+          test "$("$STORAGE_LLVM_TOOLS/llvm-cxxfilt" --no-strip-underscore _ZN9IOService5startEPS_)" = 'IOService::start(IOService*)'
       - name: Build deferred original-bootstrap source kernel
         run: |
           EXTRA_ARGS=()

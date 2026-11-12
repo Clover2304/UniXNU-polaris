@@ -105,15 +105,23 @@ def main():
         if component=='NativeVirtioBlock':
             expected=qualification['storage_reference_methods']
             if len(expected)!=190:raise SystemExit('Incomplete qualified reference table')
-            all_names=list(dict.fromkeys(methods+expected));demangled=subprocess.check_output(
-                ['xcrun','c++filt'],input='\n'.join(n[1:] for n in all_names)+'\n',text=True).splitlines()
+            all_names=list(dict.fromkeys(methods+expected))
+            demangler=shutil.which('llvm-cxxfilt')
+            if not demangler:
+                raise SystemExit('Requires LLVM llvm-cxxfilt from the selected build toolchain')
+            demangled=subprocess.check_output([demangler,'--no-strip-underscore'],
+                input='\n'.join(n[1:] for n in all_names)+'\n',text=True).splitlines()
+            if len(demangled)!=len(all_names):
+                raise SystemExit('Demangler did not return one result per dispatch name')
             readable=dict(zip(all_names,demangled))
+            (out/'dispatch-readable.json').write_text(json.dumps(readable,indent=2)+'\n')
             for slot,(actual,wanted) in enumerate(zip(methods,expected)):
                 own=actual.startswith(('__ZN17NativeVirtioBlock','__ZNK17NativeVirtioBlock'))
                 if wanted=='___cxa_pure_virtual':
                     if not own:raise SystemExit('Required storage method unimplemented')
-                elif actual!=wanted and (not own or (slot not in (0,1) and readable[actual].split('::',1)[1]!=readable[wanted].split('::',1)[1])):
-                    raise SystemExit('Storage dispatch mismatch at '+str(slot))
+                elif actual!=wanted:
+                    if not own or (slot not in (0,1) and ('::' not in readable[actual] or '::' not in readable[wanted] or readable[actual].split('::',1)[1]!=readable[wanted].split('::',1)[1])):
+                        raise SystemExit('Storage dispatch mismatch at '+str(slot)+': '+readable[actual]+' versus '+readable[wanted])
         token='IOAESAccelerator' if component=='NativeAES' else 'IOBlockStorageDevice'
         allowed=qualification['aes_bindings' if component=='NativeAES' else 'storage_bindings']
         undefined=[name for name,value,kind in symbols if kind==1 and token in name]
