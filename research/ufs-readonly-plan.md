@@ -317,7 +317,7 @@ EOF/越过 EOF、零长度、负偏移、重复读取、只读/读写打开被�
 匹配 QEMU 根 ADT；它仅替代物理读取后端，实际 devfs 和用户系统调用仍执行。
 手机包只允许 `polaris-ufs-node=1`，明确禁止 model 参数。
 
-当前状态：[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43132575295) 通过，
+首个候选的软件状态：[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43132575295) 通过，
 包含 83 项主机测试与 16 份运行验收（原 15 项基线加 devfs 模型）；补充的 19 项
 本地 UFS 回归通过。QEMU 实际系统调用的计数为 opens=2、reads=12、bytes=20502、
 denied=2，原有进程自检与常驻运行通过。最终手机打包镜像关闭硬件参数并显式启用
@@ -326,8 +326,47 @@ QEMU 模型后，画面显示 NODE_OK，心跳 5→8；这不代表原生 UFS �
 已通过 Mass Storage 更新文件，完整 128 MiB 启动卷直接回读与缓存同步通过，最终
 实际 FAT32 布局的文件映射模型通过。标题为 `polaris: UFS NODE READ`；启动卷 SHA256
 `52ca01625f062a58b43ed6ee69f955b46481d9747c08ad6a719d88be0f04ce47`。
-按用户要求已停止，未重启设备。**本轮真机接口待验收**，上一成功真机基线仍为
+按用户要求已停止，未重启设备。当时尚待真机验收，后续已报告下述超时失败。上一成功真机基线仍为
 `2791907`。成功包 `artifacts/ufs-node-ready/`，实际镜像
 `private/ufs-node-deploy/update/updated-esp.img`，记录
 `private/ufs-node-deploy/state.json`。普通重启后再以原生 CDC 核对精确源码、NODE_OK、
 9 个请求的命令轨迹及两个独立采样间的心跳；不能将文件回读或 QEMU 模型记为硬件通过。
+
+### 第八轮真机未通过：顺序读等待后端超时
+
+用户启动后报告 `POLARIS_IO_FAILED stage=81 errno=060`。该阶段为三段顺序读取
+（4096、4096、1 字节），`60` 来自后端 5 秒请求期限；节点已打开，但还不能确定
+第几段失败、工作线程是否仍存活或物理读取停在何处。因此不将本轮 devfs 接口记为
+硬件通过，也不把此前的 QEMU 模型结果外推为原生读取成功。
+
+原 fixture 的 `io_failure` 通过用户 panic 保留画面，会停掉原生 USB 工作线程。
+服务器 USBIP 两次接入均报 Device in error state，随后 Windows 报设备描述符请求
+失败，未取得本轮原生 USB 日志。此时反复重新绑定 CDC 不能恢复已经停机的工作线程。
+
+诊断候选 `2dd96b8` 增加 `POLARIS_UFS_NODE_TIMEOUT queue=... phase=... loops=...
+claimed=... phys=...`。queue=1 为尚待认领，2 为已认领未完成；phase=1 服务入口、
+2 认领完成、3 物理读取入口、4 请求完成前、5 USB 事件处理、6 USB 发包/状态、
+7 线程睡眠、8 USB 后备恢复、9 后备恢复失败后线程退出。计数为故障定位快照，
+不作为性能/可靠性资格。
+
+该诊断版在 node 测试阶段（80～94）失败后输出错误并用 select 定时睡眠，保留
+系统与传输线程继续运行的机会；原有非 node 失败路径仍保留 panic。真实前端和
+工作线程代码的本地模型覆盖成功、EIO、未认领超时及处理中取消，另验证失败处理
+确实输出/让出 CPU 且不触发 panic；4 项 node 主机检查通过。当时诊断构建中，后续构建和部署结果见下方；尚未断言底层超时根因已修复。
+
+本地另以未注册 devfs 节点的 QEMU 控制触发 `stage=80 errno=002`：GDB 确认失败
+处理仍在 EL0，并观察到两次 10 秒 select 返回，采样间隔 10.90 秒、定时器中断
+4526→4539。画面保留普通错误行，无 panic。该控制仅验证失败后的可调度行为，
+不表示原生 USB 或 UFS 读取已通过，也不替代本轮真机超时诊断。
+
+
+诊断候选 `2dd96b8` 的 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43136956061)
+已通过：86 项主机检查和 16 份运行报告；打包镜像本地 QEMU 显示 NODE_OK，心跳
+5→8，源程序负路径模拟也通过。FAT 文件映射模型对最终实际更新布局通过。
+已通过 Mass Storage 更新文件，全 128 MiB 启动卷直接回读与缓存同步通过；标题
+`polaris: UFS NODE TIMEOUT DIAG`，实际启动卷 SHA256
+`34488cf9a1547ca962ea4cfc304547321b9d410b450ef912994459bbee8b44d0`。
+成功包 `artifacts/ufs-node-diag-ready/`，记录 `private/ufs-node-diag-deploy/state.json`。
+按用户要求已停止，未重启。本候选用于定位超时，尚未确认真机根因修复或 devfs
+硬件通过。普通重启后优先保存原生 CDC 日志；若仍不能枚举，抄取 NODE_TIMEOUT
+整行的 queue/phase/loops/claimed/phys，不再单凭 IO_FAILED 阶段猜测请求进度。
