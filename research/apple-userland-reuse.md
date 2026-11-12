@@ -1,6 +1,6 @@
 # Apple 用户态启动：现有适配复用盘点
 
-更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，当前真机已验证内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`，候选 `f916ebb` 已通过原版 dyld 的 QEMU 早期执行检查；原版 launchd 主函数尚未验证，真机 dyld 已按用户画面回报到达依赖查找阶段。
+更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，最近完整真机自检基线为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`；`f916ebb` 原版 dyld 已通过 QEMU 早期执行，真机按用户画面回报到达缺 libSystem 的依赖查找阶段。新候选 `57a7d7f` 已在 QEMU 通过原版小缓存的 16K 签名/4K 缺页校验和拒绝对照，尚未更新手机。完整缓存和原版 launchd 主函数仍未通过。
 
 ## 结论与基线
 
@@ -136,3 +136,20 @@ RAM fixture 采用当前 N4KROOT v3，保留原版 `/sbin/launchd`、`/usr/lib/d
 原版 launchd 的 LC_LOAD_DYLIB 明确依赖 `/usr/lib/libSystem.B.dylib`，此外还依赖 ObjC、Sandbox 与 Swift 库。只读检查同一原 OS 卷确认 libSystem、libobjc、libswiftCore 没有独立文件；原共享缓存 image catalog 中可定位 libSystem。当前 1.51 MB RAM fixture 仅含原版 launchd/dyld，未提供共享缓存，因此需要推进存储与动态链接阶段。
 
 下一轮先在服务器验证：复用已有只读卷/缓存加载工具，确定与当前源内核匹配的文件读取和 mmap 路径；接入同版本已校验的 53 个 cache/subcache，并验证已有的原 16K 签名块支持。当前两份精确 CDHash 的诊断授权也需按已核对的原 System trust-cache 成员扩展并验证，不能直接视为整个缓存已获准装载。随后再依据真实缺接口推进 libSystem、ObjC/Swift 和 launchd 主函数。当前 16 条目/32 MiB RAM 根无法容纳约 3.3 GB 缓存，完整缓存接入需要可分页的文件后端；本轮未重编内核或再次写入手机。
+
+
+## G3：原版小缓存签名和映射已模拟通过（57a7d7f）
+
+[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43166582757)通过：88 项主机检查、16 份原有运行报告。复用固定 UniXNU 已有的 `native-4k-signature-hash-cache.patch`，启用 `CONFIG_XNU_NATIVE_CS_HASH_CACHE=y`，没有改写 Apple 缓存文件或其签名。新增显式 `polaris-cache-probe=1` 的诊断授权：仅 PID 1、有效 ad-hoc / 16K CodeDirectory、53 个已审计原 System trust-module 成员的精确 CDHash。它只授权签名登记，不授予平台身份/entitlement，也未加载 AMFI 或 Apple trust-cache runtime。
+
+自制无 libc 的 PID 1 打开同一原版 `dyld_shared_cache_arm64.02`（49,152 字节），实际执行 `F_ADDFILESIGS_RETURN`、32 KiB `mmap(MAP_PRIVATE, PROT_READ|PROT_EXEC)`、8 页数据读取、`munmap` 和 `close`，随后继续定时运行。QEMU 只读观察到：两个完整 16K 签名块认证成功、8 次原生 4K 缺页校验、一个就绪哈希缓存，bad_hash/no_hash 均为 0；实际 EL0 和 4K MMU 配置同时取证。没有执行缓存中的原版指令。
+
+[10 组运行证据](apple-cache-runtime.json)均通过：旧内核仍拒绝 16K 签名；新内核正向；关闭授权返回 EPERM；隔离副本分别损坏第 0、1、2、3、4 个 4K 区段，每组均返回 EBADEXEC、bad_hash=1、未发布就绪缓存。第 4 区段的失败发生在第二个签名块，此时第一个完整块计数为 1。最终打包内核再重复通过正向和第二块损坏对照。主机未写入来宾寄存器、代码或返回值，所有 Apple 原输入保留不变。
+
+真机候选在 `artifacts/cache-phone-ready-57a7d7f/`，菜单默认 `polaris: ORIGINAL CACHE 16K / 4K`。旧原版 dyld 探针和 `abc75cf` 自检的内核、ADT、HMAC 与根目录均以原字节保留为另两项；共享 EFI 字节一致。128 MiB FAT 文件逐一回读通过，最终打包内核正向/篡改检查通过；更新仍待用户进入固件 Mass Storage。实际写入后会完整回读并停下，等待用户手动重启。
+
+真机验收使用 `scripts/check-polaris-cache-usb.py`：核对原生 CDC 身份、精确构建 SHA、随机 nonce、USB 健康计数、完整零丢失日志、自制程序的 CACHE_OK 和两次独立快照间继续变化的心跳。该程序只证明自检结果与存活，内核内部 2/8 计数当前仅在 QEMU 直接观察；旧进程/压力 USB 验收器保持原要求。失败程序保持运行，不因预期签名错误主动 panic。
+
+下一步分开处理：先完成此小缓存探针真机验收；再在 QEMU 复用只读 APFS/虚拟块设备路径，核对存储 ABI、组件绑定与 crypto_bootstrap 配置，提供同版本 OS/SystemOS 文件后端及 53 个缓存路径，继续观察真实 dyld。只读存储声明闭包已缩小为 12 个可执行组件和 7 个内核接口，但计划工具仍返回 loadable=false，未生成或启动该组件组合。主机已转换并核对只读 OS raw 输入；这不构成内核 APFS 挂载证据。原生 UFS 的通用可分页后端另行适配，当前固定 8193 字节字符设备不能装载约 3.3 GB 缓存。
+
+目前 G3 的原签名页路径有了实际小文件运行证据；完整缓存映射、libSystem 初始化、TLS、原版 launchd 主函数、服务和 iPadOS 界面仍未通过。
