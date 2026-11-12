@@ -2,7 +2,7 @@ name: Darwin 23 platform kernel
 on:
   push:
     branches: ['work/polaris-ramdisk']
-    paths: ['.github/workflows/**', 'scripts/**', 'drivers/**', 'kernel-overrides/**', 'tests/**', 'board.toml', 'configs/**', 'upstream.json', '!.github/workflows/storage.yml', '!scripts/build-storage-reference.py', '!scripts/build-storage-drivers.py', '!configs/polaris_storage_defconfig', '!configs/polaris_storage_io_defconfig']
+    paths: ['.github/workflows/**', 'scripts/**', 'drivers/**', 'kernel-overrides/**', 'tests/**', 'board.toml', 'configs/**', 'upstream.json', '!.github/workflows/storage.yml', '!scripts/build-storage-reference.py', '!scripts/build-storage-drivers.py', '!configs/polaris_storage_defconfig', '!configs/polaris_storage_io_defconfig', '!configs/polaris_security_io_defconfig']
   workflow_dispatch:
     inputs:
       defconfig:
