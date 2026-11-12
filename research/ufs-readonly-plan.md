@@ -370,3 +370,47 @@ claimed=... phys=...`。queue=1 为尚待认领，2 为已认领未完成；phas
 按用户要求已停止，未重启。本候选用于定位超时，尚未确认真机根因修复或 devfs
 硬件通过。普通重启后优先保存原生 CDC 日志；若仍不能枚举，抄取 NODE_TIMEOUT
 整行的 queue/phase/loops/claimed/phys，不再单凭 IO_FAILED 阶段猜测请求进度。
+
+### 第八轮故障进一步定位：待认领请求没有提交 UFS
+
+诊断版 `2dd96b8` 普通启动后，原生 CDC 接入成功；精确源码、随机 nonce 和完整
+缓存日志通过核对，USB 命令错误/回复溢出/日志丢失均为 0。Boot FAT32 文件读取仍
+通过独立镜像核验。现场为 `queue=1 phase=7 loops=748 claimed=0 phys=0`，随后
+`stage=81 errno=060`。缓存响应显示 submitted=1、completed=0、cancelled=1，
+节点 opens=1、reads=1、bytes=0，live READ(10) 数为 0。这次已能确认是首个数据请求，
+停在认领前；不是一次已提交 UFS 命令的传输超时。失败后持续运行和 USB 取证已在
+真机证实，但文件设备功能仍未通过。[故障摘要](ufs-node-timeout-result.json)。
+
+修正版候选 `abc75cf` 将生产者/消费者从 1 ms/2 ms 轮询改为持 mutex 的显式事件
+唤醒和 deadline 等待：请求到达唤醒所有者，完成时唤醒读取者；检查状态与入睡原子
+交接，保持 5 秒期限和 Pending/Working/Abandoned 的既有内存生命周期。工作线程
+为 USB 保留最多 2 ms 的定时等待，遇到待认领请求不再入睡。这里是基于现场证据
+选定的交接修正，尚未宣称已证明底层定时器/调度器的具体缺陷。
+
+QEMU 的 model 模式改用同一套 nodeCopy/serviceUfsNode/事件等待以及真实内核线程，
+仅用生成数据替代物理块传输，并继续以 ADT 和 bootarg 双重限制在 QEMU 内。
+运行验收额外要求真实队列认领 9 次、模拟块读取 10 次；旧的 devfs 内联生成数据
+路径不再存在。主机模型覆盖成功、EIO、两类取消、超时与完成竞争、伪唤醒及入睡前
+已到达请求，并用真实双线程/条件变量执行 100 次请求与完成唤醒；本地 4 项检查通过。
+当时完整 CI 构建中；后续通过结果与文件更新记录见下方。
+
+固定 XNU 的 [IOSleep](https://github.com/apple-oss-distributions/xnu/blob/d8b80295118ef25ac3a784134bcf95cd8e88109f/iokit/Kernel/IOLib.cpp)
+实际调用 delay_for_interval；[clock.c](https://github.com/apple-oss-distributions/xnu/blob/d8b80295118ef25ac3a784134bcf95cd8e88109f/osfmk/kern/clock.c)
+会按自旋阈值、抢占和中断状态选择忙等或线程等待，不能把短 IOSleep 当成总会交出
+CPU 的保证。当前未采样现场的阈值/抢占状态，因此实际自旋分支尚非已证明的根因。
+本次使用的 IOLockSleepDeadline 则按固定内核的 mutex/event 协议原子入睡与重加锁。
+
+候选 `abc75cf` 已完成 macOS 编译/链接，本地用该实际内核完成加强后的 QEMU 运行：
+队列进度 `[phase=7, loops=6241, claimed=9, physical=10]`，文件系统调用、原有进程
+压力和常驻心跳通过。这里仍是明确的 QEMU 数据传输模型；当时完整远程回归在进行中，后续结果如下。
+
+
+候选 `abc75cf` 的 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43141529622)
+已通过，含 86 项主机检查和 16 份运行报告。远程 QEMU 实际队列为认领 9、模拟块
+读取 10；最终手机包在本地 QEMU 的 NODE_OK 和心跳 5→8 通过，最终实际 FAT 布局
+映射模型通过。已更新手机文件，全 128 MiB 启动卷直接回读及缓存同步通过，SHA256
+`5e10f59584d2e7c01cb3f2bd50140d15636d97ad3fc630ac2e11a69a6e5545be`。
+标题 `polaris: UFS NODE WAKEUP`，成功包 `artifacts/ufs-node-event-ready/`，记录
+`private/ufs-node-event-deploy/state.json`。按要求已停止，未代用户重启。
+**事件交接修正仍待真机验证**；下次普通启动后检查 NODE_OK、9 次实际请求的 READ
+序列/CRC、VFS 计数、持续心跳与 USB 健康，不把 QEMU 模型的通过记为原生文件设备通过。
