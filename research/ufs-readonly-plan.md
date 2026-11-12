@@ -412,5 +412,26 @@ CPU 的保证。当前未采样现场的阈值/抢占状态，因此实际自旋
 `5e10f59584d2e7c01cb3f2bd50140d15636d97ad3fc630ac2e11a69a6e5545be`。
 标题 `polaris: UFS NODE WAKEUP`，成功包 `artifacts/ufs-node-event-ready/`，记录
 `private/ufs-node-event-deploy/state.json`。按要求已停止，未代用户重启。
-**事件交接修正仍待真机验证**；下次普通启动后检查 NODE_OK、9 次实际请求的 READ
-序列/CRC、VFS 计数、持续心跳与 USB 健康，不把 QEMU 模型的通过记为原生文件设备通过。
+该轮更新完成后按要求停止；随后用户普通启动，原生验收已通过，记录如下。
+
+
+### 第八轮真机结果：通过系统调用读取固定 UFS 文件
+
+源码 `abc75cf`，用户启动后原生 CDC 精确身份及 nonce 通过。PID 1 显示
+`POLARIS_UFS_NODE_OK bytes=8193 cross=3 repeat=2 eof=OK readonly=OK reopen=OK`，
+原有 IO/PROC/TMP/1,000 次进程自检完成并继续常驻。9 个请求全部完成，取消、忙和
+后端错误均为 0；实际 10 条单块 READ(10) 均 GOOD、residual=0、保护区完整且队列
+停止。命令顺序和每个块 CRC32 均与实际 ESP 簇链和独立映射一致；重复读取重新提交
+物理读请求。VFS 计数 opens=2、reads=12、bytes=20502、denied=2，验证了 8193 字节
+顺序读、跨簇/物理页、EOF/越过 EOF、零长度、负偏移、重复读取、写入拒绝和重开。
+
+三个独立 USB 捕获返回同一完成轨迹，采样间心跳继续变化；USB 命令错误、回复
+溢出和日志丢失均为 0，无 IO_FAILED 或 NODE_TIMEOUT。UFS 阶段不写 SMMU 或介质，
+global FSR=0，bank FSR 保持 FORMAT=0x400，未新增故障位。该次启动证实事件交接
+修正解决了此前首个请求未认领的问题，但未单独测定旧 IOSleep 路径的具体自旋条件。
+[公开证据](ufs-node-result.json)仅含必要计数、哈希和块轨迹；原始日志保留本地。
+
+当前仍为固定路径的只读字符设备视图，根目录继续使用 RAM。通用 UFS 块设备、FAT
+挂载、任意文件查找、介质写入/持久化和 Apple 用户态尚未完成。下一步可接入有限
+只读块设备/文件系统，或按既有复用计划推进最小 Apple 用户态依赖；本次未新增候选
+构建或设备更新。新版本只有本轮一次功能启动验收，十轮可靠性资格仍属于原 USB 基线。

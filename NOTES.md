@@ -1,9 +1,35 @@
 # UniXNU-polaris handoff notes
 
 
+## 2026-11-12: native fixed-file devfs read verified
+
+Current verified source: `abc75cfb6a7f3a209af4865f575a9b70387c916e`.
+After the user's restart, three native CDC captures verify exact source/nonce,
+NODE_OK and continued heartbeat, with no USB errors, reply overflow or log loss.
+Nine requests complete and ten fresh READ(10) commands match the actual ESP's
+block order/CRCs. Devfs opens=2, reads=12, bytes=20502, denied=2. Cross-cluster
+reads, EOF, negative offsets, repeats, read-only refusal and reopen pass.
+No SMMU/media writes, new SMMU fault, IO_FAILED or NODE_TIMEOUT is observed.
+See `research/ufs-node-result.json`; the first unclaimed-request failure is
+retained separately in `research/ufs-node-timeout-result.json`.
+
+The event handoff fix is verified on this boot; the exact old spin/timer branch
+was not measured. RAM remains the root. No general block device, filesystem
+mount, media writes or Apple userspace is qualified. CI has 86 host checks and
+16 runtime reports, including an actual kernel-thread queued QEMU model.
+
+Current ESP: `../private/ufs-node-event-deploy/update/updated-esp.img`, SHA256
+`5e10f59584d2e7c01cb3f2bd50140d15636d97ad3fc630ac2e11a69a6e5545be`.
+Ready: `../artifacts/ufs-node-event-ready/`; native evidence:
+`../artifacts/ufs-node-event-phone-abc75cf/`. Keep the phone running; no further
+update or reboot was performed during qualification. Older instructions below
+are historical; preserve prior images. Ten-boot reliability belongs to the
+original USB baseline and is not inherited by this version.
+
+
 ## 2026-11-12: native FAT32 known-file read verified
 
-Current verified source is `27919074b4705074b3d89f1ad4669717e5483cf0`.
+Previously verified source is `27919074b4705074b3d89f1ad4669717e5483cf0`.
 The user restarted normally after the requested post-update stop. Native CDC
 identity/nonce, two independent captures, baseline self-checks and heartbeat pass
 with zero USB errors or log loss. The standalone FAT32 reader finds
@@ -12,7 +38,7 @@ Each block CRC32, the chain and complete file bytes/SHA256 match the updated
 ESP and independent mtools. No media writes or VFS mount are qualified.
 See `research/ufs-fat-result.json` and the UFS/test plans.
 
-Current phone ESP: `../private/ufs-fat-deploy/update/updated-esp.img`, SHA256
+Previous phone ESP: `../private/ufs-fat-deploy/update/updated-esp.img`, SHA256
 `722a52712b8b060d681546ee169470365585245d8a6dd0815eb7b16ec032dd81`.
 Ready package: `../artifacts/ufs-fat-ready/`; raw evidence:
 `../artifacts/ufs-fat-phone-2791907/`. Candidate/update instructions below are

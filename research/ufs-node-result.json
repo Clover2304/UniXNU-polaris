@@ -1,0 +1,144 @@
+{
+  "stage": "F2 fixed-file devfs reads through the native UFS worker",
+  "board": "Xiaomi MIX 2S / polaris",
+  "source_commit": "abc75cfb6a7f3a209af4865f575a9b70387c916e",
+  "ci_run_url": "https://github.com/Clover2304/UniXNU-polaris/actions/runs/43141529622",
+  "ram_profile_gib": 6,
+  "cpus": 1,
+  "source_kernel_sha256": "556f27b4f061293c61e33ede558acacdcb1aa6f7d18030145a7d723beb3f2e1b",
+  "packaged_kernel_sha256": "4b3126eb76b27b0113696951b47a39174f6eef6d7b5340e012674982f64bb4bc",
+  "physical_updated_esp_sha256": "5e10f59584d2e7c01cb3f2bd50140d15636d97ad3fc630ac2e11a69a6e5545be",
+  "runtime_log_sha256": "76ccef30f4951c0796aa860d8ce58777660ead177f534fa08ab39b57f864de5b",
+  "runtime_usb_capture_count": 3,
+  "qualified_phone_boot_count": 1,
+  "runtime_log_dropped": 0,
+  "usb_command_errors": 0,
+  "usb_reply_overflow": 0,
+  "baseline_io_proc_tmp_stress_verified": true,
+  "resident_heartbeat_verified": true,
+  "path": "/dev/polaris-esp-file",
+  "file_size": 8193,
+  "sector_commands_submitted": 10,
+  "sector_mmio_write_operations": 30,
+  "ufs_stage_smmu_write_operations": 0,
+  "media_write_commands_submitted": 0,
+  "continuous_media_read_stress_verified": false,
+  "general_block_device_verified": false,
+  "apple_userland_booted": false,
+  "scope": "Fixed file, ordinary EL0 read/pread, cross-cluster and EOF cases; each request uses fresh bounded UFS READ(10)",
+  "ufs_node_faults": {
+    "global_before": 0,
+    "bank_before": 1024,
+    "global_after": 0,
+    "bank_after": 1024
+  },
+  "event_handoff_functionally_verified": true,
+  "underlying_spin_or_timer_branch_identified": false,
+  "ci_passed": true,
+  "macos_kernel_ci_passed": true,
+  "remote_linux_ci_passed": true,
+  "acceptance_environment": "Exact-source GitHub Actions host/EFI/macOS kernel/signature gate/native QEMU: 16 runtime reports and 86 host checks passed; local and remote actual queued model each claimed 9 requests and read 10 model blocks; host actual frontend/worker included 100 real-thread event handoffs; packaged QEMU model ticks 5->8; staged FAT layout model passed",
+  "package_origin": "exact-source GitHub Actions ufs-node-stage-results artifact",
+  "efi_provenance": {
+    "source_commit": "abc75cfb6a7f3a209af4865f575a9b70387c916e",
+    "ci_run_id": 43141529622,
+    "files": {
+      "EFI/BOOT/BOOTAA64.EFI": "aad20205a434770b515722dea25343e08e9ad1b39a9bac4c663226c14b639cf6",
+      "EFI/UniXNU/Payloads/DarwinBoot.efi": "8dbcbd3e535c8013b82b1cf25b43ba2e3a3e221b718dc0a9698e9b9742a45a72"
+    }
+  },
+  "ufs_node_verified": true,
+  "ufs_node_mode": "hardware",
+  "ufs_node_sha256": "8a5c0e98bd7aa2962f7c97b3efbf8c7db29a050766d2e062bdab1cd454af72b8",
+  "ufs_node_commands": [
+    {
+      "lba": 404335,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1942892168
+    },
+    {
+      "lba": 404336,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 619686921
+    },
+    {
+      "lba": 404337,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 3828099093
+    },
+    {
+      "lba": 404335,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1942892168
+    },
+    {
+      "lba": 404335,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1942892168
+    },
+    {
+      "lba": 404336,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 619686921
+    },
+    {
+      "lba": 404337,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 3828099093
+    },
+    {
+      "lba": 404335,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1942892168
+    },
+    {
+      "lba": 404335,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1942892168
+    },
+    {
+      "lba": 404335,
+      "bytes": 4096,
+      "polls": 2,
+      "crc32": 1942892168
+    }
+  ],
+  "ufs_node_requests": 9,
+  "ufs_node_syscall_reads": 12,
+  "ufs_node_bytes": 20502,
+  "ufs_node_fresh_reads_verified": true,
+  "ufs_node_readonly_verified": true,
+  "ufs_esp_file_sha256": "6f8f27897d728e935435ada86bf393b8751de163396edcd4c9bf24df56d9da6f",
+  "ufs_esp_geometry": {
+    "sector_bytes": 512,
+    "spc": 2,
+    "reserved": 32,
+    "fat_sectors": 1016,
+    "data_sector": 2064,
+    "root": 2,
+    "clusters": 130040
+  },
+  "ufs_esp_chain": [
+    43446,
+    43447,
+    43448,
+    43449,
+    43450,
+    43451,
+    43452,
+    43453,
+    43454
+  ],
+  "ufs_native_media_read_verified": true,
+  "ufs_filesystem_mount_verified": false,
+  "media_write_verified": false
+}

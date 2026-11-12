@@ -4,14 +4,14 @@
 
 ## 当前基线与证据
 
-- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令与运行时日志取回，以及 UFS 控制器/队列/SMMU 只读盘点、自有队列 NOP、DEVICE/UNIT 0 描述符查询，以及独立 PRDT 数据页上的 SCSI INQUIRY/READ CAPACITY、LUN 0 前六个 4 KiB 扇区原生读取与主 GPT 校验、ESP 中已知 FAT32 文件读取；另已验证默认 edk2 启动和固件辅助的 USB 文件更新。
+- 已到达：单核 XNU、具名 RAM 根目录、有容量上限的 `/tmp` 动态普通文件、1,000 次进程创建/执行/回收自检（含每批 8 个子进程），以及原生轮询 USB CDC 诊断命令与运行时日志取回，以及 UFS 控制器/队列/SMMU 只读盘点、自有队列 NOP、DEVICE/UNIT 0 描述符查询，以及独立 PRDT 数据页上的 SCSI INQUIRY/READ CAPACITY、LUN 0 前六个 4 KiB 扇区原生读取与主 GPT 校验、ESP 中已知 FAT32 文件读取，以及通过只读 devfs 节点的实际 EL0 文件访问；另已验证默认 edk2 启动和固件辅助的 USB 文件更新。
 - 配置：6 GB 机型配置；当前仅启用 1 CPU，内核限制在受控的 1 GiB 内存窗口。完整 RAM 和 SMP 未验证。
 - 十轮启动和重连已验证的 USB 源码基线：`7e3fa6ff5fe21e5ede1d0e7d44ab3536eb846f4b`。此前 USB 基线 `638a344d865375c209f13f6109484eee7fd7d5fe`、压力测试基线 `c4081260dd52a6ccdbd3b4f99128b1f4e9c4025e` 及其他成功镜像均保留。
 - 保留的 UFS NOP 源码 `1d38b03539ec26b146ceda717c6cf831ab572cec` 已通过 [完整 CI 与模拟器运行](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43004883497)、57 项主机 unittest、定时器/加载窗口检查和一轮真机启动。首轮 c5dbce2、只读盘点 9f1401c 和前置检查误拦 5670f6c 的镜像/记录均保留。QEMU 不模拟 SDM845 USB/UFS；相应外设取证来自真机。
 - 真机证据：用户先确认 USB_RUN 和 Windows CDC 枚举，随后主机通过原生 USB 完成 ping、随机 nonce 往返、精确构建身份核对，并取回包含 TMP_CHILD_OK、TMP_OK、CHILD_OK、PROC_OK、STRESS_OK/CLEAN 和变化心跳的运行日志。主机保存了原始 USB 响应及部分外设寄存器诊断；内部进程/task/内存页计数仍仅在 QEMU 取证。
 - 保留的 USB 工作区基线：`/root/projects/xnu-polaris/artifacts/usb-reset-ready/`，ESP SHA256：`0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47`。USB 证据在 `artifacts/usb-native-check-7e3fa6f/`、`artifacts/usb-reconnect-7e3fa6f-10/`、`artifacts/usb-control-stall-7e3fa6f/`、`artifacts/usb-continuous-7e3fa6f/`。整机启动计数单独保存在 `artifacts/usb-boot-series-7e3fa6f/index.json`。
 - 保留的 NOP 镜像在 `artifacts/ufs-nop-format-ready/`，ESP SHA256 `495a3a4b2b9cbf162654c44750952089114fbd45076075eb1e52119e2d219493`；[NOP 证据](ufs-nop-result.json)、[队列/SMMU 证据](ufs-queue-smmu-snapshot.json)和[后续计划](ufs-readonly-plan.md)已保存。
-- 当前运行内核源码为 `27919074b4705074b3d89f1ad4669717e5483cf0`，已通过 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43126540937)、82 项主机测试和 15 项运行验收报告；最终打包 QEMU 画面自检通过，心跳 3→6。用户普通重启后，原生 USB 精确身份及两个独立采样通过；六扇区/GPT、固定路径 FAT32 文件、基线自检和持续心跳均通过。8193 字节文件的 9 簇链、30 个块 CRC32、完整内容和 SHA256 与实际更新镜像/mtools 一致，见 [FAT 文件证据](ufs-fat-result.json)。保留此前 [六扇区证据](ufs-read-result.json) 和 [SCSI 元数据证据](ufs-scsi-result.json)；默认 edk2 与 USB 文件更新方式见 [说明](uefi-usb-update.md)。
+- 当前运行内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`，已通过 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43141529622)、86 项主机检查和 16 份运行验收，QEMU 也执行真实异步请求队列。真机一轮启动通过 `/dev/polaris-esp-file` 的 8193 字节顺序读、跨界/偏移、EOF、重复读、写入拒绝和重开；9 次请求完成，10 条 READ(10) 的顺序与 CRC 匹配实际镜像，三次独立 USB 捕获与变化心跳通过。原有自检、USB 健康、SMMU 故障位和零日志丢失通过，见 [文件设备证据](ufs-node-result.json)。此前 [FAT 文件](ufs-fat-result.json)、[六扇区](ufs-read-result.json) 与 [SCSI 元数据](ufs-scsi-result.json) 基线保留。默认 edk2 与 USB 更新见 [说明](uefi-usb-update.md)。
 - 当前根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。尚无 Apple 用户态、交互输入、通用 UFS 块设备/文件系统或完整可写文件系统；当前原生介质读取限定 GPT 六扇区和已核对的 128 MiB ESP 窗口，文件查找限定一个固定路径。
 - 目标 Apple 镜像先固定为 arm64 iPadOS 17.7.11（21H461，iPad7,1）；自制程序通过不等于该系统已兼容。
 
@@ -21,7 +21,7 @@
 
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
-| A1 | 固定源码、工具链与配置，保存哈希并可重复构建 | 当前源码完整 CI、82 项主机测试及 15 项运行验收报告通过；此前源码的 CI 故障单独保留 |
+| A1 | 固定源码、工具链与配置，保存哈希并可重复构建 | 当前源码完整 CI、86 项主机检查及 16 项运行验收报告通过；此前源码的 CI 故障单独保留 |
 | A2 | 固件、UniXNU、DarwinBoot 到 XNU 交接 | 临时 fastboot 路径与新默认 edk2 普通重启路径均真机通过 |
 | A3 | ADT、加载地址、内存窗口与越界拒绝 | 正常路径真机通过；异常输入主机/模拟通过 |
 | A4 | 内核初始化、当前配置 corecrypto POST、BSD/IOKit 初始化 | 真机通过 |
@@ -63,7 +63,7 @@
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
 | D1 | 具名目录及父子关系 | 真机通过：5 目录、5 文件 |
-| D2 | open/read/write/close、重开、pread/pwrite | 固定 4 KiB 文件真机通过 |
+| D2 | open/read/write/close、重开、pread/pwrite | 固定 4 KiB RAM 文件和固定只读 UFS 文件视图真机通过 |
 | D3 | EOF、边界与越界写入错误 | 真机通过 |
 | D4 | 精确路径、相对路径、chdir 和 ENOENT | 真机通过 |
 | D5 | 负偏移、超大长度、分配与用户拷贝失败 | 内核例程主机通过；完整真机故障注入待做 |
@@ -89,7 +89,7 @@
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
 | F1 | DMA、缓存一致性、SMMU/IOMMU、设备中断 | USB 收发、UFS NOP/QUERY 和单项 PRDT 的 INQUIRY/容量元数据、六个 4 KiB 扇区和已知 FAT32 文件的 DMA、缓存维护真机通过，复用原有旁路；隔离、长期独占和原生设备中断待验证 |
-| F2 | XNU 原生 UFS 识别、读写和持久化 | 部分：UFSHCI 2.1 识别、候选 SMMU 盘点、自有队列交接、单次 NOP、DEVICE/UNIT 0 描述符查询、单项 PRDT INQUIRY/READ CAPACITY、固定 LUN 0/LBA 0～5 原生读取、主 GPT 校验及固定 ESP 路径的 FAT32 文件读取（含 >4 GiB 数据页 DMA）真机通过；通用块设备/VFS 挂载、任意文件访问、介质写入和持久化未验证；固件读 ESP 不计入 |
+| F2 | XNU 原生 UFS 识别、读写和持久化 | 部分：UFSHCI 2.1 识别、候选 SMMU 盘点、自有队列交接、单次 NOP、DEVICE/UNIT 0 描述符查询、单项 PRDT INQUIRY/READ CAPACITY、固定 LUN 0/LBA 0～5 原生读取、主 GPT 校验、固定 ESP 路径 FAT32 文件读取及 devfs 只读文件系统调用/事件交接（含 >4 GiB 数据页 DMA）真机通过；通用块设备/VFS 挂载、任意文件访问、介质写入和持久化未验证；固件读 ESP 不计入 |
 | F3 | XNU USB 枚举、收发和电脑控制台 | 轮询 CDC 枚举、诊断/日志、十次 USB/IP 重连及控制请求 STALL 恢复真机通过；物理插拔、POSIX 终端、吞吐和挂起恢复待验证 |
 | F4 | 原生显示控制器、面板初始化与刷新 | 未接入；当前继承固件 framebuffer |
 | F5 | Adreno 命令提交、显存管理与图形合成 | 未接入 |
@@ -238,9 +238,9 @@ D6/D7 基本可写 RAM 文件系统 → C5/H2 进程回收压力 → E5 日志�
 
 <!-- polaris-boot-series:end -->
 
-F2 已完成控制器/队列/SMMU 盘点和自有队列单次 NOP：在 `0x1023bc000` 的 16 KiB 新分配中验证描述符、请求及 NOP IN 响应 DMA，OCS=0、tag 匹配、保护区完整，最终 UTRL run-stop=0、doorbell=0。候选 bank 2 配置未改；首轮误把 FSR FORMAT 当故障的问题已按 `0xc00001fe` 掩码修正并保存记录。原有自检与变化心跳通过，USB 错误、回复溢出和日志丢失均为零。查询源码 `9feeaca` 已进一步通过 DEVICE/UNIT 0 READ_DESCRIPTOR：UFS 2.1、4 KiB 块、59,064,188,928 字节容量线索，原有自检/持续心跳和 USB 正常；当前 `88cf31d` 已完成单项 PRDT INQUIRY 与 READ CAPACITY，容量一致，原有自检/心跳通过且 USB 错误/丢失均为零。随后 `996fb95` 已在一轮普通重启中完成六个 4 KiB 扇区读回和主 GPT 校验，逐字节匹配参考；随后 `2791907` 已完成 ESP 中固定 FAT32 文件的原生读取与独立内容核验；下一轮接只读块设备/VFS 接口。见 [UFS 计划和结果](ufs-readonly-plan.md)。
+F2 已完成控制器/队列/SMMU 盘点和自有队列单次 NOP：在 `0x1023bc000` 的 16 KiB 新分配中验证描述符、请求及 NOP IN 响应 DMA，OCS=0、tag 匹配、保护区完整，最终 UTRL run-stop=0、doorbell=0。候选 bank 2 配置未改；首轮误把 FSR FORMAT 当故障的问题已按 `0xc00001fe` 掩码修正并保存记录。原有自检与变化心跳通过，USB 错误、回复溢出和日志丢失均为零。查询源码 `9feeaca` 已进一步通过 DEVICE/UNIT 0 READ_DESCRIPTOR：UFS 2.1、4 KiB 块、59,064,188,928 字节容量线索，原有自检/持续心跳和 USB 正常；当前 `88cf31d` 已完成单项 PRDT INQUIRY 与 READ CAPACITY，容量一致，原有自检/心跳通过且 USB 错误/丢失均为零。随后 `996fb95` 已在一轮普通重启中完成六个 4 KiB 扇区读回和主 GPT 校验，逐字节匹配参考；随后 `2791907` 已完成 ESP 中固定 FAT32 文件的原生读取与独立内容核验；当前 `abc75cf` 已通过固定 devfs 文件的实际读取与事件交接。下一步为通用只读块设备/文件系统。见 [UFS 计划和结果](ufs-readonly-plan.md)。
 
-当前成功包：`artifacts/ufs-fat-ready/`；实际启动卷：`private/ufs-fat-deploy/update/updated-esp.img`，SHA256 `722a52712b8b060d681546ee169470365585245d8a6dd0815eb7b16ec032dd81`。本轮仅一次普通重启；十轮可靠性资格仍属于原 USB 基线。
+当前成功包：`artifacts/ufs-node-event-ready/`；实际启动卷：`private/ufs-node-event-deploy/update/updated-esp.img`，SHA256 `5e10f59584d2e7c01cb3f2bd50140d15636d97ad3fc630ac2e11a69a6e5545be`。本轮仅一次普通重启；十轮可靠性资格仍属于原 USB 基线。
 
 
 ### F2 首次原生扇区读取验收
@@ -266,16 +266,16 @@ SMMU 故障位无新增、配置未改，无介质写命令。未读取备 GPT�
 [公开证据](ufs-fat-result.json)。下一步为只读块设备/VFS 接口；最小 Apple 用户态
 可按既有复用计划并行推进，本轮仍未启动 Apple 用户态。
 
-### F2 进行中：固定文件的 devfs 接口
+### F2 历史候选：固定文件的 devfs 接口
 
 在已通过的 FAT32 文件读取上接 `/dev/polaris-esp-file`，本轮只验证固定文件的
 用户态系统调用与实时物理读取，不将其记为通用块设备或 FAT 挂载。检查清单和
-边界见 [第八轮候选](ufs-readonly-plan.md)。当前成功真机基线仍为 `2791907`，
+边界见 [第八轮候选](ufs-readonly-plan.md)。当时成功真机基线仍为 `2791907`，
 本轮候选 `8959e7f` 已通过完整 CI（16 份运行报告）、最终打包 QEMU 模型和文件更新全卷回读；已按用户要求停止，未重启。下一项是用户手动普通重启后的独立原生 USB 验收，尚不计入硬件通过。
 
 F2 devfs 本轮真机报告 `IO_FAILED stage=81 errno=060`（顺序读后端超时），**未通过**。
 原失败处理触发 panic，USB 工作线程随之停止，无法从 CDC 补取日志。诊断版
-`2dd96b8` 将保留运行并输出队列/工作线程进度；当前最后成功硬件基线仍为
+`2dd96b8` 将保留运行并输出队列/工作线程进度；当时最后成功硬件基线仍为
 `2791907` 的固定 FAT32 文件读取。详见 [失败记录和诊断计划](ufs-readonly-plan.md)。
 
 
@@ -290,3 +290,13 @@ QEMU 模型，已更新并完成全启动卷回读/缓存同步；按用户要�
 也改测真实异步队列；完整 CI 的 86 项主机检查、16 份运行报告通过，实际队列认领
 9 次、模拟块读 10 次。已更新并全卷回读/同步，标题 `polaris: UFS NODE WAKEUP`，
 按用户要求停止、未重启。下一项是该候选的原生文件设备验收。
+
+
+### F2 固定 UFS 文件的 devfs 访问通过（2026-11-12）
+
+`abc75cf` 本轮普通启动通过。9 个请求均完成、无超时/取消，10 条原生 READ(10)
+顺序及块 CRC 匹配实际 ESP。`open/read/pread/close`、跨边界、EOF、负偏移、重复读、
+写入拒绝与重开检查通过；累计返回 20502 字节。三次 USB 捕获中完成轨迹一致、
+心跳继续变化，原有 IO/PROC/TMP/1,000 次进程自检通过，USB 错误、溢出和日志丢失
+为 0。SMMU 未改、无新增故障位，无介质写入。[证据](ufs-node-result.json)。
+固定只读字符设备视图已通过；通用块设备、文件系统挂载和 Apple 用户态仍待推进。

@@ -17,7 +17,7 @@ or photograph. The C entry aligns the raw process stack before its first stack
 access, fixing the real-phone SIGBUS that the QEMU run did not expose.
 
 The framebuffer is inherited from firmware. There is no Apple userland,
-POSIX terminal input, persistent XNU storage, native touch/display/GPU driver or
+POSIX terminal input, writable persistent XNU storage, native touch/display/GPU driver or
 daily-usable system. The named-root and second-process stage is also verified by the user-reported
 phone screen: `POLARIS_CHILD_OK pid=2 ppid=1`,
 `POLARIS_PROC_OK child=2 exit=42 reaped=1 cow=OK`, and a changing
@@ -141,6 +141,18 @@ one fixed path on one boot; a VFS mount, general block device, arbitrary files
 and media writes remain unqualified. Complete CI, 82 host tests, 15 runtime
 reports and the final packaged QEMU screen check passed.
 
+**Native userspace reads of the fixed UFS file now pass on `abc75cf`.**
+`/dev/polaris-esp-file` exposes the verified 8193-byte file through normal
+`open/read/pread/close`. Nine requests complete through the event-driven worker,
+with ten fresh READ(10) commands matching the actual image's block order and
+CRCs. Cross-boundary reads, EOF, negative offsets, repeated reads, write refusal
+and reopen checks pass; the original self-checks and heartbeat continue with
+zero USB errors or log loss. [Evidence](research/ufs-node-result.json) covers
+one boot and a fixed read-only character-device view. The RAM root remains;
+general block access, a filesystem mount and Apple userspace remain unqualified.
+Complete CI includes 86 host checks and 16 runtime reports; QEMU now exercises
+the actual asynchronous queue as well.
+
 Apple-input reuse is also being checked against the exact iPad7,1 / 17.7.11
 cache. [Input and static prelink results](research/apple-userland-reuse.md)
 confirm the pinned cache and absolute-pointer plan; component ABI, loading and
@@ -235,8 +247,9 @@ The ten-boot and USB reconnect checks have passed on the captured baseline.
 [Read-only UFS controller identification](research/ufs-readonly-plan.md) now passes
 on one phone boot. Read-only inventory and one owned-queue NOP DMA also pass.
 DEVICE/UNIT-0 descriptors and single-entry PRDT INQUIRY/READ CAPACITY also pass.
-Fixed LBA 0..5 native readback and primary GPT checks now pass. Fixed FAT32 ESP-file readback also passes. Next is a read-only block/VFS
-interface. Apple userland,
+Fixed LBA 0..5 native readback, primary GPT checks and fixed FAT32 ESP-file reads pass.
+The fixed devfs file view also passes native userspace read tests. Next is a
+general read-only block/filesystem interface. Apple userland,
 prelinked components and native display/touch remain later stages. The full
 history of both chains is in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -268,6 +281,9 @@ USB 基线支持 `ping/echo/status/log/help`，UFS 测试版另有 `ufs`、`ufs-
 `996fb95` 已通过一轮原生 UFS 扇区读取：LUN 0/LBA 0～5 共 24 KiB，逐字节匹配预启动参考，保护 MBR、主 GPT 头/表 CRC、容量与分区边界通过。原有自检、心跳和 USB 正常，未写介质。[结果](research/ufs-read-result.json)仅覆盖固定范围；完整 CI、77 项本地主机测试、15 项运行验收与最终打包画面通过。下一步为已知 ESP 文件读回及只读块设备/文件系统。
 
 `2791907` 已通过固定 FAT32 文件的原生读取：`EFI/UniXNU/READTEST.BIN` 共 8193 字节、9 簇，30 个读取块的 CRC32、簇链及完整内容/SHA256 与实际更新镜像和独立 mtools 结果一致。原有自检、心跳和 USB 正常，未写介质。[结果](research/ufs-fat-result.json)仅覆盖固定路径的有限解析器；下一步接只读块设备/VFS。完整 CI、82 项主机测试、15 项运行报告和最终打包画面通过。
+
+
+`abc75cf` 已通过固定 UFS 文件的 devfs 访问：9 个请求完成，实际 10 条 READ(10) 的顺序和块 CRC 与实际 ESP 一致；顺序/偏移读、跨边界、EOF、重复读、写入拒绝和重开检查通过，累计返回 20502 字节。原有自检和持续心跳通过，USB 错误、溢出和日志丢失为 0。[结果](research/ufs-node-result.json)仅覆盖固定只读字符设备视图，仍使用 RAM 根。事件唤醒修正解决了本轮首个请求未认领的失败；具体旧自旋/定时器条件未单独测定。
 
 Apple 用户态、用户态终端输入、通用 UFS 文件系统挂载、介质写入、触摸和 GPU 尚未接入。
 
