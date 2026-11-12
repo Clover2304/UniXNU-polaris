@@ -1,0 +1,1579 @@
+{
+  "candidate_sha256": "d35d168cb631e2c37700018d11fe7b30c2035af17e5e268472c051b6b78b74ee",
+  "source_kernel_sha256": "62871f670a5b75695cd8b3b45a05019c208bbed60d3de961f964db3b10598ec8",
+  "source_commit": "64cf3e7be7d5f3c2f585b6dffc6c4951aed33741",
+  "original_sha256": "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7",
+  "reference_layout_sha256": "e0d7af94ccdcb7bff00748eaf5526a698e453fec5f63d49f30bc47953b339be2",
+  "compiled_metaclass_offsets": {
+    "superClassLink": 16,
+    "className": 24,
+    "classSize": 32
+  },
+  "method_slots": 190,
+  "kernel_bindings": 176,
+  "pure_virtual_slots": 14,
+  "vtable": 18446744005087282368,
+  "original_metaclass": 18446744005102129616,
+  "source_ioservice_metaclass": 18446744005119134872,
+  "original_protected_constructor": 18446744005067074968,
+  "original_base_destructor": 18446744005067075000,
+  "abstract_complete_destructors_trap": true,
+  "original_executable_code_unchanged": true,
+  "methods": [
+    {
+      "slot": 0,
+      "reference_name": "__ZN20IOBlockStorageDeviceD1Ev",
+      "candidate_target": 18446744005067075004,
+      "kernel_names": []
+    },
+    {
+      "slot": 1,
+      "reference_name": "__ZN20IOBlockStorageDeviceD0Ev",
+      "candidate_target": 18446744005067075008,
+      "kernel_names": []
+    },
+    {
+      "slot": 2,
+      "reference_name": "__ZNK8OSObject7releaseEi",
+      "candidate_target": 18446744005116090920,
+      "kernel_names": [
+        "__ZNK8OSObject7releaseEi"
+      ]
+    },
+    {
+      "slot": 3,
+      "reference_name": "__ZNK8OSObject14getRetainCountEv",
+      "candidate_target": 18446744005116090380,
+      "kernel_names": [
+        "__ZNK8OSObject14getRetainCountEv"
+      ]
+    },
+    {
+      "slot": 4,
+      "reference_name": "__ZNK8OSObject6retainEv",
+      "candidate_target": 18446744005116090880,
+      "kernel_names": [
+        "__ZNK8OSObject6retainEv"
+      ]
+    },
+    {
+      "slot": 5,
+      "reference_name": "__ZNK8OSObject7releaseEv",
+      "candidate_target": 18446744005116090864,
+      "kernel_names": [
+        "__ZNK8OSObject7releaseEv"
+      ]
+    },
+    {
+      "slot": 6,
+      "reference_name": "__ZNK8OSObject9serializeEP11OSSerialize",
+      "candidate_target": 18446744005116090940,
+      "kernel_names": [
+        "__ZNK8OSObject9serializeEP11OSSerialize"
+      ]
+    },
+    {
+      "slot": 7,
+      "reference_name": "__ZNK20IOBlockStorageDevice12getMetaClassEv",
+      "candidate_target": 18446744005067075012,
+      "kernel_names": []
+    },
+    {
+      "slot": 8,
+      "reference_name": "__ZNK15OSMetaClassBase9isEqualToEPKS_",
+      "candidate_target": 18446744005116082656,
+      "kernel_names": [
+        "__ZNK15OSMetaClassBase9isEqualToEPKS_"
+      ]
+    },
+    {
+      "slot": 9,
+      "reference_name": "__ZNK8OSObject12taggedRetainEPKv",
+      "candidate_target": 18446744005116090500,
+      "kernel_names": [
+        "__ZNK8OSObject12taggedRetainEPKv"
+      ]
+    },
+    {
+      "slot": 10,
+      "reference_name": "__ZNK8OSObject13taggedReleaseEPKv",
+      "candidate_target": 18446744005116090604,
+      "kernel_names": [
+        "__ZNK8OSObject13taggedReleaseEPKv"
+      ]
+    },
+    {
+      "slot": 11,
+      "reference_name": "__ZNK8OSObject13taggedReleaseEPKvi",
+      "candidate_target": 18446744005116090620,
+      "kernel_names": [
+        "__ZNK8OSObject13taggedReleaseEPKvi"
+      ]
+    },
+    {
+      "slot": 12,
+      "reference_name": "__ZN9IOService8DispatchE5IORPC",
+      "candidate_target": 18446744005116379444,
+      "kernel_names": [
+        "__ZN9IOService8DispatchE5IORPC"
+      ]
+    },
+    {
+      "slot": 13,
+      "reference_name": "__ZN8OSObject4initEv",
+      "candidate_target": 18446744005116091544,
+      "kernel_names": [
+        "__ZN8OSObject4initEv"
+      ]
+    },
+    {
+      "slot": 14,
+      "reference_name": "__ZN9IOService4freeEv",
+      "candidate_target": 18446744005116508264,
+      "kernel_names": [
+        "__ZN9IOService4freeEv"
+      ]
+    },
+    {
+      "slot": 15,
+      "reference_name": "__ZNK15IORegistryEntry12copyPropertyEPKcPK15IORegistryPlanej",
+      "candidate_target": 18446744005116482516,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry12copyPropertyEPKcPK15IORegistryPlanej"
+      ]
+    },
+    {
+      "slot": 16,
+      "reference_name": "__ZNK15IORegistryEntry12copyPropertyEPK8OSStringPK15IORegistryPlanej",
+      "candidate_target": 18446744005116482240,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry12copyPropertyEPK8OSStringPK15IORegistryPlanej"
+      ]
+    },
+    {
+      "slot": 17,
+      "reference_name": "__ZNK15IORegistryEntry12copyPropertyEPK8OSSymbolPK15IORegistryPlanej",
+      "candidate_target": 18446744005116481964,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry12copyPropertyEPK8OSSymbolPK15IORegistryPlanej"
+      ]
+    },
+    {
+      "slot": 18,
+      "reference_name": "__ZNK15IORegistryEntry15copyParentEntryEPK15IORegistryPlane",
+      "candidate_target": 18446744005116491676,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry15copyParentEntryEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 19,
+      "reference_name": "__ZNK15IORegistryEntry14copyChildEntryEPK15IORegistryPlane",
+      "candidate_target": 18446744005116492148,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry14copyChildEntryEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 20,
+      "reference_name": "__ZN15IORegistryEntry17runPropertyActionEPFiP8OSObjectPvS2_S2_S2_ES1_S2_S2_S2_S2_",
+      "candidate_target": 18446744005116484188,
+      "kernel_names": [
+        "__ZN15IORegistryEntry17runPropertyActionEPFiP8OSObjectPvS2_S2_S2_ES1_S2_S2_S2_S2_"
+      ]
+    },
+    {
+      "slot": 21,
+      "reference_name": "__ZN20IOBlockStorageDevice4initEP12OSDictionary",
+      "candidate_target": 18446744005067075120,
+      "kernel_names": []
+    },
+    {
+      "slot": 22,
+      "reference_name": "__ZN15IORegistryEntry16setPropertyTableEP12OSDictionary",
+      "candidate_target": 18446744005116480200,
+      "kernel_names": [
+        "__ZN15IORegistryEntry16setPropertyTableEP12OSDictionary"
+      ]
+    },
+    {
+      "slot": 23,
+      "reference_name": "__ZN15IORegistryEntry11setPropertyEPK8OSSymbolP8OSObject",
+      "candidate_target": 18446744005116483980,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setPropertyEPK8OSSymbolP8OSObject"
+      ]
+    },
+    {
+      "slot": 24,
+      "reference_name": "__ZN15IORegistryEntry11setPropertyEPK8OSStringP8OSObject",
+      "candidate_target": 18446744005116484684,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setPropertyEPK8OSStringP8OSObject"
+      ]
+    },
+    {
+      "slot": 25,
+      "reference_name": "__ZN15IORegistryEntry11setPropertyEPKcP8OSObject",
+      "candidate_target": 18446744005116484784,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setPropertyEPKcP8OSObject"
+      ]
+    },
+    {
+      "slot": 26,
+      "reference_name": "__ZN15IORegistryEntry11setPropertyEPKcS1_",
+      "candidate_target": 18446744005116484884,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setPropertyEPKcS1_"
+      ]
+    },
+    {
+      "slot": 27,
+      "reference_name": "__ZN15IORegistryEntry11setPropertyEPKcb",
+      "candidate_target": 18446744005116485016,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setPropertyEPKcb"
+      ]
+    },
+    {
+      "slot": 28,
+      "reference_name": "__ZN15IORegistryEntry11setPropertyEPKcyj",
+      "candidate_target": 18446744005116485144,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setPropertyEPKcyj"
+      ]
+    },
+    {
+      "slot": 29,
+      "reference_name": "__ZN15IORegistryEntry11setPropertyEPKcPvj",
+      "candidate_target": 18446744005116485280,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setPropertyEPKcPvj"
+      ]
+    },
+    {
+      "slot": 30,
+      "reference_name": "__ZN15IORegistryEntry14removePropertyEPK8OSSymbol",
+      "candidate_target": 18446744005116483908,
+      "kernel_names": [
+        "__ZN15IORegistryEntry14removePropertyEPK8OSSymbol"
+      ]
+    },
+    {
+      "slot": 31,
+      "reference_name": "__ZN15IORegistryEntry14removePropertyEPK8OSString",
+      "candidate_target": 18446744005116484540,
+      "kernel_names": [
+        "__ZN15IORegistryEntry14removePropertyEPK8OSString"
+      ]
+    },
+    {
+      "slot": 32,
+      "reference_name": "__ZN15IORegistryEntry14removePropertyEPKc",
+      "candidate_target": 18446744005116484612,
+      "kernel_names": [
+        "__ZN15IORegistryEntry14removePropertyEPKc"
+      ]
+    },
+    {
+      "slot": 33,
+      "reference_name": "__ZNK20IOBlockStorageDevice11getPropertyEPK8OSSymbol",
+      "candidate_target": 18446744005067075208,
+      "kernel_names": []
+    },
+    {
+      "slot": 34,
+      "reference_name": "__ZNK15IORegistryEntry11getPropertyEPK8OSString",
+      "candidate_target": 18446744005116484372,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry11getPropertyEPK8OSString"
+      ]
+    },
+    {
+      "slot": 35,
+      "reference_name": "__ZNK15IORegistryEntry11getPropertyEPKc",
+      "candidate_target": 18446744005116484456,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry11getPropertyEPKc"
+      ]
+    },
+    {
+      "slot": 36,
+      "reference_name": "__ZNK15IORegistryEntry11getPropertyEPK8OSSymbolPK15IORegistryPlanej",
+      "candidate_target": 18446744005116480924,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry11getPropertyEPK8OSSymbolPK15IORegistryPlanej"
+      ]
+    },
+    {
+      "slot": 37,
+      "reference_name": "__ZNK15IORegistryEntry11getPropertyEPK8OSStringPK15IORegistryPlanej",
+      "candidate_target": 18446744005116481412,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry11getPropertyEPK8OSStringPK15IORegistryPlanej"
+      ]
+    },
+    {
+      "slot": 38,
+      "reference_name": "__ZNK15IORegistryEntry11getPropertyEPKcPK15IORegistryPlanej",
+      "candidate_target": 18446744005116481688,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry11getPropertyEPKcPK15IORegistryPlanej"
+      ]
+    },
+    {
+      "slot": 39,
+      "reference_name": "__ZNK15IORegistryEntry12copyPropertyEPK8OSSymbol",
+      "candidate_target": 18446744005116480612,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry12copyPropertyEPK8OSSymbol"
+      ]
+    },
+    {
+      "slot": 40,
+      "reference_name": "__ZNK15IORegistryEntry12copyPropertyEPK8OSString",
+      "candidate_target": 18446744005116480716,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry12copyPropertyEPK8OSString"
+      ]
+    },
+    {
+      "slot": 41,
+      "reference_name": "__ZNK15IORegistryEntry12copyPropertyEPKc",
+      "candidate_target": 18446744005116480820,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry12copyPropertyEPKc"
+      ]
+    },
+    {
+      "slot": 42,
+      "reference_name": "__ZNK15IORegistryEntry24dictionaryWithPropertiesEv",
+      "candidate_target": 18446744005116480508,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry24dictionaryWithPropertiesEv"
+      ]
+    },
+    {
+      "slot": 43,
+      "reference_name": "__ZNK9IOService19serializePropertiesEP11OSSerialize",
+      "candidate_target": 18446744005116551636,
+      "kernel_names": [
+        "__ZNK9IOService19serializePropertiesEP11OSSerialize"
+      ]
+    },
+    {
+      "slot": 44,
+      "reference_name": "__ZN20IOBlockStorageDevice13setPropertiesEP8OSObject",
+      "candidate_target": 18446744005067075384,
+      "kernel_names": []
+    },
+    {
+      "slot": 45,
+      "reference_name": "__ZNK15IORegistryEntry17getParentIteratorEPK15IORegistryPlane",
+      "candidate_target": 18446744005116491504,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry17getParentIteratorEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 46,
+      "reference_name": "__ZNK15IORegistryEntry14applyToParentsEPFvPS_PvES1_PK15IORegistryPlane",
+      "candidate_target": 18446744005116492552,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry14applyToParentsEPFvPS_PvES1_PK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 47,
+      "reference_name": "__ZNK15IORegistryEntry14getParentEntryEPK15IORegistryPlane",
+      "candidate_target": 18446744005116491804,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry14getParentEntryEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 48,
+      "reference_name": "__ZNK15IORegistryEntry16getChildIteratorEPK15IORegistryPlane",
+      "candidate_target": 18446744005116491864,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry16getChildIteratorEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 49,
+      "reference_name": "__ZNK15IORegistryEntry15applyToChildrenEPFvPS_PvES1_PK15IORegistryPlane",
+      "candidate_target": 18446744005116492336,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry15applyToChildrenEPFvPS_PvES1_PK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 50,
+      "reference_name": "__ZNK15IORegistryEntry13getChildEntryEPK15IORegistryPlane",
+      "candidate_target": 18446744005116492276,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry13getChildEntryEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 51,
+      "reference_name": "__ZNK15IORegistryEntry7isChildEPS_PK15IORegistryPlaneb",
+      "candidate_target": 18446744005116492768,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry7isChildEPS_PK15IORegistryPlaneb"
+      ]
+    },
+    {
+      "slot": 52,
+      "reference_name": "__ZNK15IORegistryEntry8isParentEPS_PK15IORegistryPlaneb",
+      "candidate_target": 18446744005116493136,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry8isParentEPS_PK15IORegistryPlaneb"
+      ]
+    },
+    {
+      "slot": 53,
+      "reference_name": "__ZNK15IORegistryEntry7inPlaneEPK15IORegistryPlane",
+      "candidate_target": 18446744005116493504,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry7inPlaneEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 54,
+      "reference_name": "__ZNK15IORegistryEntry8getDepthEPK15IORegistryPlane",
+      "candidate_target": 18446744005116496008,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry8getDepthEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 55,
+      "reference_name": "__ZN15IORegistryEntry14attachToParentEPS_PK15IORegistryPlane",
+      "candidate_target": 18446744005116493792,
+      "kernel_names": [
+        "__ZN15IORegistryEntry14attachToParentEPS_PK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 56,
+      "reference_name": "__ZN15IORegistryEntry16detachFromParentEPS_PK15IORegistryPlane",
+      "candidate_target": 18446744005116494824,
+      "kernel_names": [
+        "__ZN15IORegistryEntry16detachFromParentEPS_PK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 57,
+      "reference_name": "__ZN15IORegistryEntry13attachToChildEPS_PK15IORegistryPlane",
+      "candidate_target": 18446744005116494480,
+      "kernel_names": [
+        "__ZN15IORegistryEntry13attachToChildEPS_PK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 58,
+      "reference_name": "__ZN15IORegistryEntry15detachFromChildEPS_PK15IORegistryPlane",
+      "candidate_target": 18446744005116495160,
+      "kernel_names": [
+        "__ZN15IORegistryEntry15detachFromChildEPS_PK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 59,
+      "reference_name": "__ZN15IORegistryEntry11detachAboveEPK15IORegistryPlane",
+      "candidate_target": 18446744005116495496,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11detachAboveEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 60,
+      "reference_name": "__ZN15IORegistryEntry9detachAllEPK15IORegistryPlane",
+      "candidate_target": 18446744005116495656,
+      "kernel_names": [
+        "__ZN15IORegistryEntry9detachAllEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 61,
+      "reference_name": "__ZNK15IORegistryEntry7getNameEPK15IORegistryPlane",
+      "candidate_target": 18446744005116485684,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry7getNameEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 62,
+      "reference_name": "__ZNK15IORegistryEntry8copyNameEPK15IORegistryPlane",
+      "candidate_target": 18446744005116485868,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry8copyNameEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 63,
+      "reference_name": "__ZNK15IORegistryEntry12compareNamesEP8OSObjectPP8OSString",
+      "candidate_target": 18446744005116487188,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry12compareNamesEP8OSObjectPP8OSString"
+      ]
+    },
+    {
+      "slot": 64,
+      "reference_name": "__ZNK15IORegistryEntry11compareNameEP8OSStringPS1_",
+      "candidate_target": 18446744005116487048,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry11compareNameEP8OSStringPS1_"
+      ]
+    },
+    {
+      "slot": 65,
+      "reference_name": "__ZN15IORegistryEntry7setNameEPK8OSSymbolPK15IORegistryPlane",
+      "candidate_target": 18446744005116486268,
+      "kernel_names": [
+        "__ZN15IORegistryEntry7setNameEPK8OSSymbolPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 66,
+      "reference_name": "__ZN15IORegistryEntry7setNameEPKcPK15IORegistryPlane",
+      "candidate_target": 18446744005116486560,
+      "kernel_names": [
+        "__ZN15IORegistryEntry7setNameEPKcPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 67,
+      "reference_name": "__ZNK15IORegistryEntry11getLocationEPK15IORegistryPlane",
+      "candidate_target": 18446744005116486188,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry11getLocationEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 68,
+      "reference_name": "__ZNK15IORegistryEntry12copyLocationEPK15IORegistryPlane",
+      "candidate_target": 18446744005116486044,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry12copyLocationEPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 69,
+      "reference_name": "__ZN15IORegistryEntry11setLocationEPK8OSSymbolPK15IORegistryPlane",
+      "candidate_target": 18446744005116486776,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setLocationEPK8OSSymbolPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 70,
+      "reference_name": "__ZN15IORegistryEntry11setLocationEPKcPK15IORegistryPlane",
+      "candidate_target": 18446744005116486940,
+      "kernel_names": [
+        "__ZN15IORegistryEntry11setLocationEPKcPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 71,
+      "reference_name": "__ZNK15IORegistryEntry7getPathEPcPiPK15IORegistryPlane",
+      "candidate_target": 18446744005116487632,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry7getPathEPcPiPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 72,
+      "reference_name": "__ZNK15IORegistryEntry16getPathComponentEPcPiPK15IORegistryPlane",
+      "candidate_target": 18446744005116489452,
+      "kernel_names": [
+        "__ZNK15IORegistryEntry16getPathComponentEPcPiPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 73,
+      "reference_name": "__ZN15IORegistryEntry13childFromPathEPKcPK15IORegistryPlanePcPi",
+      "candidate_target": 18446744005116491476,
+      "kernel_names": [
+        "__ZN15IORegistryEntry13childFromPathEPKcPK15IORegistryPlanePcPi"
+      ]
+    },
+    {
+      "slot": 74,
+      "reference_name": "__ZN9IOService4initEP15IORegistryEntryPK15IORegistryPlane",
+      "candidate_target": 18446744005116508172,
+      "kernel_names": [
+        "__ZN9IOService4initEP15IORegistryEntryPK15IORegistryPlane"
+      ]
+    },
+    {
+      "slot": 75,
+      "reference_name": "__ZN9IOService16requestTerminateEPS_j",
+      "candidate_target": 18446744005116523908,
+      "kernel_names": [
+        "__ZN9IOService16requestTerminateEPS_j"
+      ]
+    },
+    {
+      "slot": 76,
+      "reference_name": "__ZN9IOService13willTerminateEPS_j",
+      "candidate_target": 18446744005116530940,
+      "kernel_names": [
+        "__ZN9IOService13willTerminateEPS_j"
+      ]
+    },
+    {
+      "slot": 77,
+      "reference_name": "__ZN9IOService12didTerminateEPS_jPb",
+      "candidate_target": 18446744005116530976,
+      "kernel_names": [
+        "__ZN9IOService12didTerminateEPS_jPb"
+      ]
+    },
+    {
+      "slot": 78,
+      "reference_name": "__ZN9IOService15nextIdleTimeoutEyyj",
+      "candidate_target": 18446744005116602632,
+      "kernel_names": [
+        "__ZN9IOService15nextIdleTimeoutEyyj"
+      ]
+    },
+    {
+      "slot": 79,
+      "reference_name": "__ZN9IOService18systemWillShutdownEj",
+      "candidate_target": 18446744005116635132,
+      "kernel_names": [
+        "__ZN9IOService18systemWillShutdownEj"
+      ]
+    },
+    {
+      "slot": 80,
+      "reference_name": "__ZN9IOService22copyClientWithCategoryEPK8OSSymbol",
+      "candidate_target": 18446744005116535716,
+      "kernel_names": [
+        "__ZN9IOService22copyClientWithCategoryEPK8OSSymbol"
+      ]
+    },
+    {
+      "slot": 81,
+      "reference_name": "__ZN9IOService15configureReportEP19IOReportChannelListjPvS2_",
+      "candidate_target": 18446744005116567264,
+      "kernel_names": [
+        "__ZN9IOService15configureReportEP19IOReportChannelListjPvS2_"
+      ]
+    },
+    {
+      "slot": 82,
+      "reference_name": "__ZN9IOService12updateReportEP19IOReportChannelListjPvS2_",
+      "candidate_target": 18446744005116567712,
+      "kernel_names": [
+        "__ZN9IOService12updateReportEP19IOReportChannelListjPvS2_"
+      ]
+    },
+    {
+      "slot": 83,
+      "reference_name": "__ZNK9IOService8getStateEv",
+      "candidate_target": 18446744005116557292,
+      "kernel_names": [
+        "__ZNK9IOService8getStateEv"
+      ]
+    },
+    {
+      "slot": 84,
+      "reference_name": "__ZN9IOService15registerServiceEj",
+      "candidate_target": 18446744005116512732,
+      "kernel_names": [
+        "__ZN9IOService15registerServiceEj"
+      ]
+    },
+    {
+      "slot": 85,
+      "reference_name": "__ZN9IOService5probeEPS_Pi",
+      "candidate_target": 18446744005116508024,
+      "kernel_names": [
+        "__ZN9IOService5probeEPS_Pi"
+      ]
+    },
+    {
+      "slot": 86,
+      "reference_name": "__ZN9IOService5startEPS_",
+      "candidate_target": 18446744005116508028,
+      "kernel_names": [
+        "__ZN9IOService5startEPS_"
+      ]
+    },
+    {
+      "slot": 87,
+      "reference_name": "__ZN9IOService4stopEPS_",
+      "candidate_target": 18446744005116508036,
+      "kernel_names": [
+        "__ZN9IOService4stopEPS_"
+      ]
+    },
+    {
+      "slot": 88,
+      "reference_name": "__ZN9IOService4openEPS_jPv",
+      "candidate_target": 18446744005116534512,
+      "kernel_names": [
+        "__ZN9IOService4openEPS_jPv"
+      ]
+    },
+    {
+      "slot": 89,
+      "reference_name": "__ZN9IOService5closeEPS_j",
+      "candidate_target": 18446744005116534864,
+      "kernel_names": [
+        "__ZN9IOService5closeEPS_j"
+      ]
+    },
+    {
+      "slot": 90,
+      "reference_name": "__ZNK9IOService6isOpenEPKS_",
+      "candidate_target": 18446744005116535156,
+      "kernel_names": [
+        "__ZNK9IOService6isOpenEPKS_"
+      ]
+    },
+    {
+      "slot": 91,
+      "reference_name": "__ZN9IOService10handleOpenEPS_jPv",
+      "candidate_target": 18446744005116535248,
+      "kernel_names": [
+        "__ZN9IOService10handleOpenEPS_jPv"
+      ]
+    },
+    {
+      "slot": 92,
+      "reference_name": "__ZN9IOService11handleCloseEPS_j",
+      "candidate_target": 18446744005116535360,
+      "kernel_names": [
+        "__ZN9IOService11handleCloseEPS_j"
+      ]
+    },
+    {
+      "slot": 93,
+      "reference_name": "__ZNK9IOService12handleIsOpenEPKS_",
+      "candidate_target": 18446744005116535384,
+      "kernel_names": [
+        "__ZNK9IOService12handleIsOpenEPKS_"
+      ]
+    },
+    {
+      "slot": 94,
+      "reference_name": "__ZN9IOService9terminateEj",
+      "candidate_target": 18446744005116534504,
+      "kernel_names": [
+        "__ZN9IOService9terminateEj"
+      ]
+    },
+    {
+      "slot": 95,
+      "reference_name": "__ZN9IOService8finalizeEj",
+      "candidate_target": 18446744005116533860,
+      "kernel_names": [
+        "__ZN9IOService8finalizeEj"
+      ]
+    },
+    {
+      "slot": 96,
+      "reference_name": "__ZN9IOService18lockForArbitrationEb",
+      "candidate_target": 18446744005116520248,
+      "kernel_names": [
+        "__ZN9IOService18lockForArbitrationEb"
+      ]
+    },
+    {
+      "slot": 97,
+      "reference_name": "__ZN9IOService20unlockForArbitrationEv",
+      "candidate_target": 18446744005116520912,
+      "kernel_names": [
+        "__ZN9IOService20unlockForArbitrationEv"
+      ]
+    },
+    {
+      "slot": 98,
+      "reference_name": "__ZN9IOService15terminateClientEPS_j",
+      "candidate_target": 18446744005116534404,
+      "kernel_names": [
+        "__ZN9IOService15terminateClientEPS_j"
+      ]
+    },
+    {
+      "slot": 99,
+      "reference_name": "__ZN9IOService12getBusyStateEv",
+      "candidate_target": 18446744005116549952,
+      "kernel_names": [
+        "__ZN9IOService12getBusyStateEv"
+      ]
+    },
+    {
+      "slot": 100,
+      "reference_name": "__ZN9IOService10adjustBusyEi",
+      "candidate_target": 18446744005116549764,
+      "kernel_names": [
+        "__ZN9IOService10adjustBusyEi"
+      ]
+    },
+    {
+      "slot": 101,
+      "reference_name": "__ZN9IOService18matchPropertyTableEP12OSDictionaryPi",
+      "candidate_target": 18446744005116516976,
+      "kernel_names": [
+        "__ZN9IOService18matchPropertyTableEP12OSDictionaryPi"
+      ]
+    },
+    {
+      "slot": 102,
+      "reference_name": "__ZN9IOService18matchPropertyTableEP12OSDictionary",
+      "candidate_target": 18446744005116516988,
+      "kernel_names": [
+        "__ZN9IOService18matchPropertyTableEP12OSDictionary"
+      ]
+    },
+    {
+      "slot": 103,
+      "reference_name": "__ZN9IOService13matchLocationEPS_",
+      "candidate_target": 18446744005116562952,
+      "kernel_names": [
+        "__ZN9IOService13matchLocationEPS_"
+      ]
+    },
+    {
+      "slot": 104,
+      "reference_name": "__ZN9IOService17addNeededResourceEPKc",
+      "candidate_target": 18446744005116546944,
+      "kernel_names": [
+        "__ZN9IOService17addNeededResourceEPKc"
+      ]
+    },
+    {
+      "slot": 105,
+      "reference_name": "__ZN9IOService15comparePropertyEP12OSDictionaryPKc",
+      "candidate_target": 18446744005116562352,
+      "kernel_names": [
+        "__ZN9IOService15comparePropertyEP12OSDictionaryPKc"
+      ]
+    },
+    {
+      "slot": 106,
+      "reference_name": "__ZN9IOService15comparePropertyEP12OSDictionaryPK8OSString",
+      "candidate_target": 18446744005116562500,
+      "kernel_names": [
+        "__ZN9IOService15comparePropertyEP12OSDictionaryPK8OSString"
+      ]
+    },
+    {
+      "slot": 107,
+      "reference_name": "__ZN9IOService17comparePropertiesEP12OSDictionaryP12OSCollection",
+      "candidate_target": 18446744005116562648,
+      "kernel_names": [
+        "__ZN9IOService17comparePropertiesEP12OSDictionaryP12OSCollection"
+      ]
+    },
+    {
+      "slot": 108,
+      "reference_name": "__ZN9IOService6attachEPS_",
+      "candidate_target": 18446744005116509812,
+      "kernel_names": [
+        "__ZN9IOService6attachEPS_"
+      ]
+    },
+    {
+      "slot": 109,
+      "reference_name": "__ZN9IOService6detachEPS_",
+      "candidate_target": 18446744005116510480,
+      "kernel_names": [
+        "__ZN9IOService6detachEPS_"
+      ]
+    },
+    {
+      "slot": 110,
+      "reference_name": "__ZNK9IOService11getProviderEv",
+      "candidate_target": 18446744005116517004,
+      "kernel_names": [
+        "__ZNK9IOService11getProviderEv"
+      ]
+    },
+    {
+      "slot": 111,
+      "reference_name": "__ZNK9IOService11getWorkLoopEv",
+      "candidate_target": 18446744005116517120,
+      "kernel_names": [
+        "__ZNK9IOService11getWorkLoopEv"
+      ]
+    },
+    {
+      "slot": 112,
+      "reference_name": "__ZNK9IOService19getProviderIteratorEv",
+      "candidate_target": 18446744005116517168,
+      "kernel_names": [
+        "__ZNK9IOService19getProviderIteratorEv"
+      ]
+    },
+    {
+      "slot": 113,
+      "reference_name": "__ZNK9IOService23getOpenProviderIteratorEv",
+      "candidate_target": 18446744005116517748,
+      "kernel_names": [
+        "__ZNK9IOService23getOpenProviderIteratorEv"
+      ]
+    },
+    {
+      "slot": 114,
+      "reference_name": "__ZNK9IOService9getClientEv",
+      "candidate_target": 18446744005116517188,
+      "kernel_names": [
+        "__ZNK9IOService9getClientEv"
+      ]
+    },
+    {
+      "slot": 115,
+      "reference_name": "__ZNK9IOService17getClientIteratorEv",
+      "candidate_target": 18446744005116517208,
+      "kernel_names": [
+        "__ZNK9IOService17getClientIteratorEv"
+      ]
+    },
+    {
+      "slot": 116,
+      "reference_name": "__ZNK9IOService21getOpenClientIteratorEv",
+      "candidate_target": 18446744005116517936,
+      "kernel_names": [
+        "__ZNK9IOService21getOpenClientIteratorEv"
+      ]
+    },
+    {
+      "slot": 117,
+      "reference_name": "__ZN9IOService20callPlatformFunctionEPK8OSSymbolbPvS3_S3_S3_",
+      "candidate_target": 18446744005116518124,
+      "kernel_names": [
+        "__ZN9IOService20callPlatformFunctionEPK8OSSymbolbPvS3_S3_S3_"
+      ]
+    },
+    {
+      "slot": 118,
+      "reference_name": "__ZN9IOService20callPlatformFunctionEPKcbPvS2_S2_S2_",
+      "candidate_target": 18446744005116518724,
+      "kernel_names": [
+        "__ZN9IOService20callPlatformFunctionEPKcbPvS2_S2_S2_"
+      ]
+    },
+    {
+      "slot": 119,
+      "reference_name": "__ZN9IOService12getResourcesEv",
+      "candidate_target": 18446744005116516996,
+      "kernel_names": [
+        "__ZN9IOService12getResourcesEv"
+      ]
+    },
+    {
+      "slot": 120,
+      "reference_name": "__ZN9IOService20getDeviceMemoryCountEv",
+      "candidate_target": 18446744005116564112,
+      "kernel_names": [
+        "__ZN9IOService20getDeviceMemoryCountEv"
+      ]
+    },
+    {
+      "slot": 121,
+      "reference_name": "__ZN9IOService24getDeviceMemoryWithIndexEj",
+      "candidate_target": 18446744005116564184,
+      "kernel_names": [
+        "__ZN9IOService24getDeviceMemoryWithIndexEj"
+      ]
+    },
+    {
+      "slot": 122,
+      "reference_name": "__ZN9IOService24mapDeviceMemoryWithIndexEjj",
+      "candidate_target": 18446744005116564276,
+      "kernel_names": [
+        "__ZN9IOService24mapDeviceMemoryWithIndexEjj"
+      ]
+    },
+    {
+      "slot": 123,
+      "reference_name": "__ZN9IOService15getDeviceMemoryEv",
+      "candidate_target": 18446744005116564344,
+      "kernel_names": [
+        "__ZN9IOService15getDeviceMemoryEv"
+      ]
+    },
+    {
+      "slot": 124,
+      "reference_name": "__ZN9IOService15setDeviceMemoryEP7OSArray",
+      "candidate_target": 18446744005116564392,
+      "kernel_names": [
+        "__ZN9IOService15setDeviceMemoryEP7OSArray"
+      ]
+    },
+    {
+      "slot": 125,
+      "reference_name": "__ZN9IOService17registerInterruptEiP8OSObjectPFvS1_PvPS_iES2_",
+      "candidate_target": 18446744005116565020,
+      "kernel_names": [
+        "__ZN9IOService17registerInterruptEiP8OSObjectPFvS1_PvPS_iES2_"
+      ]
+    },
+    {
+      "slot": 126,
+      "reference_name": "__ZN9IOService19unregisterInterruptEi",
+      "candidate_target": 18446744005116565392,
+      "kernel_names": [
+        "__ZN9IOService19unregisterInterruptEi"
+      ]
+    },
+    {
+      "slot": 127,
+      "reference_name": "__ZN9IOService16getInterruptTypeEiPi",
+      "candidate_target": 18446744005116566700,
+      "kernel_names": [
+        "__ZN9IOService16getInterruptTypeEiPi"
+      ]
+    },
+    {
+      "slot": 128,
+      "reference_name": "__ZN9IOService15enableInterruptEi",
+      "candidate_target": 18446744005116566880,
+      "kernel_names": [
+        "__ZN9IOService15enableInterruptEi"
+      ]
+    },
+    {
+      "slot": 129,
+      "reference_name": "__ZN9IOService16disableInterruptEi",
+      "candidate_target": 18446744005116567008,
+      "kernel_names": [
+        "__ZN9IOService16disableInterruptEi"
+      ]
+    },
+    {
+      "slot": 130,
+      "reference_name": "__ZN9IOService14causeInterruptEi",
+      "candidate_target": 18446744005116567136,
+      "kernel_names": [
+        "__ZN9IOService14causeInterruptEi"
+      ]
+    },
+    {
+      "slot": 131,
+      "reference_name": "__ZN9IOService12requestProbeEj",
+      "candidate_target": 18446744005116563796,
+      "kernel_names": [
+        "__ZN9IOService12requestProbeEj"
+      ]
+    },
+    {
+      "slot": 132,
+      "reference_name": "__ZN9IOService7messageEjPS_Pv",
+      "candidate_target": 18446744005116564100,
+      "kernel_names": [
+        "__ZN9IOService7messageEjPS_Pv"
+      ]
+    },
+    {
+      "slot": 133,
+      "reference_name": "__ZN9IOService13messageClientEjP8OSObjectPvm",
+      "candidate_target": 18446744005116521328,
+      "kernel_names": [
+        "__ZN9IOService13messageClientEjP8OSObjectPvm"
+      ]
+    },
+    {
+      "slot": 134,
+      "reference_name": "__ZN9IOService14messageClientsEjPvm",
+      "candidate_target": 18446744005116522164,
+      "kernel_names": [
+        "__ZN9IOService14messageClientsEjPvm"
+      ]
+    },
+    {
+      "slot": 135,
+      "reference_name": "__ZN9IOService16registerInterestEPK8OSSymbolPFiPvS3_jPS_S3_mES3_S3_",
+      "candidate_target": 18446744005116522320,
+      "kernel_names": [
+        "__ZN9IOService16registerInterestEPK8OSSymbolPFiPvS3_jPS_S3_mES3_S3_"
+      ]
+    },
+    {
+      "slot": 136,
+      "reference_name": "__ZN9IOService16applyToProvidersEPFvPS_PvES1_",
+      "candidate_target": 18446744005116521220,
+      "kernel_names": [
+        "__ZN9IOService16applyToProvidersEPFvPS_PvES1_"
+      ]
+    },
+    {
+      "slot": 137,
+      "reference_name": "__ZN9IOService14applyToClientsEPFvPS_PvES1_",
+      "candidate_target": 18446744005116521240,
+      "kernel_names": [
+        "__ZN9IOService14applyToClientsEPFvPS_PvES1_"
+      ]
+    },
+    {
+      "slot": 138,
+      "reference_name": "__ZN9IOService17applyToInterestedEPK8OSSymbolPFvP8OSObjectPvES5_",
+      "candidate_target": 18446744005116521724,
+      "kernel_names": [
+        "__ZN9IOService17applyToInterestedEPK8OSSymbolPFvP8OSObjectPvES5_"
+      ]
+    },
+    {
+      "slot": 139,
+      "reference_name": "__ZN9IOService23acknowledgeNotificationEPvj",
+      "candidate_target": 18446744005116522308,
+      "kernel_names": [
+        "__ZN9IOService23acknowledgeNotificationEPvj"
+      ]
+    },
+    {
+      "slot": 140,
+      "reference_name": "__ZN9IOService13newUserClientEP4taskPvjP12OSDictionaryPP12IOUserClient",
+      "candidate_target": 18446744005116563036,
+      "kernel_names": [
+        "__ZN9IOService13newUserClientEP4taskPvjP12OSDictionaryPP12IOUserClient"
+      ]
+    },
+    {
+      "slot": 141,
+      "reference_name": "__ZN9IOService13newUserClientEP4taskPvjPP12IOUserClient",
+      "candidate_target": 18446744005116563724,
+      "kernel_names": [
+        "__ZN9IOService13newUserClientEP4taskPvjPP12IOUserClient"
+      ]
+    },
+    {
+      "slot": 142,
+      "reference_name": "__ZN9IOService16stringFromReturnEi",
+      "candidate_target": 18446744005116563848,
+      "kernel_names": [
+        "__ZN9IOService16stringFromReturnEi"
+      ]
+    },
+    {
+      "slot": 143,
+      "reference_name": "__ZN9IOService15errnoFromReturnEi",
+      "candidate_target": 18446744005116563864,
+      "kernel_names": [
+        "__ZN9IOService15errnoFromReturnEi"
+      ]
+    },
+    {
+      "slot": 144,
+      "reference_name": "__ZN9IOService6PMinitEv",
+      "candidate_target": 18446744005116569196,
+      "kernel_names": [
+        "__ZN9IOService6PMinitEv"
+      ]
+    },
+    {
+      "slot": 145,
+      "reference_name": "__ZN9IOService6PMstopEv",
+      "candidate_target": 18446744005116578488,
+      "kernel_names": [
+        "__ZN9IOService6PMstopEv"
+      ]
+    },
+    {
+      "slot": 146,
+      "reference_name": "__ZN9IOService10joinPMtreeEPS_",
+      "candidate_target": 18446744005116578428,
+      "kernel_names": [
+        "__ZN9IOService10joinPMtreeEPS_"
+      ]
+    },
+    {
+      "slot": 147,
+      "reference_name": "__ZN9IOService19registerPowerDriverEPS_P14IOPMPowerStatem",
+      "candidate_target": 18446744005116585948,
+      "kernel_names": [
+        "__ZN9IOService19registerPowerDriverEPS_P14IOPMPowerStatem"
+      ]
+    },
+    {
+      "slot": 148,
+      "reference_name": "__ZN9IOService23requestPowerDomainStateEmP17IOPowerConnectionm",
+      "candidate_target": 18446744005116597148,
+      "kernel_names": [
+        "__ZN9IOService23requestPowerDomainStateEmP17IOPowerConnectionm"
+      ]
+    },
+    {
+      "slot": 149,
+      "reference_name": "__ZN9IOService14activityTickleEmm",
+      "candidate_target": 18446744005116601136,
+      "kernel_names": [
+        "__ZN9IOService14activityTickleEmm"
+      ]
+    },
+    {
+      "slot": 150,
+      "reference_name": "__ZN9IOService17setAggressivenessEmm",
+      "candidate_target": 18446744005116603416,
+      "kernel_names": [
+        "__ZN9IOService17setAggressivenessEmm"
+      ]
+    },
+    {
+      "slot": 151,
+      "reference_name": "__ZN9IOService17getAggressivenessEmPm",
+      "candidate_target": 18446744005116603424,
+      "kernel_names": [
+        "__ZN9IOService17getAggressivenessEmPm"
+      ]
+    },
+    {
+      "slot": 152,
+      "reference_name": "__ZN9IOService13addPowerChildEPS_",
+      "candidate_target": 18446744005116581344,
+      "kernel_names": [
+        "__ZN9IOService13addPowerChildEPS_"
+      ]
+    },
+    {
+      "slot": 153,
+      "reference_name": "__ZN9IOService16removePowerChildEP17IOPowerConnection",
+      "candidate_target": 18446744005116584712,
+      "kernel_names": [
+        "__ZN9IOService16removePowerChildEP17IOPowerConnection"
+      ]
+    },
+    {
+      "slot": 154,
+      "reference_name": "__ZN9IOService18setIdleTimerPeriodEm",
+      "candidate_target": 18446744005116602196,
+      "kernel_names": [
+        "__ZN9IOService18setIdleTimerPeriodEm"
+      ]
+    },
+    {
+      "slot": 155,
+      "reference_name": "__ZN9IOService13setPowerStateEmPS_",
+      "candidate_target": 18446744005116634804,
+      "kernel_names": [
+        "__ZN9IOService13setPowerStateEmPS_"
+      ]
+    },
+    {
+      "slot": 156,
+      "reference_name": "__ZN9IOService27maxCapabilityForDomainStateEm",
+      "candidate_target": 18446744005116634884,
+      "kernel_names": [
+        "__ZN9IOService27maxCapabilityForDomainStateEm"
+      ]
+    },
+    {
+      "slot": 157,
+      "reference_name": "__ZN9IOService31initialPowerStateForDomainStateEm",
+      "candidate_target": 18446744005116634956,
+      "kernel_names": [
+        "__ZN9IOService31initialPowerStateForDomainStateEm"
+      ]
+    },
+    {
+      "slot": 158,
+      "reference_name": "__ZN9IOService24powerStateForDomainStateEm",
+      "candidate_target": 18446744005116635040,
+      "kernel_names": [
+        "__ZN9IOService24powerStateForDomainStateEm"
+      ]
+    },
+    {
+      "slot": 159,
+      "reference_name": "__ZN9IOService22powerStateWillChangeToEmmPS_",
+      "candidate_target": 18446744005116635112,
+      "kernel_names": [
+        "__ZN9IOService22powerStateWillChangeToEmmPS_"
+      ]
+    },
+    {
+      "slot": 160,
+      "reference_name": "__ZN9IOService21powerStateDidChangeToEmmPS_",
+      "candidate_target": 18446744005116635120,
+      "kernel_names": [
+        "__ZN9IOService21powerStateDidChangeToEmmPS_"
+      ]
+    },
+    {
+      "slot": 161,
+      "reference_name": "__ZN9IOService13askChangeDownEm",
+      "candidate_target": 18446744005116623512,
+      "kernel_names": [
+        "__ZN9IOService13askChangeDownEm"
+      ]
+    },
+    {
+      "slot": 162,
+      "reference_name": "__ZN9IOService14tellChangeDownEm",
+      "candidate_target": 18446744005116623524,
+      "kernel_names": [
+        "__ZN9IOService14tellChangeDownEm"
+      ]
+    },
+    {
+      "slot": 163,
+      "reference_name": "__ZN9IOService16tellNoChangeDownEm",
+      "candidate_target": 18446744005116629808,
+      "kernel_names": [
+        "__ZN9IOService16tellNoChangeDownEm"
+      ]
+    },
+    {
+      "slot": 164,
+      "reference_name": "__ZN9IOService12tellChangeUpEm",
+      "candidate_target": 18446744005116630156,
+      "kernel_names": [
+        "__ZN9IOService12tellChangeUpEm"
+      ]
+    },
+    {
+      "slot": 165,
+      "reference_name": "__ZN9IOService16allowPowerChangeEm",
+      "candidate_target": 18446744005116632472,
+      "kernel_names": [
+        "__ZN9IOService16allowPowerChangeEm"
+      ]
+    },
+    {
+      "slot": 166,
+      "reference_name": "__ZN9IOService17cancelPowerChangeEm",
+      "candidate_target": 18446744005116632576,
+      "kernel_names": [
+        "__ZN9IOService17cancelPowerChangeEm"
+      ]
+    },
+    {
+      "slot": 167,
+      "reference_name": "__ZN9IOService15powerChangeDoneEm",
+      "candidate_target": 18446744005116635128,
+      "kernel_names": [
+        "__ZN9IOService15powerChangeDoneEm"
+      ]
+    },
+    {
+      "slot": 168,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 169,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 170,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 171,
+      "reference_name": "__ZN20IOBlockStorageDevice18doSynchronizeCacheEv",
+      "candidate_target": 18446744005067075700,
+      "kernel_names": []
+    },
+    {
+      "slot": 172,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 173,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 174,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 175,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 176,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 177,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 178,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 179,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 180,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 181,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 182,
+      "reference_name": "__ZN20IOBlockStorageDevice18getWriteCacheStateEPb",
+      "candidate_target": 18446744005067075640,
+      "kernel_names": []
+    },
+    {
+      "slot": 183,
+      "reference_name": "__ZN20IOBlockStorageDevice18setWriteCacheStateEb",
+      "candidate_target": 18446744005067075652,
+      "kernel_names": []
+    },
+    {
+      "slot": 184,
+      "reference_name": "___cxa_pure_virtual",
+      "candidate_target": 18446744005116223392,
+      "kernel_names": [
+        "___cxa_pure_virtual"
+      ]
+    },
+    {
+      "slot": 185,
+      "reference_name": "__ZN20IOBlockStorageDevice11requestIdleEv",
+      "candidate_target": 18446744005067075664,
+      "kernel_names": []
+    },
+    {
+      "slot": 186,
+      "reference_name": "__ZN20IOBlockStorageDevice7doUnmapEP26IOBlockStorageDeviceExtentjj",
+      "candidate_target": 18446744005067075676,
+      "kernel_names": []
+    },
+    {
+      "slot": 187,
+      "reference_name": "__ZN20IOBlockStorageDevice13doSetPriorityEP26IOBlockStorageDeviceExtentjh",
+      "candidate_target": 18446744005067075688,
+      "kernel_names": []
+    },
+    {
+      "slot": 188,
+      "reference_name": "__ZN20IOBlockStorageDevice13doSynchronizeEyyj",
+      "candidate_target": 18446744005067075712,
+      "kernel_names": []
+    },
+    {
+      "slot": 189,
+      "reference_name": "__ZN20IOBlockStorageDevice20doGetProvisionStatusEyyPjP35IOBlockStorageProvisionDeviceExtenty",
+      "candidate_target": 18446744005067075724,
+      "kernel_names": []
+    }
+  ],
+  "static_dispatch_qualified": true,
+  "live_metadata_qualified": true,
+  "disk_read_tested": false,
+  "filesystem_mounted": false,
+  "hardware_tested": false,
+  "passed": true,
+  "live_native_4k": true,
+  "apfs_load_checkpoint_reached": true,
+  "acceptance_scope": "original storage dispatch/live base metadata and genuine crypto registration; not VFS registration or filesystem I/O",
+  "original_apfs_registered": false,
+  "observed_counters": {
+    "_native_apfs_load_status": 0,
+    "_native_apfs_registered": 0,
+    "_native_apfs_vfsops": 0,
+    "_crypto_init": 1,
+    "_prng_ready": 1
+  },
+  "live_metadata": {
+    "super_class_link": 18446744005119134872,
+    "block_class_size": 144,
+    "ioservice_class_size": 136
+  },
+  "raw_observation_sha256": "015d22a5ea7b28fd3dbb8de63fc3070270697de992eda0d971c830493a5958ae",
+  "original_crypto_provider_observed": true,
+  "original_crypto_function_table": 18446744005087512176,
+  "original_crypto_callbacks_in_first_16_words": 7,
+  "live_aes_parent_service_class_sizes": [
+    288,
+    136,
+    136
+  ],
+  "live_aes_parent_binds_source_ioservice": true,
+  "original_components": [
+    "com.apple.driver.AppleARMPlatform",
+    "com.apple.driver.AppleARMWatchdogTimer",
+    "com.apple.driver.AppleEffaceableStorage",
+    "com.apple.filesystems.apfs",
+    "com.apple.iokit.CoreAnalyticsFamily",
+    "com.apple.iokit.IOCryptoAcceleratorFamily",
+    "com.apple.iokit.IOReportFamily",
+    "com.apple.iokit.IOSlowAdaptiveClockingFamily",
+    "com.apple.iokit.IOStorageFamily",
+    "com.apple.kec.corecrypto",
+    "com.apple.kext.CoreTrust",
+    "com.apple.security.AppleImage4"
+  ],
+  "original_components_emitted": 12,
+  "ci_run_id": 43174437089,
+  "ci_url": "https://github.com/Clover2304/UniXNU-polaris/actions/runs/43174437089",
+  "raw_report_path": "artifacts/storage-interface-64cf3e7/gdb-stop.json",
+  "original_apfs_load_api_return": 0,
+  "original_apfs_registration_independently_verified": false,
+  "legacy_native_apfs_registration_probe_value": 0,
+  "block_transport_linked": false,
+  "block_transport_tested": false,
+  "original_cache_loaded": false,
+  "apple_launchd_main_executed": false,
+  "phone_accessed": false,
+  "source_corecrypto_bootstrap_disabled": true,
+  "all_12_original_executable_sections_unchanged": true,
+  "first_missing_hash_method_failure_record": "artifacts/storage-component-64cf3e7-v2/gdb-stop.json",
+  "missing_hash_method_corrected_by_chosen_property": "sha2-384",
+  "early_bsd_entry_precedes_original_storage_class_initialization": true
+}

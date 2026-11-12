@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import platform
 import shutil
+import shlex
 import struct
 import subprocess
 import sys
@@ -64,6 +65,8 @@ def main():
                         help='configs/ name; the prelinked crypto bootstrap additionally uses the IPSW kernelcache')
     parser.add_argument('--defer-prelink', action='store_true',
                         help='build the raw prelinked-bootstrap input only; it requires later composition and is not a boot candidate')
+    parser.add_argument('--storage-source',type=Path,help='pinned public IOStorageFamily checkout for the isolated transport input')
+    parser.add_argument('--storage-bindings',type=Path,help='measured original storage import metadata; not an Apple executable')
     args = parser.parse_args()
     if platform.system() != 'Darwin' or not shutil.which('xcodebuild'):
         parser.error('this step requires macOS with Xcode and the iPhoneOS SDK')
@@ -88,6 +91,16 @@ def main():
         do_prelink, needs_prelink = deferred_prelink(ctx.config, ctx.board, args.defer_prelink)
     except ValueError as error:
         parser.error(str(error))
+    storage_transport=ctx.config.get('XNU_NATIVE_VIRTIO_BLOCK') is True
+    if storage_transport:
+        if not needs_prelink or ctx.config.get('XNU_NATIVE_AES') is not True or not args.storage_source or not args.storage_bindings:
+            parser.error('storage transport requires deferred composition, NativeAES, public storage source and measured bindings')
+        subprocess.run(['git','-C',base,'submodule','update','--init','--depth','1',
+                        'drivers/NativeAES','drivers/NativeVirtioBlock'],check=True)
+        ctx.board['kernel']['archives'].append(shlex.join(['build-storage-drivers.py',
+            '--source',str(args.storage_source.resolve()),'--bindings',str(args.storage_bindings.resolve())]))
+    elif args.storage_source or args.storage_bindings:
+        parser.error('storage source/bindings require the isolated NativeVirtioBlock configuration')
     shutil.copyfile(config, ctx.config_path)
     modules = feeds.resolve(ctx)
     references = set(cli.REFERENCES['kernel'])
@@ -125,7 +138,7 @@ def main():
     obj = ctx.tree / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837'
     bootstrap = dict(env, XNU_SOURCE_CORECRYPTO14='0', XNU_SOURCE_PTHREAD='0',
                      XNU_ARM_DT_PLATFORM='0', XNU_ARMCPU='0', XNU_NATIVE_ARCH_TIMER='0',
-                     XNU_SOURCE_MOCKFS='0', XNU_BOOT_PROGRESS='0')
+                     XNU_SOURCE_MOCKFS='0', XNU_BOOT_PROGRESS='0',XNU_NATIVE_AES='0',XNU_NATIVE_VIRTIO_BLOCK='0')
     print('Bootstrap pass: compiling XNU records before external archives', flush=True)
     bootstrap_failed = False
     try:
@@ -219,6 +232,9 @@ def main():
         check.symbols(data, {'_cs_native4k_hash_cache_version', '_cs_native4k_full_blocks',
                              '_cs_native4k_page_checks', '_cs_native4k_ready_blobs',
                              '_polaris_cache_signature_accepted', '_polaris_cache_signature_rejected'})
+    if storage_transport:
+        check.symbols(data,{'_native_aes_kat_status','_native_aes_registered','_native_virtio_ready',
+                            '_native_virtio_read_requests','_native_virtio_read_failures'})
     prelinked = None
     if do_prelink:
         print('Prelink pass: composing with the original iPadOS 17 kernelcache', flush=True)
@@ -228,6 +244,8 @@ def main():
     report = {'kernel_sha256': hashlib.sha256(data).hexdigest(), 'kernel_bytes': len(data),
               'defconfig': args.defconfig, 'crypto_bootstrap': ctx.config.get('XNU_CRYPTO_BOOTSTRAP'),
               'prelink_deferred': needs_prelink, 'requires_original_prelink': needs_prelink,
+              'native_virtio_block_linked':storage_transport,
+              'native_aes_linked':ctx.config.get('XNU_NATIVE_AES') is True,
               'source_mockfs': source_mockfs, 'mockfs_symbols': mockfs_symbols,
               'apple_probe_available': apple_probe_available,
               'native4k_signature_hash_cache': native4k_signature_cache,

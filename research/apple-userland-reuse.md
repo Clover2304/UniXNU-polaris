@@ -162,3 +162,16 @@ RAM fixture 采用当前 N4KROOT v3，保留原版 `/sbin/launchd`、`/usr/lib/d
 本轮真机通过范围为：自制 PID 1 对未改写的 49,152 字节原版 subcache 完成签名登记、32 KiB RX 映射、8 页数据自检和释放/关闭，并经原生 USB 核对精确构建和存活。内核内部“两块 16K / 八次 4K”计数与损坏页拒绝对照仍只在 QEMU 直接观察，未从手机导出；原版缓存代码没有执行。原全套进程/临时文件/UFS 自检的真机基线仍是 `abc75cf`，不以本轮较小程序替代那套验收。
 
 下一项转到服务器侧的只读文件分页后端：核对现有 APFS/虚拟块设备方案的存储 ABI、绑定与 crypto_bootstrap 组合，提供同一目标 OS/SystemOS 文件路径，再继续原版 dyld 的完整共享缓存和 libSystem 加载。完整 cache、libSystem 初始化、TLS、原版 launchd 主函数和 iPadOS 界面仍待验证；当前无需再次准备 Mass Storage。
+
+
+## G2/G3 只读存储组件：基础接口已模拟验证
+
+独立原版 crypto bootstrap 输入和公开 IOStorageFamily 注释对象已由 [构建 43174437089](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43174437089) 编译通过。原始内核需要后续组件组合，打包/平台启动工具会拒绝未组合输入；手机仍运行已验收的 `57a7d7f` 小缓存探针，本阶段未访问或更新手机。
+
+[基础接口证据](apple-storage-interface.json)记录：同一原版目标的 12 个组件可执行区段保持字节一致；实际 190 个存储方法槽中 176 项对应源内核绑定，14 个为原类自有方法，抽象析构陷阱和可用基类析构分别核对。QEMU 直接观察原存储类/源 IOService 大小为 0x90/0x88，原 AES/crypto 父类/源 IOService 大小为 0x120/0x88/0x88，继承链正确，CPU 为实际 4K 翻译。原 corecrypto 表位于原组件范围，首 16 项中 7 个回调指向原可执行区段，crypto_init/prng_ready 均为 1。
+
+首轮 AppleImage4 因缺少 chosen.crypto-hash-method 退出，原失败保留；补上目标所用 sha2-384 后继续。只在 bsd_init 入口观察尚未加载的类会读到零，因此采用已有 offline-apfs-load 的真实 OSKext API，在 VFS 初始化后的检查点取证。该加载 API 返回 0；旧诊断的 native_apfs_registered 仍为 0，不能据此声称 APFS 注册或挂载已经通过。后续使用实际 VFS 注册返回、设备发现与只读挂载另行验收。
+
+[绑定元数据](apple-storage-bindings.json)只包含接口名、地址与哈希，没有 Apple 可执行代码。AES 的共同 168 槽取自当前源 IOService 的真实 vtable，其余 13 项沿用固定 UniXNU ABI 头和绑定记录，并逐项比对原版 vtable；后续还必须检查新编译子类的全部 181 槽并运行 KAT。下一步编译已有 NativeAES/NativeVirtioBlock，组合后验证实际只读设备、两卷 UUID/设备名、挂载与 APFS 上小缓存的映射。完整 cache、libSystem、原版 launchd 主函数和真机通用存储仍未通过。
+
+构建首轮因当前 Apple Clang 不识别一个上游警告抑制选项而失败，源码内核本身已链接成功；已移除该无效选项并保留 -Werror，修正版编译通过。原 RAM 根配置的 [完整回归 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43172241674)也通过；不能将它记为新存储路径通过。

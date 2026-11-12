@@ -2,10 +2,18 @@ name: Read-only storage component inputs
 on:
   push:
     branches: ['work/polaris-ramdisk']
-    paths: ['.github/workflows/storage.yml', 'configs/polaris_storage_defconfig', 'scripts/build-storage-reference.py']
+    paths: ['.github/workflows/storage.yml', 'configs/polaris_storage_defconfig', 'configs/polaris_storage_io_defconfig', 'scripts/build-storage-reference.py', 'scripts/build-storage-drivers.py', 'research/apple-storage-bindings.json']
   workflow_dispatch:
+    inputs:
+      defconfig:
+        description: 'Isolated server-only storage input'
+        type: choice
+        default: polaris_storage_io_defconfig
+        options: [polaris_storage_defconfig, polaris_storage_io_defconfig]
 permissions:
   contents: read
+env:
+  STORAGE_DEFCONFIG: ${{ inputs.defconfig || 'polaris_storage_io_defconfig' }}
 jobs:
   source-and-reference:
     runs-on: macos-15-intel
@@ -36,7 +44,12 @@ jobs:
           xcrun --sdk iphoneos --find mig
           xcrun --sdk iphoneos --find iig
       - name: Build deferred original-bootstrap source kernel
-        run: python3 scripts/build-platform-kernel.py --base out/upstream -j 4 --defconfig polaris_storage_defconfig --defer-prelink
+        run: |
+          EXTRA_ARGS=()
+          if [ "$STORAGE_DEFCONFIG" = polaris_storage_io_defconfig ]; then
+            EXTRA_ARGS+=(--storage-source out/storage-source --storage-bindings research/apple-storage-bindings.json)
+          fi
+          python3 scripts/build-platform-kernel.py --base out/upstream -j 4 --defconfig "$STORAGE_DEFCONFIG" --defer-prelink "${EXTRA_ARGS[@]}"
       - name: Compile public storage annotation with actual XNU record
         run: python3 scripts/build-storage-reference.py --tree out/native/polaris/tree --source out/storage-source --out out/storage-annotation
       - uses: actions/upload-artifact@v4
@@ -47,6 +60,8 @@ jobs:
           path: |
             out/native/polaris/kernel/
             out/storage-annotation/
+            out/native/polaris/tree/build/native-aes/
+            out/native/polaris/tree/build/native-virtio-block/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
