@@ -1,0 +1,82 @@
+--- /dev/null
++++ b/bsd/kern/polaris_apple_probe.h
+@@ -0,0 +1,19 @@
++/* Exact original-input diagnostic only. No Apple trust or entitlement grant. */
++#ifndef POLARIS_APPLE_PROBE_H
++#define POLARIS_APPLE_PROBE_H
++static inline unsigned
++polaris_apple_blob_kind(const struct cs_blob *blob, int pid, int mode)
++{
++ static const unsigned char hashes[2][CS_CDHASH_LEN] = {
++  {0x1d,0x52,0xc6,0x97,0x47,0xdf,0xfc,0x4b,0x19,0x37,0xd2,0x41,0xbd,0xbc,0x9c,0xee,0x3b,0x22,0xdf,0x18},
++  {0xb4,0x79,0xf9,0x0e,0x05,0x54,0x53,0x14,0xcb,0x84,0x34,0x10,0xc3,0xd9,0x8e,0xf8,0x4d,0x92,0x67,0x10}
++ };
++ if(mode!=1 || pid!=1 || !blob || (blob->csb_flags&(CS_VALID|CS_ADHOC))!=(CS_VALID|CS_ADHOC))return 0;
++ for(unsigned kind=0;kind<2;kind++) {
++  unsigned difference=0;
++  for(unsigned i=0;i<CS_CDHASH_LEN;i++)difference|=blob->csb_cdhash[i]^hashes[kind][i];
++  if(!difference)return kind+1;
++ }
++ return 0;
++}
++#endif
+--- a/bsd/kern/ubc_subr.c
++++ b/bsd/kern/ubc_subr.c
+@@ -4373,9 +4373,27 @@
+ volatile uint32_t polaris_child_signature_accepted, polaris_child_signature_rejected;
+ 
+ #include "polaris_process_policy.h"
++#include "polaris_apple_probe.h"
++volatile uint32_t polaris_apple_signature_accepted, polaris_apple_signature_rejected;
++volatile uint32_t polaris_apple_launchd_accepted, polaris_apple_dyld_accepted;
++int
++polaris_apple_probe_enabled(void)
++{
++ int mode=0;
++ return PE_parse_boot_argn("polaris-apple-probe",&mode,sizeof(mode)) && mode==1;
++}
+ errno_t
+ polaris_init_signature_policy(const struct cs_blob *blob)
+ {
++	if(polaris_apple_probe_enabled()) {
++		unsigned kind=polaris_apple_blob_kind(blob,proc_selfpid(),1);
++		if(!kind) { polaris_apple_signature_rejected++;return EPERM; }
++		polaris_apple_signature_accepted++;
++		if(kind==1)polaris_apple_launchd_accepted++;
++		else polaris_apple_dyld_accepted++;
++		printf("POLARIS_APPLE_CS kind=%u accepted=%u\n",kind,polaris_apple_signature_accepted);
++		return 0;
++	}
+ 	char expected[CS_CDHASH_LEN*2+2]={0};
+ 	int pid=proc_selfpid(),enabled=0;
+ 	(void)PE_parse_boot_argn("polaris-process",&enabled,sizeof(enabled));
+--- a/bsd/kern/mach_loader.c
++++ b/bsd/kern/mach_loader.c
+@@ -191,6 +191,7 @@
+ volatile uint32_t polaris_init_unsigned_rejected;
+ volatile uint32_t polaris_process_exec_checks, polaris_process_exec_rejected;
+ extern errno_t polaris_init_signature_policy(const struct cs_blob *blob);
++extern int polaris_apple_probe_enabled(void);
+ 
+ static load_return_t
+ load_code_signature(
+@@ -814,6 +815,7 @@
+ 	char polaris_init_hash[CS_CDHASH_LEN * 2 + 2] = {0};
+ 	boolean_t polaris_init_enforced = PE_parse_boot_arg_str(
+ 	    "polaris-init-cdhash", polaris_init_hash, sizeof(polaris_init_hash));
++	polaris_init_enforced = polaris_init_enforced || polaris_apple_probe_enabled();
+ 	boolean_t               found_header_segment = FALSE;
+ 	boolean_t               found_xhdr = FALSE;
+ 	boolean_t               found_version_cmd = FALSE;
+@@ -3589,6 +3591,11 @@
+ 			polaris_process_exec_checks++;
+ 			if(polaris_init_signature_policy(blob)!=0) { polaris_process_exec_rejected++;return LOAD_FAILURE; }
+ 		}
++		/* Recheck cached blobs too; retain normal parsing and page validation. */
++		if(polaris_apple_probe_enabled()) {
++			if(polaris_init_signature_policy(blob)!=0)return LOAD_FAILURE;
++			result->csflags |= CS_HARD|CS_KILL;
++		}
+ 		result->csflags |= blob->csb_flags;
+ 		result->platform_binary = blob->csb_platform_binary;
+ 		result->cs_end_offset = blob->csb_end_offset;

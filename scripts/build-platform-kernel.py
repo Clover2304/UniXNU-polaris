@@ -40,7 +40,7 @@ def install_late_io_patch_hook(script):
         raise ValueError('Pinned baseline late-patch loop changed')
     line = lines[0]
     suffix = line[len(marker):]
-    additions = ['"$ROOT/patches/xnu/polaris-usb.patch" ', '"$ROOT/patches/xnu/polaris-tmp.patch" ', '"$ROOT/patches/xnu/polaris-process.patch" ', '"$ROOT/patches/xnu/polaris-io.patch" ']
+    additions = ['"$ROOT/patches/xnu/polaris-usb.patch" ', '"$ROOT/patches/xnu/polaris-tmp.patch" ', '"$ROOT/patches/xnu/polaris-target-dyld.patch" ', '"$ROOT/patches/xnu/polaris-process.patch" ', '"$ROOT/patches/xnu/polaris-io.patch" ']
     for token in additions:
         suffix = suffix.replace(token, '')
     replacement = marker + ''.join(additions) + suffix
@@ -198,6 +198,13 @@ def main():
         if b'POLARIS_UFS_QUERY' not in data or b'polaris-ufs-query' not in data:
             raise SystemExit('Missing opt-in read-descriptor UFS QUERY')
         check.symbols(data, {'_polaris_tmp_ready','_polaris_tmp_creates','_polaris_tmp_unlinks','_polaris_tmp_reads','_polaris_tmp_writes','_polaris_tmp_reuses'})
+    apple_probe_available = b'polaris-apple-probe\0' in data
+    if source_mockfs:
+        check.symbols(data, {'_polaris_apple_probe_enabled', '_polaris_apple_signature_accepted',
+                             '_polaris_apple_signature_rejected', '_polaris_apple_launchd_accepted',
+                             '_polaris_apple_dyld_accepted'})
+        if not apple_probe_available:
+            raise SystemExit('Missing opt-in exact-original Apple execution probe')
     prelinked = None
     if do_prelink:
         print('Prelink pass: composing with the original iPadOS 17 kernelcache', flush=True)
@@ -207,6 +214,8 @@ def main():
     report = {'kernel_sha256': hashlib.sha256(data).hexdigest(), 'kernel_bytes': len(data),
               'defconfig': args.defconfig, 'crypto_bootstrap': ctx.config.get('XNU_CRYPTO_BOOTSTRAP'),
               'source_mockfs': source_mockfs, 'mockfs_symbols': mockfs_symbols,
+              'apple_probe_available': apple_probe_available,
+              'apple_probe_policy': 'pid1-two-original-cdhashes-no-entitlement-grant-v1' if apple_probe_available else None,
               'init_signature_policy': init_signature_policy,
               'ram_io_available': ram_io_available,
               'ram_tree_available': ram_tree_available,

@@ -23,7 +23,7 @@ class BuildSelectionTests(unittest.TestCase):
             source = work / '.cache/xnu-work'
             source.mkdir(parents=True)
             (source / 'node.c').write_text('int state = 0;\n')
-            for name, old, new in [('mockfs-test.patch', 0, 1), ('polaris-io.patch', 1, 2), ('polaris-process.patch', 2, 3), ('polaris-tmp.patch', 3, 4), ('polaris-usb.patch', 4, 5)]:
+            for name, old, new in [('mockfs-test.patch', 0, 1), ('polaris-io.patch', 1, 2), ('polaris-process.patch', 2, 3), ('polaris-target-dyld.patch', 3, 4), ('polaris-tmp.patch', 4, 5), ('polaris-usb.patch', 5, 6)]:
                 (work / 'patches/xnu' / name).write_text(
                     '--- a/node.c\n+++ b/node.c\n@@ -1 +1 @@\n'
                     f'-int state = {old};\n+int state = {new};\n')
@@ -51,7 +51,7 @@ done
             for _ in range(2):
                 result = subprocess.run(['bash', script], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual((source / 'node.c').read_text(), 'int state = 5;\n')
+                self.assertEqual((source / 'node.c').read_text(), 'int state = 6;\n')
 
     def selection(self, filename):
         text = (ROOT / 'configs' / filename).read_text()
