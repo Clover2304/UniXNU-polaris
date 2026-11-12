@@ -646,7 +646,7 @@
   "packaged_cache_positive_and_tamper_verified": true,
   "previous_apple_probe_byte_preserved": true,
   "stable_selftest_payload_byte_preserved": true,
-  "phone_updated": false,
+  "phone_updated": true,
   "phone_rebooted": false,
   "hardware_cache_probe_verified": false,
   "hardware_kernel_hash_counters_observed": false,
@@ -663,5 +663,8 @@
     "Qualify storage ABI/bindings and existing read-only OS/SystemOS paging in QEMU; complete 3.3GB cache cannot fit current RAM root.",
     "Then integrate appropriate source/prelinked crypto/component profiles and expose all 53 original cache paths; observe dyld/libSystem actual progress.",
     "Extend the native UFS backend for filesystem-backed paging separately; current fixed file is 8193 bytes and not a general filesystem."
-  ]
+  ],
+  "deployment_record": "apple-cache-deploy.json",
+  "agent_reboot_performed": false,
+  "awaiting_user_manual_reboot": true
 }

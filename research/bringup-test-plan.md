@@ -13,7 +13,7 @@
 - 保留的 NOP 镜像在 `artifacts/ufs-nop-format-ready/`，ESP SHA256 `495a3a4b2b9cbf162654c44750952089114fbd45076075eb1e52119e2d219493`；[NOP 证据](ufs-nop-result.json)、[队列/SMMU 证据](ufs-queue-smmu-snapshot.json)和[后续计划](ufs-readonly-plan.md)已保存。
 - 最近一次通过真机运行的内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`，已通过 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43141529622)、86 项主机检查和 16 份运行验收，QEMU 也执行真实异步请求队列。真机一轮启动通过 `/dev/polaris-esp-file` 的 8193 字节顺序读、跨界/偏移、EOF、重复读、写入拒绝和重开；9 次请求完成，10 条 READ(10) 的顺序与 CRC 匹配实际镜像，三次独立 USB 捕获与变化心跳通过。原有自检、USB 健康、SMMU 故障位和零日志丢失通过，见 [文件设备证据](ufs-node-result.json)。此前 [FAT 文件](ufs-fat-result.json)、[六扇区](ufs-read-result.json) 与 [SCSI 元数据](ufs-scsi-result.json) 基线保留。默认 edk2 与 USB 更新见 [说明](uefi-usb-update.md)。
 - 最近完整真机自检基线的根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。原版 dyld 早期执行已有 QEMU 取证，真机按用户画面回报到达缺 libSystem 的依赖查找退出；Apple launchd 主函数、交互输入、通用 UFS 块设备/文件系统或完整可写文件系统尚未通过。当前原生介质读取限定 GPT 六扇区和已核对的 128 MiB ESP 窗口，文件查找限定一个固定路径。
-- 最新源码候选 `57a7d7f` 已通过完整 CI（88 项主机检查、16 份原有运行报告），并在 QEMU 通过原版小缓存的签名登记、两个 16K 签名块认证、8 次 4K 缺页校验和映射清理；关闭授权和篡改拒绝对照通过，最终打包内核重复通过正向/篡改测试。真机文件尚未更新；该项仍为模拟通过，见 [缓存运行证据](apple-cache-runtime.json)。
+- 最新源码候选 `57a7d7f` 已通过完整 CI（88 项主机检查、16 份原有运行报告），并在 QEMU 通过原版小缓存的签名登记、两个 16K 签名块认证、8 次 4K 缺页校验和映射清理；关闭授权和篡改拒绝对照通过，最终打包内核重复通过正向/篡改测试。真机文件已更新并通过直接整卷回读，待用户手动重启；该项运行仍为模拟通过，见 [缓存运行证据](apple-cache-runtime.json)和 [部署记录](apple-cache-deploy.json)。
 - 目标 Apple 镜像先固定为 arm64 iPadOS 17.7.11（21H461，iPad7,1）；自制程序通过不等于该系统已兼容。
 
 状态：**真机通过** = 指定功能由真机程序自检、用户回报画面或实际 USB 主机往返与日志取证证实，逐项注明来源；**模拟/主机通过** = 仅相应环境取证；**部分** = 仅列明范围；**待验证** = 无充分证据；**未实现/未接入** = 当前不具备。次数和时长均为建议目标，不是已完成结果。
@@ -344,7 +344,7 @@ QEMU 模型，已更新并完成全启动卷回读/缓存同步；按用户要�
 
 [10 组运行证据](apple-cache-runtime.json)均通过：旧内核仍拒绝 16K 签名；新内核正向；关闭授权返回 EPERM；隔离副本分别损坏第 0、1、2、3、4 个 4K 区段，每组均返回 EBADEXEC、bad_hash=1、未发布就绪缓存。第 4 区段的失败发生在第二个签名块，此时第一个完整块计数为 1。最终打包内核再重复通过正向和第二块损坏对照。主机未写入来宾寄存器、代码或返回值，所有 Apple 原输入保留不变。
 
-真机候选在 `artifacts/cache-phone-ready-57a7d7f/`，菜单默认 `polaris: ORIGINAL CACHE 16K / 4K`。旧原版 dyld 探针和 `abc75cf` 自检的内核、ADT、HMAC 与根目录均以原字节保留为另两项；共享 EFI 字节一致。128 MiB FAT 文件逐一回读通过，最终打包内核正向/篡改检查通过；更新仍待用户进入固件 Mass Storage。实际写入后会完整回读并停下，等待用户手动重启。
+真机候选在 `artifacts/cache-phone-ready-57a7d7f/`，菜单默认 `polaris: ORIGINAL CACHE 16K / 4K`。旧原版 dyld 探针和 `abc75cf` 自检的内核、ADT、HMAC 与根目录均以原字节保留为另两项；共享 EFI 字节一致。128 MiB FAT 文件逐一回读通过，最终打包内核正向/篡改检查通过；用户随后准备固件 Mass Storage，现已完成受保护文件更新：旧 ESP 精确匹配，主/备 GPT、容量和 USB 身份核对通过，16 个文件哈希及 128 MiB 整卷 O_DIRECT 回读通过，实际变更 61,091,840 字节。实际部署 ESP SHA-256 为 `65a33bdf49b0b73cc83f346664af99e5f86f801b7bb46fc474e63f30faaf32fa`；独立候选和实际更新保留的卷布局/时间戳不同，整卷哈希不同，但所有文件哈希一致。boot 与其他分区未写入，已停止设备操作，保持固件 Mass Storage 等待用户手动重启，见 [部署记录](apple-cache-deploy.json)。部署成功不计为该探针真机运行通过。
 
 真机验收使用 `scripts/check-polaris-cache-usb.py`：核对原生 CDC 身份、精确构建 SHA、随机 nonce、USB 健康计数、完整零丢失日志、自制程序的 CACHE_OK 和两次独立快照间继续变化的心跳。该程序只证明自检结果与存活，内核内部 2/8 计数当前仅在 QEMU 直接观察；旧进程/压力 USB 验收器保持原要求。失败程序保持运行，不因预期签名错误主动 panic。
 
