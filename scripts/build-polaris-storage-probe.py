@@ -25,10 +25,16 @@ def main():
     parser.add_argument('--policy-off',action='store_true')
     parser.add_argument('--launch-apple',action='store_true',help='Mount both read-only volumes, chroot, then exec original launchd')
     parser.add_argument('--stop-before-exec',action='store_true',help='Qualify the actual mount/chroot/cache path before exec')
+    parser.add_argument('--skip-ignition',action='store_true',help='Diagnostic only: PID1 sets kern.dyld_flags=8 after successful mounts/chroot')
+    parser.add_argument('--private-cache',action='store_true',help='Diagnostic only: request original dyld private cache mappings')
+    parser.add_argument('--preboot-cache',action='store_true',help='Mount cache under a RAM devfs Preboot directory; both APFS inputs remain read-only')
     parser.add_argument('--out',type=Path,required=True)
     a=parser.parse_args()
     if a.stop_before_exec and not a.launch_apple:parser.error('--stop-before-exec requires --launch-apple')
     if a.discovery and a.launch_apple:parser.error('--discovery and --launch-apple are separate instruments')
+    if a.skip_ignition and not a.launch_apple:parser.error('--skip-ignition requires --launch-apple')
+    if a.private_cache and not a.launch_apple:parser.error('--private-cache requires --launch-apple')
+    if a.preboot_cache and not a.launch_apple:parser.error('--preboot-cache requires --launch-apple')
     assert all(re.fullmatch(r'/dev/disk\d+s\d+',s) for s in [a.os_device,a.cache_device])
     a.out=a.out.resolve();a.out.mkdir(parents=True,exist_ok=False)
     lines=['#define STORAGE_OS_DEVICE '+json.dumps(a.os_device),'#define STORAGE_CACHE_DEVICE '+json.dumps(a.cache_device)]
@@ -45,7 +51,10 @@ def main():
         '-fno-stack-protector','-mgeneral-regs-only','-I',scripts/'fixtures','-I',a.out,
         *(['-DSTORAGE_DISCOVERY=1'] if a.discovery else []),
         *(['-DSTORAGE_LAUNCH_APPLE=1'] if a.launch_apple else []),
-        *(['-DSTORAGE_STOP_BEFORE_EXEC=1'] if a.stop_before_exec else []),'-c',scripts/'fixtures/polaris-storage-probe.c','-o',a.out/'init.o'],check=True)
+        *(['-DSTORAGE_STOP_BEFORE_EXEC=1'] if a.stop_before_exec else []),
+        *(['-DSTORAGE_SKIP_IGNITION=1'] if a.skip_ignition else []),
+        *(['-DSTORAGE_PRIVATE_CACHE=1'] if a.private_cache else []),
+        *(['-DSTORAGE_PREBOOT_CACHE=1'] if a.preboot_cache else []),'-c',scripts/'fixtures/polaris-storage-probe.c','-o',a.out/'init.o'],check=True)
     subprocess.run([linker,'-arch','arm64','-e','_start','-platform_version','ios','17.0','17.0',
         '-no_pie','-no_adhoc_codesign','-headerpad','0x400','-o',a.out/'unsigned.macho',a.out/'init.o'],check=True)
     image=own.static_and_sign((a.out/'unsigned.macho').read_bytes());identity=own.inspect(image)
@@ -53,7 +62,7 @@ def main():
     root=tree.encode_tree([(0,tree.DIR,'dev',b''),(0,tree.DIR,'sbin',b''),(0,tree.DIR,'tmp',b''),
         (2,tree.EXEC,'launchd',image),(0,tree.RAM,'probe.bin',bytes(4096))])
     (a.out/'launchd.macho').write_bytes(image);(a.out/'root.img').write_bytes(root)
-    report=dict(init=identity,addresses=addresses,discovery_only=a.discovery,cache_policy_off=a.policy_off,launch_apple=a.launch_apple,stop_before_exec=a.stop_before_exec,os_device=a.os_device,cache_device=a.cache_device,
+    report=dict(preboot_cache=a.preboot_cache,diagnostic_private_cache=a.private_cache,diagnostic_skip_ignition=a.skip_ignition,init=identity,addresses=addresses,discovery_only=a.discovery,cache_policy_off=a.policy_off,launch_apple=a.launch_apple,stop_before_exec=a.stop_before_exec,os_device=a.os_device,cache_device=a.cache_device,
         root_sha256=hashlib.sha256(root).hexdigest(),root_bytes=len(root),tree_entries=tree.decode_tree(root),
         boot_args='polaris-io=1 polaris-process=1 '+('polaris-apple-probe=1 polaris-apple-launcher=1 ' if a.launch_apple else '')+('' if a.policy_off else 'polaris-cache-probe=1 ')+'polaris-init-cdhash='+identity['cdhash'],
         filesystem_mounted=False,original_program_code_executed=False,hardware_tested=False)

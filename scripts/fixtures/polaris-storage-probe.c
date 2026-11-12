@@ -1,6 +1,13 @@
 /* Own offline process; original read-only data mounts and small cache mapping. */
 #include "polaris-runtime.h"
 #include "storage-input.h"
+#ifdef STORAGE_PREBOOT_CACHE
+#define STORAGE_CACHE_MOUNT "/dev/osroot/private/preboot/Cryptexes"
+#define STORAGE_CACHE_DIR "/private/preboot/Cryptexes/System/Library/Caches/com.apple.dyld"
+#else
+#define STORAGE_CACHE_MOUNT "/dev/osroot/dev"
+#define STORAGE_CACHE_DIR "/dev/System/Library/Caches/com.apple.dyld"
+#endif
 void bzero(void *p,u64 n){volatile u8 *b=p;for(u64 i=0;i<n;i++)b[i]=0;}
 volatile u64 results[4],user_page_size,old_length=8,storage_results[24];
 __attribute__((noinline)) void checkpoint(void){__asm__ volatile("":::"memory");}
@@ -38,7 +45,13 @@ static void probe(void){
 #endif
  if(!mount_volume(STORAGE_OS_DEVICE,"/dev/osroot",4))return;
 #ifdef STORAGE_LAUNCH_APPLE
- if(!mount_volume(STORAGE_CACHE_DEVICE,"/dev/osroot/dev",6))return;
+#ifdef STORAGE_PREBOOT_CACHE
+ struct reply preboot=CALL(167,"devfs","/dev/osroot/private/preboot",0,0);
+ storage_results[8]=preboot.value;storage_results[9]=preboot.flags;
+ if(!check(preboot,47))return;
+ if(!check(CALL(136,STORAGE_CACHE_MOUNT,0755,0,0),48))return;
+#endif
+ if(!mount_volume(STORAGE_CACHE_DEVICE,STORAGE_CACHE_MOUNT,6))return;
 #else
  if(!mount_volume(STORAGE_CACHE_DEVICE,"/dev/cachefs",6))return;
 #endif
@@ -47,13 +60,24 @@ static void probe(void){
 #ifdef STORAGE_LAUNCH_APPLE
  if(!check(CALL(61,"/dev/osroot",0,0,0),40))return;
  if(!check(CALL(12,"/",0,0,0),41))return;
- struct reply cache=CALL(5,"/dev/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64",0,0,0);
+ struct reply cache=CALL(5,STORAGE_CACHE_DIR "/dyld_shared_cache_arm64",0,0,0);
  if(!check(cache,42))return;
  if(!check(CALL(6,cache.value,0,0,0),43))return;
+#ifdef STORAGE_SKIP_IGNITION
+ /* Existing DEVELOPMENT sysctl publishes the same value to the commpage. */
+ int lookup[2]={0,3},oid[12];u64 oid_bytes=sizeof(oid),flags=8;
+ if(!check(sc(202,(s64)lookup,2,(s64)oid,(s64)&oid_bytes,(s64)"kern.dyld_flags",15),45))return;
+ if(!oid_bytes || oid_bytes>sizeof(oid) || oid_bytes%sizeof(int)){storage_results[0]=45;storage_results[1]=997;return;}
+ if(!check(sc(202,(s64)oid,oid_bytes/sizeof(int),0,0,(s64)&flags,sizeof(flags)),46))return;
+#endif
  storage_results[0]=200;storage_exec_checkpoint();
 #ifndef STORAGE_STOP_BEFORE_EXEC
  const char *argv[]={"/sbin/launchd",0};
- const char *envp[]={"DYLD_SHARED_CACHE_DIR=/dev/System/Library/Caches/com.apple.dyld",0};
+#ifdef STORAGE_PRIVATE_CACHE
+ const char *envp[]={"DYLD_SHARED_CACHE_DIR=" STORAGE_CACHE_DIR,"DYLD_SHARED_REGION=private",0};
+#else
+ const char *envp[]={"DYLD_SHARED_CACHE_DIR=" STORAGE_CACHE_DIR,0};
+#endif
  struct reply exec=CALL(59,argv[0],argv,envp,0);
  storage_results[0]=44;storage_results[1]=ERROR(exec)?exec.value:994;
 #endif

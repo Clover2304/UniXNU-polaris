@@ -199,3 +199,20 @@ RAM fixture 采用当前 N4KROOT v3，保留原版 `/sbin/launchd`、`/usr/lib/d
 这一项把服务器路径从“组件注册”推进到“真实文件分页”。完整 53 文件共享缓存映射、原缓存指令执行、libSystem/TLS、原版 launchd 主函数和 iPadOS 界面仍未通过；真机通用 UFS 块设备/文件分页需要独立接入，不能用 QEMU VirtIO 结果替代。
 
 接下来先在服务器复用这套只读两卷后端，给原版 dyld 提供完整缓存路径，观察实际映射及首个缺失接口；保留签名拒绝和自制程序基线。到需要验证原生 UFS 后端时再安排 Mass Storage 更新，当前无需操作手机。
+
+
+## G3：原版 dyld 完整共享缓存已模拟装载（11c5ae3）
+
+[存储构建 43189781602](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43189781602)与[完整回归 43189781663](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43189781663)均通过；主机检查共 92 项。新增启动器入口要求显式模式、PID 1、精确启动器 CDHash、有效原生 4K 签名及无平台/entitlement 权限，旧原版程序与缓存成员授权仍分别核对。关闭启动器模式的同内核对照实际拒绝启动器，原版 launchd/dyld 未进入。手机未访问或更新，当前真机小缓存基线仍为 57a7d7f。
+
+[完整运行证据](apple-full-cache-runtime.json)：自制 PID 1 实际挂载两卷、chroot 并 exec 原版 launchd，内核加载原版 dyld。真实原版缓存加载器到达并返回其原调用者，x0=1，loadAddress 非零且等于原缓存首址加实际 slide，errorMessage=0；实际使用系统共享映射，原选项 forcePrivate=false。原 dyld 32 个实际 EL0 PC 的指令字节与原文件匹配，其自身页全局量为 4096 / 4095 / 12 / 12。
+
+全部 53 个原缓存文件完成签名登记，201,083 个原始 16K 代码块认证通过，发布 53 个哈希缓存；观察到 254 次原生 4K 页校验，bad_hash/no_hash 均为 0。49,254 次底层读取零失败。原缓存映射总量为 3,294,543,872 字节；53 个文件含签名等内容总量约 3.3 GB。实际共享映射调用包含 53 个文件与一个匿名配置记录，共 62 个映射记录。这是服务器完整缓存映射通过，不是把全部文件复制进小 RAM 根。
+
+保留的失败说明了所需布局：缓存挂在 OS 的 /dev 下时，全部签名预检已完成，但真实共享映射函数返回 EPERM，返回栈匹配。其[原 XNU 检查](https://github.com/apple-oss-distributions/xnu/blob/d8b80295118ef25ac3a784134bcf95cd8e88109f/bsd/vm/vm_unix.c#L2400)要求相应缓存位于进程根卷或认可的 Preboot 卷。修正版在现有 /private/preboot 上挂 RAM devfs，只在 RAM 中创建 Cryptexes，再把只读 SystemCryptex 挂到该目录；实际共享映射随后成功。没有关闭该检查或写入原 APFS 镜像。DYLD_SHARED_REGION=private 的对照请求未选择私有映射，失败结果保留。
+
+原启动认证链仍是单独的未完成项。未配置诊断启动标志时，实际先在 LIBIGNITION/35 退出；仅 boot-arg 设置 dyld_flags=8 时，内核为 8、commpage 仍为 0，也未通过。自制 PID 1 在挂载与 chroot 成功后调用已有 kern.dyld_flags 接口，将实际内核和 commpage 同时发布为 8，才进入本轮缓存诊断。该模式不构成 Ignition 或 Apple 启动认证链通过，也不授予 entitlement；AMFI 表仍为 0。一次 EL0 后的内核间接指针读取失败已保留完整部分记录；观测器扩展既有只读 TTBR1 物理读取后完成取证，没有修改来宾代码、寄存器或返回值。
+
+公开生成器在 Linux 重建的启动器与 RAM 根，与最终通过运行逐字节一致，完整哈希记录于证据文件。公开内容只有自制源码、配置、哈希与结构化结果；Apple 文件、镜像、含前缀字节的生成头和原始内存记录留在私有目录。
+
+下一步继续原版 dyld 的库解析、libSystem 初始化与 TLS，再验证真实 launchd 主函数。原缓存内代码执行、libSystem/TLS 和 launchd 主函数尚未作为本轮通过目标；真机通用 UFS 文件分页也仍需独立接入，不能用服务器 VirtIO 结果替代。当前无需准备 Mass Storage。
