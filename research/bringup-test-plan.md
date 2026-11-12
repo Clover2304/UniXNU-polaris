@@ -11,9 +11,9 @@
 - 真机证据：用户先确认 USB_RUN 和 Windows CDC 枚举，随后主机通过原生 USB 完成 ping、随机 nonce 往返、精确构建身份核对，并取回包含 TMP_CHILD_OK、TMP_OK、CHILD_OK、PROC_OK、STRESS_OK/CLEAN 和变化心跳的运行日志。主机保存了原始 USB 响应及部分外设寄存器诊断；内部进程/task/内存页计数仍仅在 QEMU 取证。
 - 保留的 USB 工作区基线：`/root/projects/xnu-polaris/artifacts/usb-reset-ready/`，ESP SHA256：`0fa69a26986f7529516810a70ed63290e9a39b16f5f8e3b507cc000bfec71e47`。USB 证据在 `artifacts/usb-native-check-7e3fa6f/`、`artifacts/usb-reconnect-7e3fa6f-10/`、`artifacts/usb-control-stall-7e3fa6f/`、`artifacts/usb-continuous-7e3fa6f/`。整机启动计数单独保存在 `artifacts/usb-boot-series-7e3fa6f/index.json`。
 - 保留的 NOP 镜像在 `artifacts/ufs-nop-format-ready/`，ESP SHA256 `495a3a4b2b9cbf162654c44750952089114fbd45076075eb1e52119e2d219493`；[NOP 证据](ufs-nop-result.json)、[队列/SMMU 证据](ufs-queue-smmu-snapshot.json)和[后续计划](ufs-readonly-plan.md)已保存。
-- 最近一次通过真机运行的内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`，已通过 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43141529622)、86 项主机检查和 16 份运行验收，QEMU 也执行真实异步请求队列。真机一轮启动通过 `/dev/polaris-esp-file` 的 8193 字节顺序读、跨界/偏移、EOF、重复读、写入拒绝和重开；9 次请求完成，10 条 READ(10) 的顺序与 CRC 匹配实际镜像，三次独立 USB 捕获与变化心跳通过。原有自检、USB 健康、SMMU 故障位和零日志丢失通过，见 [文件设备证据](ufs-node-result.json)。此前 [FAT 文件](ufs-fat-result.json)、[六扇区](ufs-read-result.json) 与 [SCSI 元数据](ufs-scsi-result.json) 基线保留。默认 edk2 与 USB 更新见 [说明](uefi-usb-update.md)。
+- 最近一版完成原全套自制程序真机自检的内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`，已通过 [完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43141529622)、86 项主机检查和 16 份运行验收，QEMU 也执行真实异步请求队列。真机一轮启动通过 `/dev/polaris-esp-file` 的 8193 字节顺序读、跨界/偏移、EOF、重复读、写入拒绝和重开；9 次请求完成，10 条 READ(10) 的顺序与 CRC 匹配实际镜像，三次独立 USB 捕获与变化心跳通过。原有自检、USB 健康、SMMU 故障位和零日志丢失通过，见 [文件设备证据](ufs-node-result.json)。此前 [FAT 文件](ufs-fat-result.json)、[六扇区](ufs-read-result.json) 与 [SCSI 元数据](ufs-scsi-result.json) 基线保留。默认 edk2 与 USB 更新见 [说明](uefi-usb-update.md)。
 - 最近完整真机自检基线的根目录为启动时确定的 5 个目录和 5 个文件，以及 `/tmp` 的动态普通文件能力；保留固定 4 KiB RAM 状态文件。标准输入是自测管道。原版 dyld 早期执行已有 QEMU 取证，真机按用户画面回报到达缺 libSystem 的依赖查找退出；Apple launchd 主函数、交互输入、通用 UFS 块设备/文件系统或完整可写文件系统尚未通过。当前原生介质读取限定 GPT 六扇区和已核对的 128 MiB ESP 窗口，文件查找限定一个固定路径。
-- 最新源码候选 `57a7d7f` 已通过完整 CI（88 项主机检查、16 份原有运行报告），并在 QEMU 通过原版小缓存的签名登记、两个 16K 签名块认证、8 次 4K 缺页校验和映射清理；关闭授权和篡改拒绝对照通过，最终打包内核重复通过正向/篡改测试。真机文件已更新并通过直接整卷回读，待用户手动重启；该项运行仍为模拟通过，见 [缓存运行证据](apple-cache-runtime.json)和 [部署记录](apple-cache-deploy.json)。
+- 最新源码候选 `57a7d7f` 已通过完整 CI（88 项主机检查、16 份原有运行报告），并在 QEMU 通过原版小缓存的签名登记、两个 16K 签名块认证、8 次 4K 缺页校验和映射清理；关闭授权和篡改拒绝对照通过，最终打包内核重复通过正向/篡改测试。真机已普通启动，原生 CDC 核对精确构建身份、随机 nonce、CACHE_OK 和两次独立快照间变化的心跳，错误/日志丢失均为零。本轮小缓存程序自检真机通过；内部 2/8 哈希计数仍仅 QEMU 直接观察，见 [缓存运行证据](apple-cache-runtime.json)、[真机结果](apple-cache-phone.json)和 [部署记录](apple-cache-deploy.json)。
 - 目标 Apple 镜像先固定为 arm64 iPadOS 17.7.11（21H461，iPad7,1）；自制程序通过不等于该系统已兼容。
 
 状态：**真机通过** = 指定功能由真机程序自检、用户回报画面或实际 USB 主机往返与日志取证证实，逐项注明来源；**模拟/主机通过** = 仅相应环境取证；**部分** = 仅列明范围；**待验证** = 无充分证据；**未实现/未接入** = 当前不具备。次数和时长均为建议目标，不是已完成结果。
@@ -41,7 +41,7 @@
 | B4 | C 入口栈 16 字节对齐 | 真机通过；已修复 SIGBUS |
 | B5 | fork 后父子私有内存隔离 | 单个 COW 变量及四个独立 4 KiB 页各抽样字节的进程自检真机通过 |
 | B6 | 非法地址、只读页写入和执行权限错误处理 | 待验证 |
-| B7 | mmap/mprotect/munmap、缺页与大范围 COW | 部分模拟通过：原版缓存 32 KiB MAP_PRIVATE / RX 映射、8 个 4K 页读取和 munmap；mprotect、一般映射边界、大范围 COW 与该探针真机执行待验证 |
+| B7 | mmap/mprotect/munmap、缺页与大范围 COW | 部分真机自检与 USB 日志通过：原版小缓存 32 KiB MAP_PRIVATE / RX 映射、8 个 4K 页读取和 munmap；内部缺页校验计数仅 QEMU 取证，mprotect、一般映射边界与大范围 COW 待验证 |
 | B8 | FPU/NEON/SIMD 上下文保存恢复 | 待验证；当前程序禁用 SIMD |
 | B9 | IPI、多核启动、跨核调度和 TLB 同步 | 待验证；尚无 IPI 接收证据 |
 | B10 | 全部计划 RAM、内存压力、分配失败与回收 | 待验证 |
@@ -105,7 +105,7 @@
 | --- | --- | --- |
 | G1 | 目标 Apple 二进制、签名和代码页兼容 | 部分：静态检查通过；f916ebb 在 QEMU 实际执行原版 dyld 的 32 个字节匹配 PC，关闭模式/损坏页拒绝通过；真机按画面回报到 DYLD/1 缺 libSystem；完整 Apple 信任链、entitlement、真机精确 PC/构建取证未验证 |
 | G2 | 必需预链接组件、AMFI/CoreTrust/Sandbox 与存储组件匹配 | 部分静态核对：原 18 组件计划保留；只读存储的声明依赖闭包另缩小为 12 个可执行组件、7 个内核接口并完成计划分析，尚未生成/加载；源 corecrypto 配置与原组件 crypto_bootstrap 的兼容、ABI 和实际挂载未验证 |
-| G3 | dyld、共享缓存、libSystem、TLS 和动态链接 | 部分模拟通过：原版 dyld mach_init / prepare；53 个缓存静态检查；其中一个原版 48 KiB subcache 的真实签名登记、16K 完整性认证和 8 次 4K 页校验，含关闭授权/篡改拒绝对照。完整缓存映射、原缓存代码执行、libSystem/TLS 和动态链接仍未通过；新小缓存探针待真机 |
+| G3 | dyld、共享缓存、libSystem、TLS 和动态链接 | 部分模拟通过：原版 dyld mach_init / prepare；53 个缓存静态检查；其中一个原版 48 KiB subcache 的真实签名登记、16K 完整性认证和 8 次 4K 页校验，含关闭授权/篡改拒绝对照。完整缓存映射、原缓存代码执行、libSystem/TLS 和动态链接仍未通过；小缓存探针的程序自检、精确构建 CDC 与变化心跳真机通过，内部哈希计数和拒绝对照仍仅 QEMU 取证 |
 | G4 | Apple launchd 和基本 Mach 服务 | 未接入 |
 | G5 | 必需守护进程和系统服务持续运行 | 未接入 |
 | G6 | IOSurface、图形服务、SpringBoard 及输入 | 未接入 |
@@ -351,3 +351,12 @@ QEMU 模型，已更新并完成全启动卷回读/缓存同步；按用户要�
 下一步分开处理：先完成此小缓存探针真机验收；再在 QEMU 复用只读 APFS/虚拟块设备路径，核对存储 ABI、组件绑定与 crypto_bootstrap 配置，提供同版本 OS/SystemOS 文件后端及 53 个缓存路径，继续观察真实 dyld。只读存储声明闭包已缩小为 12 个可执行组件和 7 个内核接口，但计划工具仍返回 loadable=false，未生成或启动该组件组合。主机已转换并核对只读 OS raw 输入；这不构成内核 APFS 挂载证据。原生 UFS 的通用可分页后端另行适配，当前固定 8193 字节字符设备不能装载约 3.3 GB 缓存。
 
 目前 G3 的原签名页路径有了实际小文件运行证据；完整缓存映射、libSystem 初始化、TLS、原版 launchd 主函数、服务和 iPadOS 界面仍未通过。
+
+
+## 原版小缓存探针真机通过（57a7d7f）
+
+用户完成普通重启后，服务器接入 `1209:0001 / POLARISDBG01` 原生 CDC。两次独立捕获的构建身份均为 `57a7d7fa6b49e97ccdade7eb4e1928e142640e9c`，ping 与两组随机 nonce 往返通过，日志均含 `POLARIS_CACHE_START pid=1 pagesize=4096` 和 `POLARIS_CACHE_OK original=1 blocks16k=2 pages4k=8 map=RX cleanup=OK`。日志 end 从 1767 增至 1794，末尾心跳模 10 数字从 5 变为 6；cmd_errors、reply_overflow 和 dropped 均为 0。[真机结果及 8 份原始 USB 响应摘要](apple-cache-phone.json)已保存。验收过程未写介质或重启手机，当前保持常驻探针运行。
+
+本轮真机通过范围为：自制 PID 1 对未改写的 49,152 字节原版 subcache 完成签名登记、32 KiB RX 映射、8 页数据自检和释放/关闭，并经原生 USB 核对精确构建和存活。内核内部“两块 16K / 八次 4K”计数与损坏页拒绝对照仍只在 QEMU 直接观察，未从手机导出；原版缓存代码没有执行。原全套进程/临时文件/UFS 自检的真机基线仍是 `abc75cf`，不以本轮较小程序替代那套验收。
+
+下一项转到服务器侧的只读文件分页后端：核对现有 APFS/虚拟块设备方案的存储 ABI、绑定与 crypto_bootstrap 组合，提供同一目标 OS/SystemOS 文件路径，再继续原版 dyld 的完整共享缓存和 libSystem 加载。完整 cache、libSystem 初始化、TLS、原版 launchd 主函数和 iPadOS 界面仍待验证；当前无需再次准备 Mass Storage。

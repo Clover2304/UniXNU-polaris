@@ -1,6 +1,6 @@
 # Apple 用户态启动：现有适配复用盘点
 
-更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，最近完整真机自检基线为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`；`f916ebb` 原版 dyld 已通过 QEMU 早期执行，真机按用户画面回报到达缺 libSystem 的依赖查找阶段。新候选 `57a7d7f` 已在 QEMU 通过原版小缓存的 16K 签名/4K 缺页校验和拒绝对照，文件已更新并完整回读，等待用户手动重启；该探针真机运行仍待验证。完整缓存和原版 launchd 主函数仍未通过。
+更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，最近完整真机自检基线为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`；`f916ebb` 原版 dyld 已通过 QEMU 早期执行，真机按用户画面回报到达缺 libSystem 的依赖查找阶段。新候选 `57a7d7f` 已在 QEMU 通过原版小缓存的 16K 签名/4K 缺页校验和拒绝对照，该小缓存探针现已普通启动，并通过精确构建原生 CDC、程序自检和变化心跳的真机取证；内部哈希计数和拒绝对照仍仅模拟观察。完整缓存和原版 launchd 主函数仍未通过。
 
 ## 结论与基线
 
@@ -153,3 +153,12 @@ RAM fixture 采用当前 N4KROOT v3，保留原版 `/sbin/launchd`、`/usr/lib/d
 下一步分开处理：先完成此小缓存探针真机验收；再在 QEMU 复用只读 APFS/虚拟块设备路径，核对存储 ABI、组件绑定与 crypto_bootstrap 配置，提供同版本 OS/SystemOS 文件后端及 53 个缓存路径，继续观察真实 dyld。只读存储声明闭包已缩小为 12 个可执行组件和 7 个内核接口，但计划工具仍返回 loadable=false，未生成或启动该组件组合。主机已转换并核对只读 OS raw 输入；这不构成内核 APFS 挂载证据。原生 UFS 的通用可分页后端另行适配，当前固定 8193 字节字符设备不能装载约 3.3 GB 缓存。
 
 目前 G3 的原签名页路径有了实际小文件运行证据；完整缓存映射、libSystem 初始化、TLS、原版 launchd 主函数、服务和 iPadOS 界面仍未通过。
+
+
+## 原版小缓存探针真机通过（57a7d7f）
+
+用户完成普通重启后，服务器接入 `1209:0001 / POLARISDBG01` 原生 CDC。两次独立捕获的构建身份均为 `57a7d7fa6b49e97ccdade7eb4e1928e142640e9c`，ping 与两组随机 nonce 往返通过，日志均含 `POLARIS_CACHE_START pid=1 pagesize=4096` 和 `POLARIS_CACHE_OK original=1 blocks16k=2 pages4k=8 map=RX cleanup=OK`。日志 end 从 1767 增至 1794，末尾心跳模 10 数字从 5 变为 6；cmd_errors、reply_overflow 和 dropped 均为 0。[真机结果及 8 份原始 USB 响应摘要](apple-cache-phone.json)已保存。验收过程未写介质或重启手机，当前保持常驻探针运行。
+
+本轮真机通过范围为：自制 PID 1 对未改写的 49,152 字节原版 subcache 完成签名登记、32 KiB RX 映射、8 页数据自检和释放/关闭，并经原生 USB 核对精确构建和存活。内核内部“两块 16K / 八次 4K”计数与损坏页拒绝对照仍只在 QEMU 直接观察，未从手机导出；原版缓存代码没有执行。原全套进程/临时文件/UFS 自检的真机基线仍是 `abc75cf`，不以本轮较小程序替代那套验收。
+
+下一项转到服务器侧的只读文件分页后端：核对现有 APFS/虚拟块设备方案的存储 ABI、绑定与 crypto_bootstrap 组合，提供同一目标 OS/SystemOS 文件路径，再继续原版 dyld 的完整共享缓存和 libSystem 加载。完整 cache、libSystem 初始化、TLS、原版 launchd 主函数和 iPadOS 界面仍待验证；当前无需再次准备 Mass Storage。

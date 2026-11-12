@@ -648,7 +648,7 @@
   "stable_selftest_payload_byte_preserved": true,
   "phone_updated": true,
   "phone_rebooted": false,
-  "hardware_cache_probe_verified": false,
+  "hardware_cache_probe_verified": true,
   "hardware_kernel_hash_counters_observed": false,
   "complete_dyld_cache_loaded": false,
   "original_cache_code_executed": false,
@@ -666,5 +666,7 @@
   ],
   "deployment_record": "apple-cache-deploy.json",
   "agent_reboot_performed": false,
-  "awaiting_user_manual_reboot": true
+  "awaiting_user_manual_reboot": false,
+  "phone_result": "apple-cache-phone.json",
+  "user_manual_reboot_completed": true
 }

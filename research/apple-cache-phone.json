@@ -1,0 +1,100 @@
+{
+  "passed": true,
+  "source_commit": "57a7d7fa6b49e97ccdade7eb4e1928e142640e9c",
+  "physical_polaris": true,
+  "transport": "native XNU polling USB CDC",
+  "hardware_kernel_hash_counters_observed": false,
+  "complete_dyld_cache_loaded": false,
+  "original_cache_code_executed": false,
+  "apple_launchd_main_executed": false,
+  "ipados_boot_demonstrated": false,
+  "log_scope": "64 KiB post-console-open ring; own syscall/data acceptance marker",
+  "samples": [
+    {
+      "log_end": 1767,
+      "dropped": 0,
+      "last_tick_mod10": 5,
+      "log_sha256": "74cf506c60040611cb9e337161c485439871c167c7ab5a3e0030e7c0c368055b",
+      "log_bytes": 1926,
+      "path": "sample-00",
+      "nonce": "1f2e92bb9f2c2f05416b66e1ccc6c2de"
+    },
+    {
+      "log_end": 1794,
+      "dropped": 0,
+      "last_tick_mod10": 6,
+      "log_sha256": "c8e29c75358cbb91e153090f731d71a459a86ca98b200ec2bb9d969e03dc22d9",
+      "log_bytes": 1953,
+      "path": "sample-01",
+      "nonce": "28e57c03ba458fea0ea75453e0ed34e9"
+    }
+  ],
+  "native_enumeration_verified": true,
+  "bidirectional_roundtrip_verified": true,
+  "build_identity_verified": true,
+  "runtime_console_log_retrieved": true,
+  "own_cache_probe_syscall_result_verified": true,
+  "resident_heartbeat_verified": true,
+  "usb_errors": 0,
+  "log_dropped": 0,
+  "verified_at_utc": "2026-11-12T06:50:43.966912+00:00",
+  "local_evidence_directory": "artifacts/cache-phone-57a7d7f",
+  "raw_files": {
+    "sample-00/ping.raw": {
+      "bytes": 13,
+      "sha256": "dc3120e5d6200e9de4a39f11cd9d702ee43fd1348376c18ec04bbd5ddb5c1869"
+    },
+    "sample-00/echo.raw": {
+      "bytes": 46,
+      "sha256": "7813a70dab84bb8172078cc9593478775f092234e409e6d401d24935a99c43e1"
+    },
+    "sample-00/status.raw": {
+      "bytes": 239,
+      "sha256": "02f2993b455ccbf33d0af15c8ef9151453ccf7a1c769b055e4a8a9e2f548f253"
+    },
+    "sample-00/log.raw": {
+      "bytes": 1926,
+      "sha256": "74cf506c60040611cb9e337161c485439871c167c7ab5a3e0030e7c0c368055b"
+    },
+    "sample-01/ping.raw": {
+      "bytes": 13,
+      "sha256": "dc3120e5d6200e9de4a39f11cd9d702ee43fd1348376c18ec04bbd5ddb5c1869"
+    },
+    "sample-01/echo.raw": {
+      "bytes": 46,
+      "sha256": "20d85d8bd437ced73c30a3cfe0f1f79fc1402740920996142a706690cf62ce0b"
+    },
+    "sample-01/status.raw": {
+      "bytes": 239,
+      "sha256": "45bdc248af86f73cfc9305b1a9c562ef3d0913eb9eb429ba112397af2647e63e"
+    },
+    "sample-01/log.raw": {
+      "bytes": 1953,
+      "sha256": "c8e29c75358cbb91e153090f731d71a459a86ca98b200ec2bb9d969e03dc22d9"
+    }
+  },
+  "source_kernel_sha256": "7029841dc4979f735e594bfb4f4047b4e9e2fcc0bda6f9b54ab0c54e4d52475e",
+  "packaged_kernel_sha256": "3c13bb6a7dfde5479df759589e84ee0b5034dc932e448fac276022a1dec4803b",
+  "deployed_esp_sha256": "65a33bdf49b0b73cc83f346664af99e5f86f801b7bb46fc474e63f30faaf32fa",
+  "fixture_root_sha256": "084f665dacf7d50116f342d6da2d21906df3b97c6b70c5a43ec9a8efa806c476",
+  "original_file": "dyld_shared_cache_arm64.02",
+  "original_file_bytes": 49152,
+  "original_file_sha256": "3d923c404fe519184a99042b60a4cb3d37247dcb8b070242ed3e670d4d523d04",
+  "original_cdhash": "9d037a68ad6490e103e44e47086e279a2923b04e",
+  "original_file_modified": false,
+  "original_signing_block_bytes": 16384,
+  "native_page_bytes": 4096,
+  "acceptance_marker": "POLARIS_CACHE_OK original=1 blocks16k=2 pages4k=8 map=RX cleanup=OK",
+  "hardware_original_cache_probe_verified": true,
+  "hardware_original_cache_signature_registration_selftest_passed": true,
+  "hardware_original_cache_mmap_read_cleanup_selftest_passed": true,
+  "hardware_negative_signature_controls_tested": false,
+  "kernel_hash_counter_observation_scope": "2 complete 16K blocks / 8 native 4K checks observed directly in QEMU only; native evidence is own-program syscall/data result and exact-build CDC log",
+  "apple_full_trust_chain_verified": false,
+  "apple_entitlements_granted": false,
+  "agent_reboot_performed": false,
+  "device_written_during_acceptance": false,
+  "ci_run_id": 43166582757,
+  "ci_url": "https://github.com/Clover2304/UniXNU-polaris/actions/runs/43166582757",
+  "next_step": "Qualify read-only OS/SystemOS file-backed paging and storage ABI in QEMU, then continue original dyld shared-cache/libSystem loading."
+}

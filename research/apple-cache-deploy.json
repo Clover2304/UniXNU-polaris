@@ -54,9 +54,9 @@
   "boot_timeout_seconds": 10,
   "phone_updated": true,
   "agent_reboot_performed": false,
-  "awaiting_user_manual_reboot": true,
-  "current_boot_mode": "firmware Mass Storage",
-  "hardware_cache_probe_verified": false,
+  "awaiting_user_manual_reboot": false,
+  "current_boot_mode": "XNU resident original subcache probe; exact-build native CDC attested",
+  "hardware_cache_probe_verified": true,
   "hardware_kernel_hash_counters_observed": false,
   "complete_dyld_cache_loaded": false,
   "original_cache_code_executed": false,
@@ -65,5 +65,8 @@
   "previous_apple_probe_source": "f916ebb123801e2f5956407ccc0fcc51a6aade81",
   "previous_apple_probe_byte_preserved": true,
   "fallback_source_commit": "abc75cfb6a7f3a209af4865f575a9b70387c916e",
-  "fallback_kernel_and_root_byte_preserved": true
+  "fallback_kernel_and_root_byte_preserved": true,
+  "subsequent_native_boot_verified": true,
+  "subsequent_native_source_commit": "57a7d7fa6b49e97ccdade7eb4e1928e142640e9c",
+  "subsequent_native_acceptance_record": "apple-cache-phone.json"
 }
