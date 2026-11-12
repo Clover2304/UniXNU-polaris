@@ -73,7 +73,7 @@
 
 适用边界：自制程序和 RAM 文件变更可在 Linux 重做程序包与配置；实际应用仍需一次 Mass Storage 文件更新和普通重启。原生 CDC 当前只有固定诊断命令，没有程序上传、交互 shell 或热执行能力。内核驱动、系统调用、加载器和安全策略改变仍需重编内核。当前策略要求自制程序具有 `CS_ADHOC|CS_HARD|CS_KILL`，按 PID 1/直接子进程及精确 CDHash 授权，并拒绝平台标记和 entitlement；实际 Apple 样本的 CodeDirectory flags 是 `0x2`，不能沿用该自测策略直接执行。RAM 树另有限制：16 个条目、32 MiB 镜像，不足以放入完整系统和共享缓存。
 
-本轮手机保持运行，无需提前进入 Mass Storage。下次确有已验收的候选文件时再请求更新；完成整卷回读与同步后，仍停下等待用户手动重启。
+用户态复用验证时手机保持运行；后续在候选验收完成并由用户准备 Mass Storage 后，才执行下述文件更新，完成回读与同步后仍等待用户手动重启。
 
 
 ## 已完成：共享缓存输入检查
@@ -86,7 +86,7 @@
 
 ## 当前候选：两份原版文件的最早执行探针
 
-候选源码 `f916ebb123801e2f5956407ccc0fcc51a6aade81`，构建与既有回归见 [CI 43155794427](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43155794427)。本地/远端主机检查、macOS 内核编译、EFI 和 16 份原有运行报告均通过；新增原版 Apple 执行检查见下文。本轮尚未更新手机。
+候选源码 `f916ebb123801e2f5956407ccc0fcc51a6aade81`，构建与既有回归见 [CI 43155794427](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43155794427)。本地/远端主机检查、macOS 内核编译、EFI 和 16 份原有运行报告均通过；新增原版 Apple 执行检查见下文。QEMU 运行检查时尚未更新手机；后续实际文件更新见文末。
 
 新增 `polaris-apple-probe=1` 独立诊断模式：仅 PID 1、有效的原 CodeDirectory 和已固定的两个精确 CDHash 可通过。普通启动仍使用原自制程序策略；探针模式不授予 entitlement 或平台身份，不声称接入 AMFI 或 trust-cache runtime。loader 强制签名存在，重新核对已有缓存 blob，并保留原代码页验证及 HARD/KILL 执行约束。它用于定位最早原版代码执行依赖，不能作为 launchd 服务运行所需的完整安全兼容层。
 
@@ -115,4 +115,13 @@ RAM fixture 采用当前 N4KROOT v3，保留原版 `/sbin/launchd`、`/usr/lib/d
 
 菜单默认 `polaris: ORIGINAL DYLD PROBE`，等待 10 秒；第二项 `polaris: verified self-tests abc75cf` 保留旧成功内核、其 ADT、HMAC 记录与自制 RAM 根的原字节。共享 EFI 二进制也与旧成功版本相同。Apple 入口启用原生 USB 诊断，关闭本轮不需要的原生 UFS 探针；回退项保留原测试参数。回退菜单项的真机选择仍待验证。
 
-尚未写入手机或触发重启。已请求用户进入固件 Mass Storage 并共享 USB；更新时仍将先核对旧 ESP，完成写入、同步和完整回读后停下，等待用户手动重启。
+用户已准备固件 Mass Storage 并共享 USB；现在已核对旧 ESP 并完成文件更新、同步和完整回读。设备写入已停止，尚未重启或验证真机 Apple 执行。
+
+
+## 文件已更新，等待用户手动重启
+
+[部署记录](apple-userland-deploy.json)：2026-11-12 经固件 Mass Storage 更新 EFI 文件。USB 身份、已知容量、主/备 GPT 和目标 userdata 分区均核对通过；原 128 MiB ESP 与上次保存的 `5e10f59584d2e7c01cb3f2bd50140d15636d97ad3fc630ac2e11a69a6e5545be` 完全一致后才开始更新。实际卷布局中的 12 个文件均先读回核对，物理写入约 39.3 MiB；同步、清理块缓存后的 O_DIRECT 整卷回读通过。
+
+实际部署 ESP SHA-256 为 `90bce8dfa4b7c93bd43099db7419cb17850a389f900f9a62fa1cd293f963fb6d`。它保留旧卷几何与布局，因而与前述独立制作候选 ESP 的整卷哈希不同；所有已部署文件哈希均与候选清单一致。boot 和其他分区未写入，旧 `abc75cf` 回退内核/ADT/RAM 根及原启动参数保留。
+
+当前停在固件 Mass Storage，未重启。下次用户普通重启后，默认等待 10 秒启动 `polaris: ORIGINAL DYLD PROBE`；`polaris: verified self-tests abc75cf` 为回退项。原版 dyld 的真实手机执行、回退项的手机菜单选择和完整 iPadOS 启动仍未验证；文件写入成功不作为这些运行项通过的证据。
