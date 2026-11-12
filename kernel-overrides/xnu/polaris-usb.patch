@@ -38,7 +38,7 @@
 
 --- /dev/null
 +++ b/bsd/dev/arm/polaris_ufs_node.h
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,73 @@
 +/* SPDX-License-Identifier: BSD-2-Clause-Patent
 + * Fixed read-only character-device file view; data backend owns its buffers.
 + */
@@ -46,6 +46,7 @@
 +#include <kern/kalloc.h>
 +#include <pexpert/device_tree.h>
 +extern int polaris_ufs_node_copy(uint64_t, unsigned, void *) __attribute__((weak_import));
++extern int polaris_ufs_node_model_enable(void) __attribute__((weak_import));
 +static int polaris_node_major = -1, polaris_node_model;
 +volatile uint64_t polaris_node_reads, polaris_node_bytes, polaris_node_opens, polaris_node_denied;
 +static int polaris_node_open(dev_t dev, int flags, int type, struct proc *p)
@@ -71,8 +72,7 @@
 +  uint64_t off=(uint64_t)uio_offset(uio),remaining=8193-off;
 +  unsigned count=(uint64_t)uio_resid(uio)<remaining?(unsigned)uio_resid(uio):(unsigned)remaining;
 +  if(count>4096)count=4096;
-+  if(polaris_node_model){for(unsigned i=0;i<count;i++)temporary[i]=(uint8_t)((off+i)*37+((off+i)>>8)*11+0x51);}
-+  else if(!polaris_ufs_node_copy){error=ENXIO;break;}
++  if(!polaris_ufs_node_copy){error=ENXIO;break;}
 +  else {error=polaris_ufs_node_copy(off,count,temporary);if(error)break;}
 +  error=uiomove((caddr_t)temporary,(int)count,uio);if(error)break;
 +  __atomic_fetch_add(&polaris_node_bytes,count,__ATOMIC_RELAXED);
@@ -98,6 +98,7 @@
 + if(model){if(!polaris_node_is_qemu() || !PE_parse_boot_argn("polaris-ufs-node-model",&enabled,sizeof(enabled)) || enabled!=1)return EPERM;}
 + else if(!polaris_ufs_node_copy || !PE_parse_boot_argn("polaris-ufs-node",&enabled,sizeof(enabled)) || enabled!=1)return EPERM;
 + if(polaris_node_major>=0)return polaris_node_model==model?0:EBUSY;
++ if(model){if(!polaris_ufs_node_model_enable)return ENXIO;int error=polaris_ufs_node_model_enable();if(error)return error;}
 + polaris_node_model=model;
 + int major=cdevsw_add(-1,&polaris_node_switch);if(major<0)return ENXIO;
 + void *node=devfs_make_node(makedev(major,0),DEVFS_CHAR,0,0,0400,"polaris-esp-file");

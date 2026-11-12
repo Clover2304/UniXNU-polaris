@@ -111,6 +111,7 @@ def main():
         counters['_zombproc']=8
     if node_enabled:
         if build.get('ufs_node_available') is not True:p.error('missing source devfs node support')
+        counters['_polaris_ufs_node_progress']=32
         counters.update({name:8 for name in ['_polaris_node_opens','_polaris_node_reads','_polaris_node_bytes','_polaris_node_denied']})
     names = set(counters) | {'_panic', '_panic_with_options', '_panic_trap_to_debugger'}
     syms = platform.symbols(data, names)
@@ -300,7 +301,8 @@ def main():
                                     if node_enabled:
                                         values=list(struct.unpack('<16Q',memory(user['_ufs_node_results'],128)))
                                         report['ufs_node_results']=values
-                                        report['ufs_node_verified']=(values[:10]==[100,1,8193,1,1,3,2,2,9,1] and last['_polaris_node_opens']==2 and last['_polaris_node_denied']==2 and last['_polaris_node_bytes']==20502 and last['_polaris_node_reads']>=12)
+                                        report['ufs_node_queue_progress']=[(last['_polaris_ufs_node_progress']>>(64*i))&((1<<64)-1) for i in range(4)]
+                                        report['ufs_node_verified']=(values[:10]==[100,1,8193,1,1,3,2,2,9,1] and last['_polaris_node_opens']==2 and last['_polaris_node_denied']==2 and last['_polaris_node_bytes']==20502 and last['_polaris_node_reads']>=12 and ((last['_polaris_ufs_node_progress']>>(64*2))&((1<<64)-1))==9 and (last['_polaris_ufs_node_progress']>>(64*3))==10)
                                     if stress_enabled:report['stress_verified']=grade_stress(report)
                                     report['passed']=(not a.negative and (not node_enabled or report['ufs_node_verified']) and (not stress_enabled or report['stress_verified']) and (not tmp_enabled or report['tmp_verified']) and report['el0_observed'] and report['io_verified'] and report['resident_verified'] and report['process_verified'] and
                                         last['_polaris_tree_enabled']==1 and last['_polaris_tree_nodes']==len(bundle['entries'])+1 and

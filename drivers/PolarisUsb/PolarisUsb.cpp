@@ -8,6 +8,8 @@
 #include <libkern/c++/OSSharedPtr.h>
 #include <kern/task.h>
 #include <kern/thread.h>
+#include <kern/clock.h>
+#include <pexpert/device_tree.h>
 #include <pexpert/pexpert.h>
 #include <libkern/libkern.h>
 #include <stdarg.h>
@@ -37,6 +39,7 @@ void polaris_usb_capture(const char *,unsigned);
 int kmputc(int,char);
 int polaris_ufs_node_start(int) __attribute__((weak_import));
 int polaris_ufs_node_copy(uint64_t,unsigned,void *);
+int polaris_ufs_node_model_enable(void);
 extern volatile uint64_t polaris_node_reads,polaris_node_bytes,polaris_node_opens,polaris_node_denied;
 }
 namespace {
@@ -90,7 +93,7 @@ struct TerminalSession {
     uint32_t ufsEspFaultBefore[2]{},ufsEspFaultAfter[2]{};
     IOLock *ufsNodeLock=nullptr;
     PolarisUfsNodeQueue ufsNodeQueue;
-    bool ufsNodeEnabled=false,ufsNodeReady=false,ufsNodeFailed=false,ufsNodeSmmuUnchanged=false;
+    bool ufsNodeEnabled=false,ufsNodeReady=false,ufsNodeFailed=false,ufsNodeSmmuUnchanged=false,ufsNodeModel=false;
     int ufsNodeError=0;
     uint64_t ufsNodeSubmitted=0,ufsNodeCompleted=0,ufsNodeCancelled=0,ufsNodeBusy=0,ufsNodeErrors=0;
     PolarisUfsScsiResult ufsNodeCommands[128];
@@ -388,6 +391,11 @@ static void ufsEspText(TerminalSession &s,bool response) {
 static void nodePhase(uint64_t phase){__atomic_store_n(&polaris_ufs_node_progress[0],phase,__ATOMIC_RELEASE);}
 static bool ufsNodePhysical(TerminalSession &s,uint32_t block) {
     nodePhase(3);__atomic_fetch_add(&polaris_ufs_node_progress[3],1,__ATOMIC_RELAXED);
+    if(s.ufsNodeModel){
+        if(block>2)return false;
+        for(unsigned i=0;i<4096;i++){uint64_t off=uint64_t(block)*4096+i;s.ufsNodeBlock[i]=uint8_t(off*37+(off>>8)*11+0x51);}
+        return true;
+    }
     if(block>=UFS_ESP_BLOCKS || s.ufsNodeCount>=128 || !s.ufsNodeSmmuUnchanged)return false;
     unsigned i=s.ufsNodeCount++;auto &r=s.ufsNodeCommands[i];
     r=polaris_ufs_scsi_read({&s,ufsNopRead,ufsNopWrite,ufsNopDelay,ufsNopCache},
@@ -419,6 +427,7 @@ static void serviceUfsNode(TerminalSession &s) {
     IOLockLock(s.ufsNodeLock);
     if(error){s.ufsNodeFailed=true;s.ufsNodeError=error;s.ufsNodeErrors++;}
     s.ufsNodeCompleted++;s.ufsNodeQueue.finish(error);
+    IOLockWakeup(s.ufsNodeLock,&s.ufsNodeQueue.error,true);
     IOLockUnlock(s.ufsNodeLock);
 }
 static int nodeCopy(uint64_t offset,unsigned bytes,void *output) {
@@ -429,22 +438,33 @@ static int nodeCopy(uint64_t offset,unsigned bytes,void *output) {
     if(!s->ufsNodeReady || s->ufsNodeFailed){IOLockUnlock(s->ufsNodeLock);return 5;}
     if(s->ufsNodeSubmitted>=64){IOLockUnlock(s->ufsNodeLock);return 28;}
     if(!s->ufsNodeQueue.submit(offset,bytes)){s->ufsNodeBusy++;IOLockUnlock(s->ufsNodeLock);return 16;}
-    s->ufsNodeSubmitted++;IOLockUnlock(s->ufsNodeLock);
-    uint64_t deadline=nowMs()+5000;
+    s->ufsNodeSubmitted++;
+    IOLockWakeup(s->ufsNodeLock,&s->ufsNodeQueue,true);
+    uint64_t deadline=0;clock_interval_to_deadline(5000,kMillisecondScale,&deadline);
     for(;;) {
-        IOLockLock(s->ufsNodeLock);int error=0;
-        bool done=s->ufsNodeQueue.collect(static_cast<uint8_t *>(output),error);
-        if(done){IOLockUnlock(s->ufsNodeLock);return error;}
-        if(nowMs()>=deadline){
+        int error=0;
+        if(s->ufsNodeQueue.collect(static_cast<uint8_t *>(output),error)){IOLockUnlock(s->ufsNodeLock);return error;}
+        if(mach_absolute_time()>=deadline){
             unsigned queue=unsigned(s->ufsNodeQueue.state);
             s->ufsNodeQueue.cancel();s->ufsNodeCancelled++;IOLockUnlock(s->ufsNodeLock);
             uint64_t progress[4];for(unsigned i=0;i<4;i++)progress[i]=__atomic_load_n(&polaris_ufs_node_progress[i],__ATOMIC_ACQUIRE);
             console("POLARIS_UFS_NODE_TIMEOUT queue=%u phase=%llu loops=%llu claimed=%llu phys=%llu\n",queue,progress[0],progress[1],progress[2],progress[3]);
             return 60;
         }
-        IOLockUnlock(s->ufsNodeLock);IOSleep(1);
+        // Sleep atomically with mutex release; completion cannot be lost.
+        (void)IOLockSleepDeadline(s->ufsNodeLock,&s->ufsNodeQueue.error,deadline,THREAD_UNINT);
     }
 }
+static void nodeWorkerPause(TerminalSession &s) {
+    if(!s.ufsNodeLock || !s.ufsNodeReady){IOSleep(2);return;}
+    IOLockLock(s.ufsNodeLock);
+    if(s.ufsNodeQueue.state!=PolarisUfsNodeQueue::Pending){
+        uint64_t deadline=0;clock_interval_to_deadline(2,kMillisecondScale,&deadline);
+        (void)IOLockSleepDeadline(s.ufsNodeLock,&s.ufsNodeQueue,deadline,THREAD_UNINT);
+    }
+    IOLockUnlock(s.ufsNodeLock);
+}
+
 static void runUfsNode(TerminalSession &s,bool enabled) {
     s.ufsNodeEnabled=enabled;if(!enabled)return;
     if(s.ufsEspResult.state!=PolarisFatResult::Success || !s.ufsEspSmmuUnchanged || !polaris_ufs_node_start){s.ufsNodeError=6;return;}
@@ -461,8 +481,8 @@ static void ufsNodeText(TerminalSession &s) {
     char text[640],hex[69];uint64_t submitted=0,completed=0,cancelled=0,busy=0,errors=0;unsigned state=0;
     if(s.ufsNodeLock){IOLockLock(s.ufsNodeLock);submitted=s.ufsNodeSubmitted;completed=s.ufsNodeCompleted;cancelled=s.ufsNodeCancelled;busy=s.ufsNodeBusy;errors=s.ufsNodeErrors;state=unsigned(s.ufsNodeQueue.state);IOLockUnlock(s.ufsNodeLock);}
     bool ok=s.ufsNodeReady && !s.ufsNodeFailed && state==0 && completed && submitted==completed && !cancelled && !errors;
-    snprintf(text,sizeof(text),"POLARIS_UFS_NODE build=%s state=%s mode=hardware ready=%u failed=%u error=%d queue=%u submitted=%llu completed=%llu cancelled=%llu busy=%llu errors=%llu count=%u writes=%u doorbells=%u smmu_unchanged=%u media_writes=0 smmu_writes=0 pa=%016llx\n",
-        POLARIS_USB_BUILD_ID,!s.ufsNodeEnabled?"disabled":ok?"ok":"pending",s.ufsNodeReady,s.ufsNodeFailed,s.ufsNodeError,state,submitted,completed,cancelled,busy,errors,s.ufsNodeCount,3*s.ufsNodeCount,s.ufsNodeCount,s.ufsNodeSmmuUnchanged,s.ufsDmaPhys);respond(s,text);
+    snprintf(text,sizeof(text),"POLARIS_UFS_NODE build=%s state=%s mode=%s ready=%u failed=%u error=%d queue=%u submitted=%llu completed=%llu cancelled=%llu busy=%llu errors=%llu count=%u writes=%u doorbells=%u smmu_unchanged=%u media_writes=0 smmu_writes=0 pa=%016llx\n",
+        POLARIS_USB_BUILD_ID,!s.ufsNodeEnabled?"disabled":ok?"ok":"pending",s.ufsNodeModel?"model":"hardware",s.ufsNodeReady,s.ufsNodeFailed,s.ufsNodeError,state,submitted,completed,cancelled,busy,errors,s.ufsNodeCount,3*s.ufsNodeCount,s.ufsNodeCount,s.ufsNodeSmmuUnchanged,s.ufsDmaPhys);respond(s,text);
     snprintf(text,sizeof(text),"POLARIS_UFS_NODE_VFS opens=%llu reads=%llu bytes=%llu denied=%llu path=/dev/polaris-esp-file size=8193\n",polaris_node_opens,polaris_node_reads,polaris_node_bytes,polaris_node_denied);respond(s,text);
     for(unsigned i=0;i<s.ufsNodeCount;i++) {
         const auto &r=s.ufsNodeCommands[i];queryHex(r.upiu,34,hex);
@@ -640,6 +660,34 @@ struct Place {};
 } // namespace
 inline void *operator new(size_t,void *p,Place) noexcept{return p;}
 namespace {
+static void nodeModelWorker(void *context,wait_result_t) {
+    auto &s=*static_cast<TerminalSession *>(context);
+    for(;;){
+        nodePhase(1);__atomic_fetch_add(&polaris_ufs_node_progress[1],1,__ATOMIC_RELAXED);
+        serviceUfsNode(s);nodePhase(7);nodeWorkerPause(s);
+    }
+}
+static int enableNodeModel() {
+    unsigned enabled=0;DTEntry root=nullptr;const void *compatible=nullptr;unsigned bytes=0;
+    if(!PE_parse_boot_argn("polaris-ufs-node-model",&enabled,sizeof(enabled)) || enabled!=1 ||
+       SecureDTLookupEntry(nullptr,"/",&root)!=kSuccess || SecureDTGetProperty(root,"compatible",&compatible,&bytes)!=kSuccess ||
+       bytes!=sizeof("linux,dummy-virt") || memcmp(compatible,"linux,dummy-virt",sizeof("linux,dummy-virt")))return 1;
+    if(__atomic_load_n(&gNodeSession,__ATOMIC_ACQUIRE))return 16;
+    void *memory=IOMalloc(sizeof(TerminalSession));if(!memory)return 12;
+    auto *s=new(memory,Place{})TerminalSession();s->ufsNodeLock=IOLockAlloc();
+    if(!s->ufsNodeLock){s->~TerminalSession();IOFree(memory,sizeof(TerminalSession));return 12;}
+    s->ufsNodeModel=true;s->ufsNodeReady=true;s->ufsNodeEnabled=true;
+    auto &file=s->ufsEspResult;file.state=PolarisFatResult::Success;file.fileBytes=8193;
+    file.sectorsPerCluster=2;file.clusters=130000;file.clusterCount=9;
+    for(unsigned i=0;i<9;i++)file.chain[i]=i+2;
+    __atomic_store_n(&gNodeSession,s,__ATOMIC_RELEASE);
+    thread_t thread=THREAD_NULL;
+    if(kernel_thread_start(nodeModelWorker,s,&thread)!=KERN_SUCCESS){
+        __atomic_store_n(&gNodeSession,static_cast<TerminalSession *>(nullptr),__ATOMIC_RELEASE);
+        IOLockFree(s->ufsNodeLock);s->~TerminalSession();IOFree(memory,sizeof(TerminalSession));return 12;
+    }
+    thread_deallocate(thread);return 0;
+}
 static void worker(void *,wait_result_t) {
     IOSleep(200);
     void *memory=IOMalloc(sizeof(TerminalSession));if(!memory){thread_terminate(current_thread());return;}
@@ -715,10 +763,11 @@ static void worker(void *,wait_result_t) {
                 if(!initQusb2(s->hw)||!runController(*s)){nodePhase(9);diagnostic();logStage("fallback-failed");thread_terminate(current_thread());return;}
             }
         }
-        nodePhase(7);IOSleep(2);
+        nodePhase(7);nodeWorkerPause(*s);
     }
 }
 } // namespace
+extern "C" int polaris_ufs_node_model_enable(void){return enableNodeModel();}
 extern "C" int polaris_ufs_node_copy(uint64_t offset,unsigned bytes,void *output){return nodeCopy(offset,bytes,output);}
 extern "C" void polaris_usb_capture(const char *data,unsigned length) {
     IOSimpleLock *lock=gLogLock;if(!lock)return;

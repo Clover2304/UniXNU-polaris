@@ -63,13 +63,17 @@ class UfsNodeTests(unittest.TestCase):
 #include <cassert>
 #include <cstdarg>
 #include <mutex>
+#include <condition_variable>
+#include <chrono>
+#include <thread>
+#include <atomic>
 using IOLock=std::mutex;
 static void IOLockLock(IOLock*p){p->lock();}
 static void IOLockUnlock(IOLock*p){p->unlock();}
-static uint64_t clockMs;static unsigned mode,diagnostics;
-static uint64_t nowMs(){return clockMs;}
+static constexpr unsigned THREAD_UNINT=0,kMillisecondScale=1;
+static unsigned mode,diagnostics;
 volatile uint64_t polaris_ufs_node_progress[4];
-static void nodePhase(uint64_t p){polaris_ufs_node_progress[0]=p;}
+static void nodePhase(uint64_t p){__atomic_store_n(&polaris_ufs_node_progress[0],p,__ATOMIC_RELEASE);}
 static void console(const char*,...){diagnostics++;}
 struct TerminalSession {
  IOLock lock;IOLock*ufsNodeLock=&lock;PolarisUfsNodeQueue ufsNodeQueue;
@@ -86,33 +90,73 @@ static bool ufsNodePhysical(TerminalSession &s,uint32_t block){
  return true;
 }
 static void serviceUfsNode(TerminalSession &s);
-static void IOSleep(unsigned ms){
- clockMs+=ms;assert(clockMs<10001);
- if(mode==1||mode==2)serviceUfsNode(*gNodeSession);
- if(mode==3&&gNodeSession->ufsNodeQueue.state==PolarisUfsNodeQueue::Pending)assert(gNodeSession->ufsNodeQueue.claim());
+static void IOSleep(unsigned){assert(!"polling must not be used for an enabled node");}
+#ifdef REAL_THREADS
+static std::condition_variable workEvent,doneEvent;
+static std::atomic<bool> waiting;
+static uint64_t mach_absolute_time(){return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());}
+static void clock_interval_to_deadline(unsigned ms,unsigned scale,uint64_t*out){assert(scale==kMillisecondScale);*out=mach_absolute_time()+uint64_t(ms)*1000000;}
+static void IOLockWakeup(IOLock*,void*event,bool one){assert(one);(event==&gNodeSession->ufsNodeQueue?workEvent:doneEvent).notify_one();}
+static int IOLockSleepDeadline(IOLock*lock,void*event,uint64_t deadline,unsigned inter){
+ assert(inter==THREAD_UNINT);std::unique_lock<IOLock> held(*lock,std::adopt_lock);
+ bool work=event==&gNodeSession->ufsNodeQueue;
+ if(work){waiting.store(true,std::memory_order_release);deadline=mach_absolute_time()+5000000000ULL;}
+ auto until=std::chrono::steady_clock::time_point(std::chrono::nanoseconds(deadline));
+ bool ok=(work?workEvent:doneEvent).wait_until(held,until,[&]{return gNodeSession->ufsNodeQueue.state==(work?PolarisUfsNodeQueue::Pending:PolarisUfsNodeQueue::Done);});
+ held.release();assert(ok);return 0;
 }
+#else
+static uint64_t clockMs;static unsigned waits,workWakes,doneWakes;
+static uint64_t mach_absolute_time(){return clockMs;}
+static void clock_interval_to_deadline(unsigned ms,unsigned scale,uint64_t*out){assert(scale==kMillisecondScale);*out=clockMs+ms;}
+static void IOLockWakeup(IOLock*,void*event,bool one){assert(one);if(event==&gNodeSession->ufsNodeQueue)workWakes++;else {assert(event==&gNodeSession->ufsNodeQueue.error);doneWakes++;}}
+static int IOLockSleepDeadline(IOLock*lock,void*event,uint64_t deadline,unsigned inter){
+ assert(inter==THREAD_UNINT);waits++;IOLockUnlock(lock);
+ if(event==&gNodeSession->ufsNodeQueue){clockMs=deadline;IOLockLock(lock);return 1;}
+ assert(event==&gNodeSession->ufsNodeQueue.error);
+ if(mode==4)clockMs=deadline;
+ if(mode==1||mode==2||mode==4||(mode==5&&waits>=3))serviceUfsNode(*gNodeSession);
+ if(mode==3&&gNodeSession->ufsNodeQueue.state==PolarisUfsNodeQueue::Pending)assert(gNodeSession->ufsNodeQueue.claim());
+ if(mode==0||mode==3)clockMs=deadline;else clockMs++;
+ IOLockLock(lock);return mode==0||mode==3||mode==4?1:0;
+}
+#endif
 ''' + actual + r'''
 int main(){
  uint8_t out[4096];
- for(mode=0;mode<=3;mode++){
-  TerminalSession s;gNodeSession=&s;clockMs=0;diagnostics=0;
-  int error=nodeCopy(0,4096,out);
-  if(mode==1){assert(!error&&s.ufsNodeCompleted==1&&!s.ufsNodeCancelled);for(unsigned i=0;i<4096;i++)assert(out[i]==uint8_t(i*37+(i>>8)*11+0x51));}
-  if(mode==2){assert(error==5&&s.ufsNodeFailed&&s.ufsNodeErrors==1);assert(nodeCopy(0,1,out)==5);assert(s.ufsNodeSubmitted==1);}
-  if(mode==0||mode==3){assert(error==60&&s.ufsNodeCancelled==1&&diagnostics==1);assert(s.ufsNodeCompleted==0);}
+#ifdef REAL_THREADS
+ for(unsigned round=0;round<100;round++){
+  TerminalSession s;gNodeSession=&s;mode=round%2?2:1;waiting.store(false,std::memory_order_relaxed);
+  std::thread owner([&]{nodeWorkerPause(s);serviceUfsNode(s);});
+  while(!waiting.load(std::memory_order_acquire))std::this_thread::yield();
+  int result=nodeCopy(0,4096,out);owner.join();assert(result==(mode==2?5:0));
+  assert(s.ufsNodeSubmitted==s.ufsNodeCompleted&&s.ufsNodeCompleted==1&&!s.ufsNodeCancelled);
+  if(mode==1)for(unsigned i=0;i<4096;i++)assert(out[i]==uint8_t(i*37+(i>>8)*11+0x51));
+ }
+#else
+ for(mode=0;mode<=5;mode++){
+  TerminalSession s;gNodeSession=&s;clockMs=0;diagnostics=waits=workWakes=doneWakes=0;
+  int error=nodeCopy(0,4096,out);assert(workWakes==1);
+  if(mode==1||mode==4||mode==5){assert(!error&&s.ufsNodeCompleted==1&&!s.ufsNodeCancelled&&doneWakes==1);for(unsigned i=0;i<4096;i++)assert(out[i]==uint8_t(i*37+(i>>8)*11+0x51));}
+  if(mode==2){assert(error==5&&s.ufsNodeFailed&&s.ufsNodeErrors==1&&doneWakes==1);assert(nodeCopy(0,1,out)==5);assert(s.ufsNodeSubmitted==1);}
+  if(mode==0||mode==3){assert(error==60&&s.ufsNodeCancelled==1&&diagnostics==1);assert(s.ufsNodeCompleted==0&&!doneWakes);}
   if(mode==0)assert(s.ufsNodeQueue.state==PolarisUfsNodeQueue::Idle);
   if(mode==3){assert(s.ufsNodeQueue.state==PolarisUfsNodeQueue::Abandoned);assert(!s.ufsNodeQueue.submit(0,1));s.ufsNodeQueue.finish(0);assert(s.ufsNodeQueue.state==PolarisUfsNodeQueue::Idle);}
  }
  TerminalSession s;gNodeSession=&s;s.ufsNodeSubmitted=64;assert(nodeCopy(0,1,out)==28);assert(nodeCopy(8193,1,out)==22);
  gNodeSession=nullptr;assert(nodeCopy(0,1,out)==6);
+ TerminalSession idle;gNodeSession=&idle;clockMs=0;waits=0;nodeWorkerPause(idle);assert(waits==1&&clockMs==2);
+ assert(idle.ufsNodeQueue.submit(0,1));nodeWorkerPause(idle);assert(waits==1);
+#endif
 }
 '''
         with tempfile.TemporaryDirectory() as td:
             d=Path(td);(d/'worker.cpp').write_text(source)
-            result=subprocess.run([shutil.which('clang++'),'-std=c++17','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',
-                '-I',ROOT/'drivers/PolarisUsb',d/'worker.cpp','-o',d/'worker'],capture_output=True,text=True)
-            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-            subprocess.run([d/'worker'],check=True,capture_output=True)
+            for flags in ([],['-DREAL_THREADS=1']):
+                result=subprocess.run([shutil.which('clang++'),'-std=c++17','-pthread','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',*flags,
+                    '-I',ROOT/'drivers/PolarisUsb',d/'worker.cpp','-o',d/'worker'],capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                subprocess.run([d/'worker'],check=True,capture_output=True,timeout=30)
 
     def test_actual_storage_failure_yields_without_panicking(self):
         text=(ROOT/'scripts/fixtures/polaris-io-init.c').read_text()
