@@ -71,6 +71,8 @@ def main():
     kernel = args.kernel.resolve()
     data = kernel.read_bytes()
     report = json.loads(kernel.with_suffix('.json').read_text())
+    if report.get('requires_original_prelink'):
+        parser.error('deferred bootstrap input requires original component composition before payload assembly')
     if args.ufs_node and (not args.ufs_esp or report.get('ufs_node_available') is not True):
         parser.error('UFS node requires --ufs-esp and source devfs support')
     if args.ufs_esp and (not args.ufs_read or report.get('ufs_fat32_file_available') is not True):

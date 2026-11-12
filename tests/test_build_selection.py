@@ -1,8 +1,10 @@
 """Keep the hardware platform build independent of the optional IPSW stage."""
 import importlib.util
+import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import tomllib
 import unittest
@@ -77,3 +79,27 @@ done
     def test_prelink_configuration_requires_its_inputs(self):
         with self.assertRaisesRegex(ValueError, r'\[kernel.prelink\]'):
             BUILD.prelink_requested(self.selection('polaris_prelink_defconfig'), {})
+
+    def test_deferred_bootstrap_requires_later_composition(self):
+        board = tomllib.loads((ROOT / 'board.toml').read_text())
+        self.assertEqual(BUILD.deferred_prelink(self.selection('polaris_storage_defconfig'),board,True),(False,True))
+        self.assertEqual(BUILD.deferred_prelink(self.selection('polaris_storage_defconfig'),board,False),(True,False))
+
+    def test_source_profile_cannot_be_mislabeled_as_deferred(self):
+        board = tomllib.loads((ROOT / 'board.toml').read_text())
+        with self.assertRaisesRegex(ValueError,'prelinked crypto bootstrap'):
+            BUILD.deferred_prelink(self.selection('polaris_ramdisk_defconfig'),board,True)
+        self.assertEqual(BUILD.deferred_prelink(self.selection('polaris_ramdisk_defconfig'),board,False),(False,False))
+
+    def test_raw_bootstrap_is_rejected_before_payload_or_boot(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary)
+            kernel=directory/'kernel.macho';kernel.write_bytes(b'uncomposed input')
+            kernel.with_suffix('.json').write_text(json.dumps({'requires_original_prelink':True}))
+            for script in ['make-payload-esp.py','check-platform-kernel.py']:
+                out=directory/script
+                result=subprocess.run([sys.executable,ROOT/'scripts'/script,'--kernel',kernel,
+                    '--efi',directory,'--out',out],capture_output=True,text=True,timeout=10)
+                self.assertEqual(result.returncode,2,result.stderr)
+                self.assertIn('requires original component composition',result.stderr)
+                self.assertFalse((out/'esp').exists())

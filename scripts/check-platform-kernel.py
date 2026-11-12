@@ -91,6 +91,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     data = args.kernel.read_bytes()
     build = json.loads(args.kernel.with_suffix('.json').read_text())
+    if build.get('requires_original_prelink'):
+        parser.error('deferred bootstrap input requires original component composition before boot')
     if (build.get('kernel_sha256') != hashlib.sha256(data).hexdigest() or
             build.get('original_components_prelinked') is not False or
             build.get('final_configured_link_passed') is not True):

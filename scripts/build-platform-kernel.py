@@ -31,6 +31,13 @@ def prelink_requested(config, board):
     return requested
 
 
+def deferred_prelink(config, board, defer):
+    requested = prelink_requested(config, board)
+    if defer and not requested:
+        raise ValueError('--defer-prelink requires the prelinked crypto bootstrap')
+    return requested and not defer, requested and defer
+
+
 def install_late_io_patch_hook(script):
     """Remove our overlapping mockfs overlay before common idempotency checks."""
     text = script.read_text()
@@ -55,6 +62,8 @@ def main():
     parser.add_argument('-j', '--jobs', type=int, default=4)
     parser.add_argument('--defconfig', default='polaris_defconfig',
                         help='configs/ name; the prelinked crypto bootstrap additionally uses the IPSW kernelcache')
+    parser.add_argument('--defer-prelink', action='store_true',
+                        help='build the raw prelinked-bootstrap input only; it requires later composition and is not a boot candidate')
     args = parser.parse_args()
     if platform.system() != 'Darwin' or not shutil.which('xcodebuild'):
         parser.error('this step requires macOS with Xcode and the iPhoneOS SDK')
@@ -76,7 +85,7 @@ def main():
     config = ROOT / 'configs' / args.defconfig
     ctx.config = parse_config(config.read_text())
     try:
-        do_prelink = prelink_requested(ctx.config, ctx.board)
+        do_prelink, needs_prelink = deferred_prelink(ctx.config, ctx.board, args.defer_prelink)
     except ValueError as error:
         parser.error(str(error))
     shutil.copyfile(config, ctx.config_path)
@@ -218,6 +227,7 @@ def main():
               f'{hashlib.sha256(prelinked.read_bytes()).hexdigest()}', flush=True)
     report = {'kernel_sha256': hashlib.sha256(data).hexdigest(), 'kernel_bytes': len(data),
               'defconfig': args.defconfig, 'crypto_bootstrap': ctx.config.get('XNU_CRYPTO_BOOTSTRAP'),
+              'prelink_deferred': needs_prelink, 'requires_original_prelink': needs_prelink,
               'source_mockfs': source_mockfs, 'mockfs_symbols': mockfs_symbols,
               'apple_probe_available': apple_probe_available,
               'native4k_signature_hash_cache': native4k_signature_cache,

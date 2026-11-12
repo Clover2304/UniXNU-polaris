@@ -1,0 +1,54 @@
+name: Read-only storage component inputs
+on:
+  push:
+    branches: ['work/polaris-ramdisk']
+    paths: ['.github/workflows/storage.yml', 'configs/polaris_storage_defconfig', 'scripts/build-storage-reference.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-reference:
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          repository: UniXNU/UniXNU
+          ref: 37987aea410691df3c1e0e146a1bfd6127932149
+          path: out/upstream
+      - uses: actions/checkout@v4
+        with:
+          repository: apple-oss-distributions/IOStorageFamily
+          ref: e45fbe30a7879e0b16e26dddb78538f1b00e0bff
+          path: out/storage-source
+      - name: Tools
+        run: |
+          brew install cmake ninja unifdef llvm lld
+          XC=/Applications/Xcode_26.2.app
+          test -d "$XC"
+          echo "DEVELOPER_DIR=$XC/Contents/Developer" >> "$GITHUB_ENV"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          xcrun --sdk iphoneos --find mig
+          xcrun --sdk iphoneos --find iig
+      - name: Build deferred original-bootstrap source kernel
+        run: python3 scripts/build-platform-kernel.py --base out/upstream -j 4 --defconfig polaris_storage_defconfig --defer-prelink
+      - name: Compile public storage annotation with actual XNU record
+        run: python3 scripts/build-storage-reference.py --tree out/native/polaris/tree --source out/storage-source --out out/storage-annotation
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storage-source-inputs
+          retention-days: 7
+          path: |
+            out/native/polaris/kernel/
+            out/storage-annotation/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: storage-source-diagnostics
+          retention-days: 7
+          path: out/native/polaris/logs/
