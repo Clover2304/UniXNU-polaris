@@ -102,9 +102,9 @@
 
 | 编号 | 验收内容 | 状态 |
 | --- | --- | --- |
-| G1 | 目标 Apple 二进制、签名和代码页兼容 | 部分静态通过：原版 launchd/dyld 为普通 ARM64、4K 可映射，131/223 个代码槽哈希和原 trust-cache 条目通过；负向对照 2/2；完整信任链与实际执行未验证 |
+| G1 | 目标 Apple 二进制、签名和代码页兼容 | 部分：静态检查通过；f916ebb 在 QEMU 实际执行原版 dyld 的 32 个字节匹配 PC，关闭模式/损坏页拒绝通过；完整 Apple 信任链、entitlement 与真机执行未验证 |
 | G2 | 必需预链接组件、AMFI/CoreTrust/Sandbox 与存储组件匹配 | 部分静态核对：目标缓存 pin 与 10 个根组件确认；已有工具解析 18 个组件的绝对指针计划；指令重定位、ABI 和实际加载未验证 |
-| G3 | dyld、共享缓存、libSystem、TLS 和动态链接 | 未接入 |
+| G3 | dyld、共享缓存、libSystem、TLS 和动态链接 | 部分：原版 dyld 的 mach_init 正常返回、4K 页全局量与 prepare 入口在 QEMU 通过；53 个 cache/subcache 静态检查通过；实际 cache 装载、libSystem/TLS 和完整动态链接未接入 |
 | G4 | Apple launchd 和基本 Mach 服务 | 未接入 |
 | G5 | 必需守护进程和系统服务持续运行 | 未接入 |
 | G6 | IOSurface、图形服务、SpringBoard 及输入 | 未接入 |
@@ -307,3 +307,17 @@ QEMU 模型，已更新并完成全启动卷回读/缓存同步；按用户要�
 已取得同一目标 OS DMG，并使用固定 UniXNU 原样审计器核对原版 launchd/dyld。结果见 [输入审计](apple-userspace-audit.json)和 [复用说明](apple-userland-reuse.md)。G1 的静态子项通过；G2～G4 的运行项仍未完成，手机没有更新。
 
 同一 `abc75cf` 原始内核在 QEMU 跑通 Linux 新编译的自制程序包，离线手机文件树中打包内核和 EFI 完全不变，仅 RAM 根与启动参数不同，见 [内核复用证据](userspace-kernel-reuse.json)。这减少用户态试验的 macOS 编译次数，仍需更新文件和普通重启；当前没有热上传/执行，Apple 签名与加载器配置变更也仍需单独编译验证。
+
+
+### G1/G3 当前实施：原版 dyld 的最早执行
+
+源码候选 `f916ebb` 增加显式开启、仅 PID 1/两份精确原版 CDHash 的诊断入口；不授予 entitlement/平台身份，不将它描述为完整 Apple 信任链或 AMFI 集成。原版文件字节保持不变。先验收 startup 的真实 EL0 指令，再验收 `mach_init` 与页大小全局量；关闭模式、损坏代码页必须拒绝。当前手机仍为 `abc75cf`；候选构建与下列 QEMU Apple 早期执行验收已完成，真机 Apple 执行未验证。
+
+53 个 cache/subcache 的静态检查见 [完整结果](apple-dyld-cache-audit.json)，全部为 4K 对齐映射、16K 签名块，代码块和原 System trust-cache 条目通过；G3 的运行项不因此通过。首次入口探针之后，按真实依赖接入已有大签名块路径及共享缓存。
+
+
+### G1/G3 本轮验收结果（f916ebb，QEMU）
+
+[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43155794427)通过，16 份原有运行报告保留。新增原版 dyld startup、`mach_init` 返回和 `prepare` 入口，以及关闭模式、损坏代码页两组对照全部通过。最终打包内核也重复通过原版 `mach_init` 正向与损坏页拒绝；共 7 组记录，见 [原版执行证据](apple-userspace-runtime.json)。所有正向代码页错误计数为 0，损坏页触发 namespace=3/code=2 和 bad_hash=1；原版文件没有改写。
+
+当前不再是只有静态样本：原版 dyld 的真实 EL0 执行已模拟取证。尚无原版 launchd 主函数、共享缓存实际装载、完整信任链、服务或界面通过。准备好的真机候选保留 `abc75cf` 的旧内核/ADT/RAM 根回退项，FAT 回读与最终打包 QEMU 已通过；手机未更新，等待用户 Mass Storage 连接，写入后仍停下等手动重启。

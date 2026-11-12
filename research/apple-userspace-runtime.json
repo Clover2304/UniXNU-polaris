@@ -1,0 +1,503 @@
+{
+  "source_commit": "f916ebb123801e2f5956407ccc0fcc51a6aade81",
+  "ci_run_id": 43155794427,
+  "ci_url": "https://github.com/Clover2304/UniXNU-polaris/actions/runs/43155794427",
+  "ci_passed": true,
+  "ci_existing_runtime_reports_passed": 16,
+  "source_kernel_sha256": "d71b0e61afb07e6561d48ba551efb6eea650aa5748d50fd3b7664771b074fa38",
+  "packaged_kernel_sha256": "8d8e0a277253f2ae371adc475dd58246d98ad14bd0312114e23ffd7c2f8b0ac1",
+  "original_input_root_sha256": "0c39fe21054df5851910422f7d87db7db3f27a32894f319b5585d5394f287730",
+  "qemu_original_dyld_entered": true,
+  "qemu_mach_init_returned": true,
+  "qemu_prepare_entered": true,
+  "rejection_controls_passed": true,
+  "original_binaries_modified": false,
+  "apple_amfi_or_trust_cache_runtime_loaded": false,
+  "apple_entitlements_granted": false,
+  "apple_full_trust_chain_verified": false,
+  "apple_launchd_main_executed": false,
+  "ipados_boot_demonstrated": false,
+  "hardware_tested": false,
+  "phone_updated": false,
+  "cases": [
+    {
+      "passed": true,
+      "checkpoint": "startup",
+      "negative_control": null,
+      "kernel_sha256": "d71b0e61afb07e6561d48ba551efb6eea650aa5748d50fd3b7664771b074fa38",
+      "input_root_sha256": "0c39fe21054df5851910422f7d87db7db3f27a32894f319b5585d5394f287730",
+      "observer_provenance": {
+        "upstream": "37987aea410691df3c1e0e146a1bfd6127932149",
+        "source_script_sha256": "30f99434c8128ec8609803f767a8aac3ff6aef5b09cba92b1cf966add278952e",
+        "adapted_script_sha256": "9cd87c70550bb432faf274254d19df15ef2cdc3da70d76f834f633a6e4f4bc58",
+        "changes": [
+          "QEMU 6.2 CPU max instead of unavailable cortex-a710, including report labels",
+          "Ubuntu packaged AAVMF variable store path",
+          "Read QEMU 6.2 AArch64 SCTLR register and explicitly alias it to SCTLR_EL1",
+          "For bounded kernel counters unavailable from EL0 virtual reads, reuse upstream actual TTBR1 4K table walk and read physical memory; preserve virtual error and translation evidence, restore mode"
+        ],
+        "guest_state_mutations_enabled": false
+      },
+      "native_4k_observed": true,
+      "original_dyld_el0_entered": true,
+      "original_byte_matched_steps": 32,
+      "original_distinct_pcs": 32,
+      "original_dyld_checkpoint_reached": true,
+      "original_dyld_page_abi": {},
+      "kernel_counters": {
+        "_rootvnode": 18446744027981413920,
+        "_PAGE_SHIFT_CONST": 12,
+        "_page_shift": 12,
+        "_page_size": 4096,
+        "_cs_validate_page_bad_hash": 0,
+        "_cs_validate_page_no_hash": 0,
+        "_amfi": 0,
+        "_polaris_apple_signature_accepted": 6,
+        "_polaris_apple_signature_rejected": 0,
+        "_polaris_apple_launchd_accepted": 3,
+        "_polaris_apple_dyld_accepted": 3,
+        "_polaris_init_signature_rejected": 0,
+        "_polaris_child_signature_rejected": 0,
+        "_polaris_init_unsigned_rejected": 0,
+        "_polaris_tree_enabled": 1,
+        "_polaris_process_exec_checks": 2,
+        "_polaris_process_exec_rejected": 0
+      },
+      "raw_report_sha256": "bd26ec19576dd6c745852aafab32c1b8f685c53f9705917267c6e181463f9b08",
+      "target_launchd_main_executed": false,
+      "ipados_boot_demonstrated": false,
+      "hardware_tested": false,
+      "negative_input": null,
+      "case": "apple-dyld-startup-f916ebb-v2",
+      "physical_counter_read_count": 17
+    },
+    {
+      "passed": true,
+      "checkpoint": "mach-init",
+      "negative_control": null,
+      "kernel_sha256": "d71b0e61afb07e6561d48ba551efb6eea650aa5748d50fd3b7664771b074fa38",
+      "input_root_sha256": "0c39fe21054df5851910422f7d87db7db3f27a32894f319b5585d5394f287730",
+      "observer_provenance": {
+        "upstream": "37987aea410691df3c1e0e146a1bfd6127932149",
+        "source_script_sha256": "30f99434c8128ec8609803f767a8aac3ff6aef5b09cba92b1cf966add278952e",
+        "adapted_script_sha256": "9cd87c70550bb432faf274254d19df15ef2cdc3da70d76f834f633a6e4f4bc58",
+        "changes": [
+          "QEMU 6.2 CPU max instead of unavailable cortex-a710, including report labels",
+          "Ubuntu packaged AAVMF variable store path",
+          "Read QEMU 6.2 AArch64 SCTLR register and explicitly alias it to SCTLR_EL1",
+          "For bounded kernel counters unavailable from EL0 virtual reads, reuse upstream actual TTBR1 4K table walk and read physical memory; preserve virtual error and translation evidence, restore mode"
+        ],
+        "guest_state_mutations_enabled": false
+      },
+      "native_4k_observed": true,
+      "original_dyld_el0_entered": true,
+      "original_byte_matched_steps": 32,
+      "original_distinct_pcs": 32,
+      "original_dyld_checkpoint_reached": true,
+      "original_dyld_page_abi": {
+        "_vm_page_size": 4096,
+        "_vm_page_mask": 4095,
+        "_vm_page_shift": 12,
+        "_vm_kernel_page_shift": 12
+      },
+      "kernel_counters": {
+        "_rootvnode": 18446744021303240592,
+        "_PAGE_SHIFT_CONST": 12,
+        "_page_shift": 12,
+        "_page_size": 4096,
+        "_cs_validate_page_bad_hash": 0,
+        "_cs_validate_page_no_hash": 0,
+        "_amfi": 0,
+        "_polaris_apple_signature_accepted": 6,
+        "_polaris_apple_signature_rejected": 0,
+        "_polaris_apple_launchd_accepted": 3,
+        "_polaris_apple_dyld_accepted": 3,
+        "_polaris_init_signature_rejected": 0,
+        "_polaris_child_signature_rejected": 0,
+        "_polaris_init_unsigned_rejected": 0,
+        "_polaris_tree_enabled": 1,
+        "_polaris_process_exec_checks": 2,
+        "_polaris_process_exec_rejected": 0
+      },
+      "raw_report_sha256": "bcca84ffef80e3fa168f7a74b27e8af6a22ee74de9007a3c0590b82cf62d8742",
+      "target_launchd_main_executed": false,
+      "ipados_boot_demonstrated": false,
+      "hardware_tested": false,
+      "negative_input": null,
+      "case": "apple-dyld-mach-init-f916ebb",
+      "original_mach_init_return": {
+        "observed": true,
+        "el0": true,
+        "x0": 0
+      },
+      "physical_counter_read_count": 17
+    },
+    {
+      "passed": true,
+      "checkpoint": "prepare",
+      "negative_control": null,
+      "kernel_sha256": "d71b0e61afb07e6561d48ba551efb6eea650aa5748d50fd3b7664771b074fa38",
+      "input_root_sha256": "0c39fe21054df5851910422f7d87db7db3f27a32894f319b5585d5394f287730",
+      "observer_provenance": {
+        "upstream": "37987aea410691df3c1e0e146a1bfd6127932149",
+        "source_script_sha256": "30f99434c8128ec8609803f767a8aac3ff6aef5b09cba92b1cf966add278952e",
+        "adapted_script_sha256": "9cd87c70550bb432faf274254d19df15ef2cdc3da70d76f834f633a6e4f4bc58",
+        "changes": [
+          "QEMU 6.2 CPU max instead of unavailable cortex-a710, including report labels",
+          "Ubuntu packaged AAVMF variable store path",
+          "Read QEMU 6.2 AArch64 SCTLR register and explicitly alias it to SCTLR_EL1",
+          "For bounded kernel counters unavailable from EL0 virtual reads, reuse upstream actual TTBR1 4K table walk and read physical memory; preserve virtual error and translation evidence, restore mode"
+        ],
+        "guest_state_mutations_enabled": false
+      },
+      "native_4k_observed": true,
+      "original_dyld_el0_entered": true,
+      "original_byte_matched_steps": 32,
+      "original_distinct_pcs": 32,
+      "original_dyld_checkpoint_reached": true,
+      "original_dyld_page_abi": {
+        "_vm_page_size": 4096,
+        "_vm_page_mask": 4095,
+        "_vm_page_shift": 12,
+        "_vm_kernel_page_shift": 12
+      },
+      "kernel_counters": {
+        "_rootvnode": 18446744023836154464,
+        "_PAGE_SHIFT_CONST": 12,
+        "_page_shift": 12,
+        "_page_size": 4096,
+        "_cs_validate_page_bad_hash": 0,
+        "_cs_validate_page_no_hash": 0,
+        "_amfi": 0,
+        "_polaris_apple_signature_accepted": 6,
+        "_polaris_apple_signature_rejected": 0,
+        "_polaris_apple_launchd_accepted": 3,
+        "_polaris_apple_dyld_accepted": 3,
+        "_polaris_init_signature_rejected": 0,
+        "_polaris_child_signature_rejected": 0,
+        "_polaris_init_unsigned_rejected": 0,
+        "_polaris_tree_enabled": 1,
+        "_polaris_process_exec_checks": 2,
+        "_polaris_process_exec_rejected": 0
+      },
+      "raw_report_sha256": "42eee79a1ad314e7b122ea173199a1801192307d9c8f23f4583b83bb46c9d276",
+      "target_launchd_main_executed": false,
+      "ipados_boot_demonstrated": false,
+      "hardware_tested": false,
+      "negative_input": null,
+      "case": "apple-dyld-prepare-f916ebb",
+      "physical_counter_read_count": 17
+    },
+    {
+      "passed": true,
+      "checkpoint": "startup",
+      "negative_control": "mode-off",
+      "kernel_sha256": "d71b0e61afb07e6561d48ba551efb6eea650aa5748d50fd3b7664771b074fa38",
+      "input_root_sha256": "0c39fe21054df5851910422f7d87db7db3f27a32894f319b5585d5394f287730",
+      "observer_provenance": {
+        "upstream": "37987aea410691df3c1e0e146a1bfd6127932149",
+        "source_script_sha256": "30f99434c8128ec8609803f767a8aac3ff6aef5b09cba92b1cf966add278952e",
+        "adapted_script_sha256": "5495de3db1d492bbcf12b85546a22c5f4fef796f6a7c053d4e64ccd248006aa3",
+        "changes": [
+          "QEMU 6.2 CPU max instead of unavailable cortex-a710, including report labels",
+          "Ubuntu packaged AAVMF variable store path",
+          "Read QEMU 6.2 AArch64 SCTLR register and explicitly alias it to SCTLR_EL1"
+        ],
+        "guest_state_mutations_enabled": false
+      },
+      "native_4k_observed": true,
+      "original_dyld_el0_entered": false,
+      "original_byte_matched_steps": 0,
+      "original_distinct_pcs": 0,
+      "original_dyld_checkpoint_reached": false,
+      "original_dyld_page_abi": {},
+      "kernel_counters": {
+        "_rootvnode": 18446744017216918720,
+        "_PAGE_SHIFT_CONST": 12,
+        "_page_shift": 12,
+        "_page_size": 4096,
+        "_cs_validate_page_bad_hash": 0,
+        "_cs_validate_page_no_hash": 0,
+        "_amfi": 0,
+        "_polaris_apple_signature_accepted": 0,
+        "_polaris_apple_signature_rejected": 0,
+        "_polaris_apple_launchd_accepted": 0,
+        "_polaris_apple_dyld_accepted": 0,
+        "_polaris_init_signature_rejected": 1,
+        "_polaris_child_signature_rejected": 0,
+        "_polaris_init_unsigned_rejected": 0,
+        "_polaris_tree_enabled": 1,
+        "_polaris_process_exec_checks": 0,
+        "_polaris_process_exec_rejected": 0
+      },
+      "raw_report_sha256": "4f8e81dc03649d39e836beafec373c47c94e7dda6103e05ddc21c6ee9687578a",
+      "target_launchd_main_executed": false,
+      "ipados_boot_demonstrated": false,
+      "hardware_tested": false,
+      "negative_input": null,
+      "case": "apple-dyld-mode-off-f916ebb",
+      "physical_counter_read_count": 0
+    },
+    {
+      "passed": true,
+      "checkpoint": "mach-init",
+      "negative_control": "damaged-dyld",
+      "kernel_sha256": "d71b0e61afb07e6561d48ba551efb6eea650aa5748d50fd3b7664771b074fa38",
+      "input_root_sha256": "eab1414ba68657c83e909e45685ab72dea09b9ac5ea4094e9fba47b94fc5fc47",
+      "observer_provenance": {
+        "upstream": "37987aea410691df3c1e0e146a1bfd6127932149",
+        "source_script_sha256": "30f99434c8128ec8609803f767a8aac3ff6aef5b09cba92b1cf966add278952e",
+        "adapted_script_sha256": "9cd87c70550bb432faf274254d19df15ef2cdc3da70d76f834f633a6e4f4bc58",
+        "changes": [
+          "QEMU 6.2 CPU max instead of unavailable cortex-a710, including report labels",
+          "Ubuntu packaged AAVMF variable store path",
+          "Read QEMU 6.2 AArch64 SCTLR register and explicitly alias it to SCTLR_EL1",
+          "For bounded kernel counters unavailable from EL0 virtual reads, reuse upstream actual TTBR1 4K table walk and read physical memory; preserve virtual error and translation evidence, restore mode"
+        ],
+        "guest_state_mutations_enabled": false
+      },
+      "native_4k_observed": true,
+      "original_dyld_el0_entered": true,
+      "original_byte_matched_steps": 0,
+      "original_distinct_pcs": 0,
+      "original_dyld_checkpoint_reached": true,
+      "original_dyld_page_abi": {
+        "_vm_page_size": null,
+        "_vm_page_mask": null,
+        "_vm_page_shift": null,
+        "_vm_kernel_page_shift": null
+      },
+      "kernel_counters": {
+        "_rootvnode": 18446744025123314032,
+        "_PAGE_SHIFT_CONST": 12,
+        "_page_shift": 12,
+        "_page_size": 4096,
+        "_cs_validate_page_bad_hash": 1,
+        "_cs_validate_page_no_hash": 0,
+        "_amfi": 0,
+        "_polaris_apple_signature_accepted": 6,
+        "_polaris_apple_signature_rejected": 0,
+        "_polaris_apple_launchd_accepted": 3,
+        "_polaris_apple_dyld_accepted": 3,
+        "_polaris_init_signature_rejected": 0,
+        "_polaris_child_signature_rejected": 0,
+        "_polaris_init_unsigned_rejected": 0,
+        "_polaris_tree_enabled": 1,
+        "_polaris_process_exec_checks": 2,
+        "_polaris_process_exec_rejected": 0
+      },
+      "raw_report_sha256": "7f6dbab7a2d3eb4f38a25b200859c266ccf1df34cfa5505030e8d3d0e3ca305c",
+      "target_launchd_main_executed": false,
+      "ipados_boot_demonstrated": false,
+      "hardware_tested": false,
+      "negative_input": {
+        "path": "/usr/lib/dyld",
+        "file_offset": 225976,
+        "before": 16,
+        "after": 17,
+        "original_files_modified": false,
+        "signature_modified": false
+      },
+      "case": "apple-dyld-tamper-f916ebb",
+      "observed_exit_reason": {
+        "namespace": 3,
+        "code": 2,
+        "meaning": "CODESIGNING / INVALID_PAGE"
+      },
+      "physical_counter_read_count": 0
+    },
+    {
+      "passed": true,
+      "checkpoint": "mach-init",
+      "negative_control": null,
+      "kernel_sha256": "8d8e0a277253f2ae371adc475dd58246d98ad14bd0312114e23ffd7c2f8b0ac1",
+      "source_kernel_sha256": "d71b0e61afb07e6561d48ba551efb6eea650aa5748d50fd3b7664771b074fa38",
+      "exact_packaged_kernel_tested": true,
+      "input_root_sha256": "0c39fe21054df5851910422f7d87db7db3f27a32894f319b5585d5394f287730",
+      "observer_provenance": {
+        "upstream": "37987aea410691df3c1e0e146a1bfd6127932149",
+        "source_script_sha256": "30f99434c8128ec8609803f767a8aac3ff6aef5b09cba92b1cf966add278952e",
+        "adapted_script_sha256": "9cd87c70550bb432faf274254d19df15ef2cdc3da70d76f834f633a6e4f4bc58",
+        "changes": [
+          "QEMU 6.2 CPU max instead of unavailable cortex-a710, including report labels",
+          "Ubuntu packaged AAVMF variable store path",
+          "Read QEMU 6.2 AArch64 SCTLR register and explicitly alias it to SCTLR_EL1",
+          "For bounded kernel counters unavailable from EL0 virtual reads, reuse upstream actual TTBR1 4K table walk and read physical memory; preserve virtual error and translation evidence, restore mode"
+        ],
+        "guest_state_mutations_enabled": false
+      },
+      "native_4k_observed": true,
+      "original_dyld_el0_entered": true,
+      "original_byte_matched_steps": 32,
+      "original_distinct_pcs": 32,
+      "original_dyld_checkpoint_reached": true,
+      "original_dyld_page_abi": {
+        "_vm_page_size": 4096,
+        "_vm_page_mask": 4095,
+        "_vm_page_shift": 12,
+        "_vm_kernel_page_shift": 12
+      },
+      "kernel_counters": {
+        "_rootvnode": 18446744015636307008,
+        "_PAGE_SHIFT_CONST": 12,
+        "_page_shift": 12,
+        "_page_size": 4096,
+        "_cs_validate_page_bad_hash": 0,
+        "_cs_validate_page_no_hash": 0,
+        "_amfi": 0,
+        "_polaris_apple_signature_accepted": 6,
+        "_polaris_apple_signature_rejected": 0,
+        "_polaris_apple_launchd_accepted": 3,
+        "_polaris_apple_dyld_accepted": 3,
+        "_polaris_init_signature_rejected": 0,
+        "_polaris_child_signature_rejected": 0,
+        "_polaris_init_unsigned_rejected": 0,
+        "_polaris_tree_enabled": 1,
+        "_polaris_process_exec_checks": 2,
+        "_polaris_process_exec_rejected": 0
+      },
+      "raw_report_sha256": "f659de52a5f411cd22306eaf529887e48b1bd7c54e7862b263b964cc7fe65ba3",
+      "target_launchd_main_executed": false,
+      "ipados_boot_demonstrated": false,
+      "hardware_tested": false,
+      "negative_input": null,
+      "case": "apple-dyld-packaged-mach-init-f916ebb",
+      "original_mach_init_return": {
+        "observed": true,
+        "el0": true,
+        "x0": 0
+      },
+      "physical_counter_read_count": 17
+    },
+    {
+      "passed": true,
+      "checkpoint": "mach-init",
+      "negative_control": "damaged-dyld",
+      "kernel_sha256": "8d8e0a277253f2ae371adc475dd58246d98ad14bd0312114e23ffd7c2f8b0ac1",
+      "source_kernel_sha256": "d71b0e61afb07e6561d48ba551efb6eea650aa5748d50fd3b7664771b074fa38",
+      "exact_packaged_kernel_tested": true,
+      "input_root_sha256": "eab1414ba68657c83e909e45685ab72dea09b9ac5ea4094e9fba47b94fc5fc47",
+      "observer_provenance": {
+        "upstream": "37987aea410691df3c1e0e146a1bfd6127932149",
+        "source_script_sha256": "30f99434c8128ec8609803f767a8aac3ff6aef5b09cba92b1cf966add278952e",
+        "adapted_script_sha256": "9cd87c70550bb432faf274254d19df15ef2cdc3da70d76f834f633a6e4f4bc58",
+        "changes": [
+          "QEMU 6.2 CPU max instead of unavailable cortex-a710, including report labels",
+          "Ubuntu packaged AAVMF variable store path",
+          "Read QEMU 6.2 AArch64 SCTLR register and explicitly alias it to SCTLR_EL1",
+          "For bounded kernel counters unavailable from EL0 virtual reads, reuse upstream actual TTBR1 4K table walk and read physical memory; preserve virtual error and translation evidence, restore mode"
+        ],
+        "guest_state_mutations_enabled": false
+      },
+      "native_4k_observed": true,
+      "original_dyld_el0_entered": true,
+      "original_byte_matched_steps": 0,
+      "original_distinct_pcs": 0,
+      "original_dyld_checkpoint_reached": true,
+      "original_dyld_page_abi": {
+        "_vm_page_size": null,
+        "_vm_page_mask": null,
+        "_vm_page_shift": null,
+        "_vm_kernel_page_shift": null
+      },
+      "kernel_counters": {
+        "_rootvnode": 18446744033833523328,
+        "_PAGE_SHIFT_CONST": 12,
+        "_page_shift": 12,
+        "_page_size": 4096,
+        "_cs_validate_page_bad_hash": 1,
+        "_cs_validate_page_no_hash": 0,
+        "_amfi": 0,
+        "_polaris_apple_signature_accepted": 6,
+        "_polaris_apple_signature_rejected": 0,
+        "_polaris_apple_launchd_accepted": 3,
+        "_polaris_apple_dyld_accepted": 3,
+        "_polaris_init_signature_rejected": 0,
+        "_polaris_child_signature_rejected": 0,
+        "_polaris_init_unsigned_rejected": 0,
+        "_polaris_tree_enabled": 1,
+        "_polaris_process_exec_checks": 2,
+        "_polaris_process_exec_rejected": 0
+      },
+      "raw_report_sha256": "f748013d3733e610900b79e16f74196100ffbb242dd658c969ae968d13723256",
+      "target_launchd_main_executed": false,
+      "ipados_boot_demonstrated": false,
+      "hardware_tested": false,
+      "negative_input": {
+        "path": "/usr/lib/dyld",
+        "file_offset": 225976,
+        "before": 16,
+        "after": 17,
+        "original_files_modified": false,
+        "signature_modified": false
+      },
+      "case": "apple-dyld-packaged-tamper-f916ebb",
+      "observed_exit_reason": {
+        "namespace": 3,
+        "code": 2,
+        "meaning": "CODESIGNING / INVALID_PAGE"
+      },
+      "physical_counter_read_count": 0
+    }
+  ],
+  "phone_candidate": {
+    "esp_sha256": "69918767d14dcaa31279735154dc6878a760c2d609d2a2daec4a34065eb4d906",
+    "bytes": 134217728,
+    "files": {
+      "EFI/BOOT/BOOTAA64.EFI": {
+        "bytes": 94208,
+        "sha256": "aad20205a434770b515722dea25343e08e9ad1b39a9bac4c663226c14b639cf6"
+      },
+      "EFI/UniXNU/Fallback/kernel.macho": {
+        "bytes": 19419904,
+        "sha256": "4b3126eb76b27b0113696951b47a39174f6eef6d7b5340e012674982f64bb4bc"
+      },
+      "EFI/UniXNU/Fallback/kernel.macho.adt": {
+        "bytes": 10580,
+        "sha256": "7bd0972944eeef5886d5599c641aa575191f3cb8f07566603f2a7455a2c5a5b0"
+      },
+      "EFI/UniXNU/Fallback/kernel.macho.crypto-hmac.json": {
+        "bytes": 307,
+        "sha256": "1928ce2565d6b64925b55d2d2c9bb57b4d31ac7b79056ee001b6367ad829016e"
+      },
+      "EFI/UniXNU/Fallback/root.img": {
+        "bytes": 204800,
+        "sha256": "8167bf20c5fb3c27f5f975543bc5854eb0c06f7f0b97a022a2640c97b6facbfd"
+      },
+      "EFI/UniXNU/Payloads/DarwinBoot.efi": {
+        "bytes": 36864,
+        "sha256": "8dbcbd3e535c8013b82b1cf25b43ba2e3a3e221b718dc0a9698e9b9742a45a72"
+      },
+      "EFI/UniXNU/Payloads/kernel.macho": {
+        "bytes": 19420264,
+        "sha256": "8d8e0a277253f2ae371adc475dd58246d98ad14bd0312114e23ffd7c2f8b0ac1"
+      },
+      "EFI/UniXNU/Payloads/kernel.macho.adt": {
+        "bytes": 10580,
+        "sha256": "82818e257c09fbe35ee5ba663999d50a95a6b4344a06bafac986da0677d9d6e8"
+      },
+      "EFI/UniXNU/Payloads/kernel.macho.crypto-hmac.json": {
+        "bytes": 307,
+        "sha256": "63c2cfd3be8e932b77efae3ca14ef772a5773f488a1e4d91a8290f75eacb8b4b"
+      },
+      "EFI/UniXNU/Payloads/root.img": {
+        "bytes": 1511424,
+        "sha256": "0c39fe21054df5851910422f7d87db7db3f27a32894f319b5585d5394f287730"
+      },
+      "EFI/UniXNU/READTEST.BIN": {
+        "bytes": 8193,
+        "sha256": "6f8f27897d728e935435ada86bf393b8751de163396edcd4c9bf24df56d9da6f"
+      },
+      "EFI/UniXNU/unixnu.toml": {
+        "bytes": 991,
+        "sha256": "a6d43a30e4ca4a1e181fcf1e37038a95bcbbb72c9084c0d59cba2fd6b8d70694"
+      }
+    },
+    "boot_default": "apple-dyld",
+    "boot_timeout_seconds": 10,
+    "fallback_source_commit": "abc75cfb6a7f3a209af4865f575a9b70387c916e",
+    "fallback_kernel_and_root_byte_preserved": true,
+    "final_packaged_apple_qemu_verified": true
+  },
+  "observer_note": "Pinned upstream observer adapted for QEMU6.2 CPU/firmware/register alias; failed EL0 reads of kernel counters use original TTBR1 hardware-page walk and read-only physical reads with explicit translation evidence. No guest code/register/return-value mutation."
+}

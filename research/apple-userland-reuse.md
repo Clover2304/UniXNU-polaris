@@ -1,6 +1,6 @@
 # Apple 用户态启动：现有适配复用盘点
 
-更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，当前已验证内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`。本文记录复用盘点与静态输入检查，不表示 Apple 用户态已执行或通过真机验证。
+更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，当前真机已验证内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`，候选 `f916ebb` 已通过原版 dyld 的 QEMU 早期执行检查；原版 launchd 主函数和真机 Apple 用户态尚未验证。
 
 ## 结论与基线
 
@@ -65,7 +65,7 @@
 | `/sbin/launchd` | 561856 | `8cec9a3c44a443b08e977ccc5d577850316ad428c575dc01f09b018dbd5b6a25` | `1d52c69747dffc4b1937d241bdbc9cee3b22df18` |
 | `/usr/lib/dyld` | 937056 | `f8df3c58fae6e409db740df22c98aa699aee110b73523541a63f1bd5e23cf705` | `b479f90e05545314cb843410c3d98ef84d926710` |
 
-共享缓存所在的独立 SystemOS DMG 尚未下载或审计。下一项是复用上游 dyld fixture/probe，核对原签名授权、entitlement、加载器和最早 EL0 入口依赖，准备独立 Apple 执行配置；当前成功镜像保留。
+共享缓存所在的 SystemOS DMG 后续也已下载并审计，详见下文。已复用上游 dyld fixture/probe 的方法准备独立 Apple 执行实验；当前成功镜像保留。
 
 ## 已验证：自制用户态可复用内核
 
@@ -74,3 +74,45 @@
 适用边界：自制程序和 RAM 文件变更可在 Linux 重做程序包与配置；实际应用仍需一次 Mass Storage 文件更新和普通重启。原生 CDC 当前只有固定诊断命令，没有程序上传、交互 shell 或热执行能力。内核驱动、系统调用、加载器和安全策略改变仍需重编内核。当前策略要求自制程序具有 `CS_ADHOC|CS_HARD|CS_KILL`，按 PID 1/直接子进程及精确 CDHash 授权，并拒绝平台标记和 entitlement；实际 Apple 样本的 CodeDirectory flags 是 `0x2`，不能沿用该自测策略直接执行。RAM 树另有限制：16 个条目、32 MiB 镜像，不足以放入完整系统和共享缓存。
 
 本轮手机保持运行，无需提前进入 Mass Storage。下次确有已验收的候选文件时再请求更新；完成整卷回读与同步后，仍停下等待用户手动重启。
+
+
+## 已完成：共享缓存输入检查
+
+[共享缓存审计](apple-dyld-cache-audit.json)：原 SystemOS `044-76034-038.dmg`（3,303,014,400 字节，ZIP 内压缩传输 1,321,525,120 字节）通过 ZIP CRC32 和 BuildManifest SHA-384；SHA-256 与 board.toml 的 pin 一致。只读提取 53 个 cache/subcache（不含 symbols），共 3,301,588,992 字节。完整的原 CodeDirectory 签名块逐一核对，53 个 CDHash 均唯一存在于同镜像的原 System trust cache。四个 4 KiB 分片中分别翻转一位，均使对应完整 16 KiB 签名块哈希失配。
+
+实际 cache 映射地址、大小和文件偏移均为 4 KiB 对齐；代码签名块则全部为 16 KiB。这两种粒度不能混为一谈。当前探针沿用默认 `XNU_NATIVE_CS_HASH_CACHE=0`，足以检查签名页为 4 KiB 的 launchd/dyld 入口；真正加载 cache 前，需要启用并验证固定 UniXNU 已有的大签名块缓存路径，不能把本次静态审计记为内核 fault-path 通过。
+
+审计复用了固定 UniXNU 的 cache 检查逻辑；Linux 适配仅替换编译器、输入路径和头文件 pin 校验。结构偏移由 Apple dyld `a571176e8e00c47e95b95e3156820ebec0cbd5e6` 原格式头经本地主机编译得到。APFS 读取用 Dissect，压缩资源块改用固定 libzbitmap，并对未加密数据使用原 extent 查找后的有界区间读取；提取结果再以完整原签名块校验。没有改写 Apple 文件、缓存布局或 CodeDirectory，也没有验证完整 Apple CMS 信任链。
+
+## 当前候选：两份原版文件的最早执行探针
+
+候选源码 `f916ebb123801e2f5956407ccc0fcc51a6aade81`，构建与既有回归见 [CI 43155794427](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43155794427)。本地/远端主机检查、macOS 内核编译、EFI 和 16 份原有运行报告均通过；新增原版 Apple 执行检查见下文。本轮尚未更新手机。
+
+新增 `polaris-apple-probe=1` 独立诊断模式：仅 PID 1、有效的原 CodeDirectory 和已固定的两个精确 CDHash 可通过。普通启动仍使用原自制程序策略；探针模式不授予 entitlement 或平台身份，不声称接入 AMFI 或 trust-cache runtime。loader 强制签名存在，重新核对已有缓存 blob，并保留原代码页验证及 HARD/KILL 执行约束。它用于定位最早原版代码执行依赖，不能作为 launchd 服务运行所需的完整安全兼容层。
+
+RAM fixture 采用当前 N4KROOT v3，保留原版 `/sbin/launchd`、`/usr/lib/dyld`，原文件字节完全不变；包大小 1,511,424 字节。先观察 dyld 的真实 EL0 指令字节和 startup 检查点，再观察 `mach_init` 返回、页大小全局量，最后逐步接近依赖库准备。拒绝对照包括关闭实验模式和只在隔离输入副本翻转一个 dyld 代码字节。
+
+本地 QEMU 6.2 观测器复用固定上游 GDB observer，只适配可用的 CPU max、Ubuntu AAVMF 路径与 SCTLR 寄存器名称。先用旧成功内核和自制程序实测 EL0 指令跟踪及检查点；其后又对新内核执行了下面的原版 Apple 输入检查。
+
+
+## 已通过：原版 dyld 的真实 QEMU 执行
+
+[运行证据](apple-userspace-runtime.json)记录同一 `f916ebb` 源码内核上的 7 组检查：原始内核的 startup、`mach_init` 返回、`dyld4::prepare` 入口、关闭探针、损坏 dyld 页，以及最终打包内核的 `mach_init` 返回和损坏页对照。全部通过；原 Apple 文件、CodeDirectory 和原 trust-cache 输入均未改写。QEMU 使用 CPU max，1 CPU / 受控 1 GiB 内核窗口；这不是 SDM845 外设或真机执行资格。
+
+- 真实 EL0 入口与原 dyld 字节一致，32 个不同执行 PC 的指令字节逐一匹配原文件，startup 检查点到达。
+- 原版 `mach_init` 在 EL0 正常返回，实际 x0=0；原 dyld 自身全局量为 page_size=4096、page_mask=4095、page_shift=12、kernel_page_shift=12。随后真实进入 `dyld4::prepare`。
+- 正向检查中原代码页 bad_hash/no_hash 均为 0。关闭独立模式时，原版文件被自制程序策略拒绝，没有进入原 dyld。
+- 隔离输入副本在 dyld 文件偏移 `0x372b8` 翻转一位，原签名保持不变；实际 bad_hash=1，`mach_init` 没有返回，panic 参数为 CODESIGNING / INVALID_PAGE（namespace=3、code=2）。最终打包内核重复通过该拒绝对照。
+- `_amfi=0`，授权是本项目显式开启的两份精确 CodeDirectory 诊断；没有授予 entitlement、加载 AMFI/Apple trust-cache runtime 或证明完整 Apple 信任链。
+
+第一次观察已看到原版代码，但 QEMU 6.2 在 EL0 对内核虚拟地址的读取返回 E14，主机评分器因此退出；原始记录保留。后续观测复用上游的真实 TTBR1 4K 页表遍历，只读物理内存中的计数器，保存每次转换与原虚拟读取错误，并恢复调试器模式。没有写入来宾代码、寄存器或返回值；修正观测后，正向计数与全套检查通过。
+
+原版 launchd 文件已由内核加载，但其主函数没有作为本轮通过目标；共享缓存尚未实际装载，libSystem/TLS、基本服务、系统界面均未完成。本轮把 G1/G3 中“原版加载器的早期实际执行”推进到模拟通过，不能记为 iPadOS 启动成功。
+
+## 已准备的真机文件与回退入口
+
+本地候选目录 `artifacts/apple-dyld-phone-ready-f916ebb/` 保存 FAT 回读通过的 128 MiB ESP，SHA-256 `69918767d14dcaa31279735154dc6878a760c2d609d2a2daec4a34065eb4d906`。最终打包内核 SHA-256 `8d8e0a277253f2ae371adc475dd58246d98ad14bd0312114e23ffd7c2f8b0ac1`，已在 QEMU 原版 dyld 正向/损坏页检查中实际使用；QEMU 仅更换对应的虚拟平台 ADT。
+
+菜单默认 `polaris: ORIGINAL DYLD PROBE`，等待 10 秒；第二项 `polaris: verified self-tests abc75cf` 保留旧成功内核、其 ADT、HMAC 记录与自制 RAM 根的原字节。共享 EFI 二进制也与旧成功版本相同。Apple 入口启用原生 USB 诊断，关闭本轮不需要的原生 UFS 探针；回退项保留原测试参数。回退菜单项的真机选择仍待验证。
+
+尚未写入手机或触发重启。已请求用户进入固件 Mass Storage 并共享 USB；更新时仍将先核对旧 ESP，完成写入、同步和完整回读后停下，等待用户手动重启。

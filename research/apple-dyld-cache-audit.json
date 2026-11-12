@@ -1,0 +1,1669 @@
+{
+  "cache_files": [
+    {
+      "file": "dyld_shared_cache_arm64",
+      "mappings": [
+        {
+          "address": "0x180000000",
+          "size": 475136,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "fcdb9268e40dc7599ae3f26c4116d5ab0329ead2",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 29
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.01",
+      "mappings": [
+        {
+          "address": "0x180074000",
+          "size": 114491392,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "313918ed6d2bb23e805081c37c7dc21bd16a5bf3",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6988
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.02",
+      "mappings": [
+        {
+          "address": "0x186da4000",
+          "size": 32768,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "9d037a68ad6490e103e44e47086e279a2923b04e",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 2
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.03",
+      "mappings": [
+        {
+          "address": "0x186dac000",
+          "size": 113999872,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "55b4a307efbf08234c98c81f09f1d17e5efc0d0a",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6958
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.04",
+      "mappings": [
+        {
+          "address": "0x18da64000",
+          "size": 212992,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "bb384a1f26cdd1e0198073247aab82535e0211fc",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 13
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.05",
+      "mappings": [
+        {
+          "address": "0x18da98000",
+          "size": 115228672,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "456fe01aea15606d1cc2003ca29cd9b6bfb66d50",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 7033
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.06",
+      "mappings": [
+        {
+          "address": "0x19487c000",
+          "size": 311296,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "09a4833efde670b41f1aa4ec9c036b7475f3fc15",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 19
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.07",
+      "mappings": [
+        {
+          "address": "0x1948c8000",
+          "size": 75694080,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "0681fd5af3f05dd19da044b026ac7a285293c815",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 4620
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.08",
+      "mappings": [
+        {
+          "address": "0x1990f8000",
+          "size": 229376,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "b9a71db3cca24312d76249508096752a5a811f08",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 14
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.09",
+      "mappings": [
+        {
+          "address": "0x199130000",
+          "size": 112705536,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "ea76a782fc7bedfcdecd89217ed432758c12ba45",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6879
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.10",
+      "mappings": [
+        {
+          "address": "0x19fcac000",
+          "size": 229376,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "3f11d0b9f508fc5ee890895ef5783d8a8bc09b95",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 14
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.11",
+      "mappings": [
+        {
+          "address": "0x19fce4000",
+          "size": 111722496,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "67063010c57d408bc4c0c17bd77f17ec308d5849",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6819
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.12",
+      "mappings": [
+        {
+          "address": "0x1a6770000",
+          "size": 360448,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "83652351dfb24aeae58920d28c4220e85983e523",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 22
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.13",
+      "mappings": [
+        {
+          "address": "0x1a67c8000",
+          "size": 113639424,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "ec1b795ee25f7c05df185f9ba299dec1e5104b02",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6936
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.14",
+      "mappings": [
+        {
+          "address": "0x1ad428000",
+          "size": 360448,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "08577712e0e5b8e101d95ce4207ce4f5e553f627",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 22
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.15",
+      "mappings": [
+        {
+          "address": "0x1ad480000",
+          "size": 104415232,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "f09d8f3f0ba8548b093aad62dee5aa89dccfdeff",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6373
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.16",
+      "mappings": [
+        {
+          "address": "0x1b3814000",
+          "size": 393216,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "bb1b5d1036e6b26edece34aaf41c9cbd299f6516",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 24
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.17",
+      "mappings": [
+        {
+          "address": "0x1b3874000",
+          "size": 115032064,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "8f887ef3a8a340816d7f2eabdf37559bff9387e7",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 7021
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.18",
+      "mappings": [
+        {
+          "address": "0x1ba628000",
+          "size": 376832,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "5ceb06ea5c9454e0fc5319432ca0382cd8a8c769",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 23
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.19",
+      "mappings": [
+        {
+          "address": "0x1ba684000",
+          "size": 107757568,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "6587d57c8b3294494da3b3f312b26d0cf2253b17",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6577
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.20",
+      "mappings": [
+        {
+          "address": "0x1c0d48000",
+          "size": 425984,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "acf71d4e6c882b334ebb6381d43b56828e7fef5e",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 26
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.21",
+      "mappings": [
+        {
+          "address": "0x1c0db0000",
+          "size": 113049600,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "94efc4a895bcc4a15bb30b98f6f094a6b6a6119e",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6900
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.22",
+      "mappings": [
+        {
+          "address": "0x1c7980000",
+          "size": 278528,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "259bae577606d5b9f3a223ea0953c9d8d016418f",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 17
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.23",
+      "mappings": [
+        {
+          "address": "0x1c79c4000",
+          "size": 107462656,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "2b1952f67ed40abf6379ca7a87e9ae27f654de4e",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6559
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.24",
+      "mappings": [
+        {
+          "address": "0x1ce040000",
+          "size": 344064,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "09ddf37cbd22f45c6ee4a0a8e51f249cc88e9c6a",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 21
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.25",
+      "mappings": [
+        {
+          "address": "0x1ce094000",
+          "size": 112050176,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "69844796f61cc6b0e0ae4eb03d57a52f0355ffc7",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6839
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.26",
+      "mappings": [
+        {
+          "address": "0x1d4b70000",
+          "size": 425984,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "578789f9dd625493d8f7b128c9390bc48002a48b",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 26
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.27",
+      "mappings": [
+        {
+          "address": "0x1d4bd8000",
+          "size": 110903296,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "c6f820c36eb90c2ab53284886ee0650971e5e77f",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6769
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.28",
+      "mappings": [
+        {
+          "address": "0x1db59c000",
+          "size": 491520,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "b8d2ba11a57c8540b4376ac999219be3aa2de020",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 30
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.29",
+      "mappings": [
+        {
+          "address": "0x1db614000",
+          "size": 112967680,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "cdfb0c2910ab35ecd75a99563fefcb233d003fbc",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6895
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.30",
+      "mappings": [
+        {
+          "address": "0x1e21d0000",
+          "size": 311296,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "3f2703ea87fa4ce6babc2868b6d0bb3bb91f1a43",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 19
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.31",
+      "mappings": [
+        {
+          "address": "0x1e221c000",
+          "size": 67813376,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "ab2153961c523db3a6967064183a05fbab081a96",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 4139
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.32",
+      "mappings": [
+        {
+          "address": "0x1e62c8000",
+          "size": 327680,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "5692fed29ef5206655234169c8f689b2c1aa14f6",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 20
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.33.dylddata",
+      "mappings": [
+        {
+          "address": "0x1e6318000",
+          "size": 475136,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        },
+        {
+          "address": "0x1e638c000",
+          "size": 87146496,
+          "fileoff": 475136,
+          "slide_offset": 226232424,
+          "slide_size": 42592,
+          "slide_version": 2,
+          "slide_page_bytes": 4096
+        },
+        {
+          "address": "0x1ed6a8000",
+          "size": 138543104,
+          "fileoff": 87621632,
+          "slide_offset": 226164736,
+          "slide_size": 67688,
+          "slide_version": 2,
+          "slide_page_bytes": 4096
+        },
+        {
+          "address": "0x1f7ac8000",
+          "size": 114688,
+          "fileoff": 226164736,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "95e63e576f1f9666cf1b4246285cee0ad1f9ea63",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 13811
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.34.dyldlinkedit",
+      "mappings": [
+        {
+          "address": "0x1f7ae4000",
+          "size": 475136,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        },
+        {
+          "address": "0x1f7b58000",
+          "size": 26869760,
+          "fileoff": 475136,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "f7b1b5e1e9d66379249453af39ceabc96b3490bd",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 1669
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.35",
+      "mappings": [
+        {
+          "address": "0x1f94f8000",
+          "size": 115589120,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "dd3a30c6128bf7cefc9b082f084e9851b880e70a",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 7055
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.36",
+      "mappings": [
+        {
+          "address": "0x200334000",
+          "size": 507904,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "e14cc77fb64f96e8ddeb12e9d5a8f413e688b223",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 31
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.37",
+      "mappings": [
+        {
+          "address": "0x2003b0000",
+          "size": 115589120,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "9949c5a4370c313d582344f93bd24b585ee8c13a",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 7055
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.38",
+      "mappings": [
+        {
+          "address": "0x2071ec000",
+          "size": 622592,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "600a0397f5e6426a1ef3b69903582b7ada5dd701",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 38
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.39",
+      "mappings": [
+        {
+          "address": "0x207284000",
+          "size": 106332160,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "e51dab480d54ac4acd1746edfe1437d2788857ae",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6490
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.40",
+      "mappings": [
+        {
+          "address": "0x20d7ec000",
+          "size": 589824,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "52a6d0d000e78189bf32677682114d48d4b203cb",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 36
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.41",
+      "mappings": [
+        {
+          "address": "0x20d87c000",
+          "size": 115736576,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "76282070b3cffc70516b6cbe0f81713bd1ac5889",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 7064
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.42",
+      "mappings": [
+        {
+          "address": "0x2146dc000",
+          "size": 475136,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "cfe91094c02a033864373b688f7e702c3ed905e2",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 29
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.43",
+      "mappings": [
+        {
+          "address": "0x214750000",
+          "size": 115097600,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "1cfd7b940d4eef40fc27179bf7db899818512b4d",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 7025
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.44",
+      "mappings": [
+        {
+          "address": "0x21b514000",
+          "size": 589824,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "eb4b52fbb555ae419945a4d6b8a88e0114fdf6a3",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 36
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.45",
+      "mappings": [
+        {
+          "address": "0x21b5a4000",
+          "size": 114343936,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "ef86c578d04ff812799d41f832df0f88dad62620",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 6979
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.46",
+      "mappings": [
+        {
+          "address": "0x2222b0000",
+          "size": 753664,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "527db79623c13f17c130c5c5d91f85ea53001b7c",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 46
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.47",
+      "mappings": [
+        {
+          "address": "0x222368000",
+          "size": 115654656,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "2d1d5753615701412509812c8e646b593b352ab0",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 7059
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.48",
+      "mappings": [
+        {
+          "address": "0x2291b4000",
+          "size": 770048,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "03e12b7630af38e773f9dcfd28dec87bf02db7d5",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 47
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.49",
+      "mappings": [
+        {
+          "address": "0x229270000",
+          "size": 1441792,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "2c477c98b65a8bda3bad38cbcbdd4869f20bd685",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 88
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.50",
+      "mappings": [
+        {
+          "address": "0x2293d0000",
+          "size": 32768,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "051b1690650fbc23a9c6c2984c8348ce5efffc7b",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 2
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.51.dylddata",
+      "mappings": [
+        {
+          "address": "0x2293d8000",
+          "size": 475136,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        },
+        {
+          "address": "0x22944c000",
+          "size": 42696704,
+          "fileoff": 475136,
+          "slide_offset": 118181672,
+          "slide_size": 20888,
+          "slide_version": 2,
+          "slide_page_bytes": 4096
+        },
+        {
+          "address": "0x22dd04000",
+          "size": 74973184,
+          "fileoff": 43171840,
+          "slide_offset": 118145024,
+          "slide_size": 36648,
+          "slide_version": 2,
+          "slide_page_bytes": 4096
+        },
+        {
+          "address": "0x234484000",
+          "size": 65536,
+          "fileoff": 118145024,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "01dd2b72e8b3de07d2ecd34b4db1cf90d4eef4c3",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 7215
+        }
+      ]
+    },
+    {
+      "file": "dyld_shared_cache_arm64.52.dyldlinkedit",
+      "mappings": [
+        {
+          "address": "0x234494000",
+          "size": 475136,
+          "fileoff": 0,
+          "slide_offset": 0,
+          "slide_size": 0
+        },
+        {
+          "address": "0x234508000",
+          "size": 403587072,
+          "fileoff": 475136,
+          "slide_offset": 0,
+          "slide_size": 0
+        }
+      ],
+      "code_directories": [
+        {
+          "cdhash": "6db718c1a2994d80b344180115a76457e9936814",
+          "hash_block_bytes": 16384,
+          "original_code_slots_verified": 24662
+        }
+      ]
+    }
+  ],
+  "files_checked": 53,
+  "all_mappings_directly_native_4k_aligned": true,
+  "original_complete_signature_blocks_verified": true,
+  "corruption_in_each_4k_quarter_rejected": true,
+  "code_directory_or_image_rewritten": false,
+  "native_4k_userspace_execution_observed": false,
+  "original_system_trustcache_sha256": "d121ba89167e03aafd00fa687c30cd8ebc4ccafd10c1408adb2ba3de12403651",
+  "original_system_trustcache_entries": 76,
+  "all_cache_cdhashes_in_original_system_trustcache": true,
+  "trustcache_matches": [
+    {
+      "file": "dyld_shared_cache_arm64",
+      "cdhash": "fcdb9268e40dc7599ae3f26c4116d5ab0329ead2",
+      "original_system_trustcache_index": 75
+    },
+    {
+      "file": "dyld_shared_cache_arm64.01",
+      "cdhash": "313918ed6d2bb23e805081c37c7dc21bd16a5bf3",
+      "original_system_trustcache_index": 19
+    },
+    {
+      "file": "dyld_shared_cache_arm64.02",
+      "cdhash": "9d037a68ad6490e103e44e47086e279a2923b04e",
+      "original_system_trustcache_index": 47
+    },
+    {
+      "file": "dyld_shared_cache_arm64.03",
+      "cdhash": "55b4a307efbf08234c98c81f09f1d17e5efc0d0a",
+      "original_system_trustcache_index": 27
+    },
+    {
+      "file": "dyld_shared_cache_arm64.04",
+      "cdhash": "bb384a1f26cdd1e0198073247aab82535e0211fc",
+      "original_system_trustcache_index": 56
+    },
+    {
+      "file": "dyld_shared_cache_arm64.05",
+      "cdhash": "456fe01aea15606d1cc2003ca29cd9b6bfb66d50",
+      "original_system_trustcache_index": 24
+    },
+    {
+      "file": "dyld_shared_cache_arm64.06",
+      "cdhash": "09a4833efde670b41f1aa4ec9c036b7475f3fc15",
+      "original_system_trustcache_index": 7
+    },
+    {
+      "file": "dyld_shared_cache_arm64.07",
+      "cdhash": "0681fd5af3f05dd19da044b026ac7a285293c815",
+      "original_system_trustcache_index": 5
+    },
+    {
+      "file": "dyld_shared_cache_arm64.08",
+      "cdhash": "b9a71db3cca24312d76249508096752a5a811f08",
+      "original_system_trustcache_index": 54
+    },
+    {
+      "file": "dyld_shared_cache_arm64.09",
+      "cdhash": "ea76a782fc7bedfcdecd89217ed432758c12ba45",
+      "original_system_trustcache_index": 65
+    },
+    {
+      "file": "dyld_shared_cache_arm64.10",
+      "cdhash": "3f11d0b9f508fc5ee890895ef5783d8a8bc09b95",
+      "original_system_trustcache_index": 20
+    },
+    {
+      "file": "dyld_shared_cache_arm64.11",
+      "cdhash": "67063010c57d408bc4c0c17bd77f17ec308d5849",
+      "original_system_trustcache_index": 35
+    },
+    {
+      "file": "dyld_shared_cache_arm64.12",
+      "cdhash": "83652351dfb24aeae58920d28c4220e85983e523",
+      "original_system_trustcache_index": 41
+    },
+    {
+      "file": "dyld_shared_cache_arm64.13",
+      "cdhash": "ec1b795ee25f7c05df185f9ba299dec1e5104b02",
+      "original_system_trustcache_index": 67
+    },
+    {
+      "file": "dyld_shared_cache_arm64.14",
+      "cdhash": "08577712e0e5b8e101d95ce4207ce4f5e553f627",
+      "original_system_trustcache_index": 6
+    },
+    {
+      "file": "dyld_shared_cache_arm64.15",
+      "cdhash": "f09d8f3f0ba8548b093aad62dee5aa89dccfdeff",
+      "original_system_trustcache_index": 70
+    },
+    {
+      "file": "dyld_shared_cache_arm64.16",
+      "cdhash": "bb1b5d1036e6b26edece34aaf41c9cbd299f6516",
+      "original_system_trustcache_index": 55
+    },
+    {
+      "file": "dyld_shared_cache_arm64.17",
+      "cdhash": "8f887ef3a8a340816d7f2eabdf37559bff9387e7",
+      "original_system_trustcache_index": 43
+    },
+    {
+      "file": "dyld_shared_cache_arm64.18",
+      "cdhash": "5ceb06ea5c9454e0fc5319432ca0382cd8a8c769",
+      "original_system_trustcache_index": 32
+    },
+    {
+      "file": "dyld_shared_cache_arm64.19",
+      "cdhash": "6587d57c8b3294494da3b3f312b26d0cf2253b17",
+      "original_system_trustcache_index": 34
+    },
+    {
+      "file": "dyld_shared_cache_arm64.20",
+      "cdhash": "acf71d4e6c882b334ebb6381d43b56828e7fef5e",
+      "original_system_trustcache_index": 51
+    },
+    {
+      "file": "dyld_shared_cache_arm64.21",
+      "cdhash": "94efc4a895bcc4a15bb30b98f6f094a6b6a6119e",
+      "original_system_trustcache_index": 44
+    },
+    {
+      "file": "dyld_shared_cache_arm64.22",
+      "cdhash": "259bae577606d5b9f3a223ea0953c9d8d016418f",
+      "original_system_trustcache_index": 14
+    },
+    {
+      "file": "dyld_shared_cache_arm64.23",
+      "cdhash": "2b1952f67ed40abf6379ca7a87e9ae27f654de4e",
+      "original_system_trustcache_index": 15
+    },
+    {
+      "file": "dyld_shared_cache_arm64.24",
+      "cdhash": "09ddf37cbd22f45c6ee4a0a8e51f249cc88e9c6a",
+      "original_system_trustcache_index": 8
+    },
+    {
+      "file": "dyld_shared_cache_arm64.25",
+      "cdhash": "69844796f61cc6b0e0ae4eb03d57a52f0355ffc7",
+      "original_system_trustcache_index": 36
+    },
+    {
+      "file": "dyld_shared_cache_arm64.26",
+      "cdhash": "578789f9dd625493d8f7b128c9390bc48002a48b",
+      "original_system_trustcache_index": 29
+    },
+    {
+      "file": "dyld_shared_cache_arm64.27",
+      "cdhash": "c6f820c36eb90c2ab53284886ee0650971e5e77f",
+      "original_system_trustcache_index": 58
+    },
+    {
+      "file": "dyld_shared_cache_arm64.28",
+      "cdhash": "b8d2ba11a57c8540b4376ac999219be3aa2de020",
+      "original_system_trustcache_index": 53
+    },
+    {
+      "file": "dyld_shared_cache_arm64.29",
+      "cdhash": "cdfb0c2910ab35ecd75a99563fefcb233d003fbc",
+      "original_system_trustcache_index": 59
+    },
+    {
+      "file": "dyld_shared_cache_arm64.30",
+      "cdhash": "3f2703ea87fa4ce6babc2868b6d0bb3bb91f1a43",
+      "original_system_trustcache_index": 21
+    },
+    {
+      "file": "dyld_shared_cache_arm64.31",
+      "cdhash": "ab2153961c523db3a6967064183a05fbab081a96",
+      "original_system_trustcache_index": 50
+    },
+    {
+      "file": "dyld_shared_cache_arm64.32",
+      "cdhash": "5692fed29ef5206655234169c8f689b2c1aa14f6",
+      "original_system_trustcache_index": 28
+    },
+    {
+      "file": "dyld_shared_cache_arm64.33.dylddata",
+      "cdhash": "95e63e576f1f9666cf1b4246285cee0ad1f9ea63",
+      "original_system_trustcache_index": 45
+    },
+    {
+      "file": "dyld_shared_cache_arm64.34.dyldlinkedit",
+      "cdhash": "f7b1b5e1e9d66379249453af39ceabc96b3490bd",
+      "original_system_trustcache_index": 73
+    },
+    {
+      "file": "dyld_shared_cache_arm64.35",
+      "cdhash": "dd3a30c6128bf7cefc9b082f084e9851b880e70a",
+      "original_system_trustcache_index": 62
+    },
+    {
+      "file": "dyld_shared_cache_arm64.36",
+      "cdhash": "e14cc77fb64f96e8ddeb12e9d5a8f413e688b223",
+      "original_system_trustcache_index": 63
+    },
+    {
+      "file": "dyld_shared_cache_arm64.37",
+      "cdhash": "9949c5a4370c313d582344f93bd24b585ee8c13a",
+      "original_system_trustcache_index": 46
+    },
+    {
+      "file": "dyld_shared_cache_arm64.38",
+      "cdhash": "600a0397f5e6426a1ef3b69903582b7ada5dd701",
+      "original_system_trustcache_index": 33
+    },
+    {
+      "file": "dyld_shared_cache_arm64.39",
+      "cdhash": "e51dab480d54ac4acd1746edfe1437d2788857ae",
+      "original_system_trustcache_index": 64
+    },
+    {
+      "file": "dyld_shared_cache_arm64.40",
+      "cdhash": "52a6d0d000e78189bf32677682114d48d4b203cb",
+      "original_system_trustcache_index": 26
+    },
+    {
+      "file": "dyld_shared_cache_arm64.41",
+      "cdhash": "76282070b3cffc70516b6cbe0f81713bd1ac5889",
+      "original_system_trustcache_index": 39
+    },
+    {
+      "file": "dyld_shared_cache_arm64.42",
+      "cdhash": "cfe91094c02a033864373b688f7e702c3ed905e2",
+      "original_system_trustcache_index": 60
+    },
+    {
+      "file": "dyld_shared_cache_arm64.43",
+      "cdhash": "1cfd7b940d4eef40fc27179bf7db899818512b4d",
+      "original_system_trustcache_index": 11
+    },
+    {
+      "file": "dyld_shared_cache_arm64.44",
+      "cdhash": "eb4b52fbb555ae419945a4d6b8a88e0114fdf6a3",
+      "original_system_trustcache_index": 66
+    },
+    {
+      "file": "dyld_shared_cache_arm64.45",
+      "cdhash": "ef86c578d04ff812799d41f832df0f88dad62620",
+      "original_system_trustcache_index": 69
+    },
+    {
+      "file": "dyld_shared_cache_arm64.46",
+      "cdhash": "527db79623c13f17c130c5c5d91f85ea53001b7c",
+      "original_system_trustcache_index": 25
+    },
+    {
+      "file": "dyld_shared_cache_arm64.47",
+      "cdhash": "2d1d5753615701412509812c8e646b593b352ab0",
+      "original_system_trustcache_index": 17
+    },
+    {
+      "file": "dyld_shared_cache_arm64.48",
+      "cdhash": "03e12b7630af38e773f9dcfd28dec87bf02db7d5",
+      "original_system_trustcache_index": 2
+    },
+    {
+      "file": "dyld_shared_cache_arm64.49",
+      "cdhash": "2c477c98b65a8bda3bad38cbcbdd4869f20bd685",
+      "original_system_trustcache_index": 16
+    },
+    {
+      "file": "dyld_shared_cache_arm64.50",
+      "cdhash": "051b1690650fbc23a9c6c2984c8348ce5efffc7b",
+      "original_system_trustcache_index": 3
+    },
+    {
+      "file": "dyld_shared_cache_arm64.51.dylddata",
+      "cdhash": "01dd2b72e8b3de07d2ecd34b4db1cf90d4eef4c3",
+      "original_system_trustcache_index": 1
+    },
+    {
+      "file": "dyld_shared_cache_arm64.52.dyldlinkedit",
+      "cdhash": "6db718c1a2994d80b344180115a76457e9936814",
+      "original_system_trustcache_index": 38
+    }
+  ],
+  "input_volume": {
+    "component": "Cryptex1,SystemOS",
+    "member": "044-76034-038.dmg",
+    "version": "17.7.11",
+    "build": "21H461",
+    "product": "iPad7,1",
+    "bytes": 3303014400,
+    "compressed_bytes": 1321525120,
+    "zip_crc32": 1374153525,
+    "zip_crc_verified": true,
+    "sha256": "b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f",
+    "sha384": "2c3abe4f7980440fb940f7831bba90467089a6970298f891f7b41124606eb49017b74b3b6fcbfdea94c43ae563e40917",
+    "build_manifest_digest_matches": true,
+    "apple_signature_trust_chain_verified": false,
+    "source_url": "https://updates.cdn-apple.com/2025SpringFCS/fullrestores/122-77166/DCA6CFE8-90E9-4B92-880D-3DE171798E40/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw",
+    "whole_ipsw_downloaded": false,
+    "elapsed_seconds": 224.6625381599879,
+    "phone_accessed": false
+  },
+  "extraction": {
+    "volume": "DawnUpdate21H461.J120J121J207J208SystemCryptex",
+    "files": [
+      {
+        "file": "dyld_shared_cache_arm64",
+        "bytes": 491520,
+        "sha256": "354ac39e0c5ac36d9c2652c6d092ec4f3cbcdc2655879f6cc3bc16b36bc927d4"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.01",
+        "bytes": 114720768,
+        "sha256": "43a0e20d64a835266938b6dc5187a9ba74e68c433c0339935519a0cc860a6346"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.02",
+        "bytes": 49152,
+        "sha256": "3d923c404fe519184a99042b60a4cb3d37247dcb8b070242ed3e670d4d523d04"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.03",
+        "bytes": 114229248,
+        "sha256": "1d3387ecfe16d74c420e02257edccbba36073cbc0c909de11a353a59d9fc967c"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.04",
+        "bytes": 229376,
+        "sha256": "d6b080594cfb533ecec8cf7341c94c0e14060a59c45d6a391580c00d2b6e6b2d"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.05",
+        "bytes": 115458048,
+        "sha256": "083b0c30c2167eb72c978f952c61856419862a1a597798a9e1f7a94fcd2afe81"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.06",
+        "bytes": 327680,
+        "sha256": "f1bb7c0ef425583acdaf29b0c98452d0c319d91ae59f54258790f701e3ad4c91"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.07",
+        "bytes": 75857920,
+        "sha256": "4e726f5caa2913bd786ce9280fdee86faf8578516f638fd560433768db90a927"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.08",
+        "bytes": 245760,
+        "sha256": "dae0186925311bf3e0a426e2269bcd4c4360f8b610d2bfe94a6c2d06f3f8d059"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.09",
+        "bytes": 112934912,
+        "sha256": "6a0837b8c572c9cbc3c6d9552b2adb393b263d7c035dd3a54e2d5f0b1dee564a"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.10",
+        "bytes": 245760,
+        "sha256": "7bd102238bc2d268945cb8a284e0eeb55c26ec271f6538b0b3cbde15c3c01f3d"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.11",
+        "bytes": 111951872,
+        "sha256": "52a53135221ec94a15404877d57de51031e08451fc7daf0bc94bc19fe22a7ce6"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.12",
+        "bytes": 376832,
+        "sha256": "a89e80395f48cc1dd19e8cd7cd370eb409260851abe99540cefd1c8f9d573d72"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.13",
+        "bytes": 113868800,
+        "sha256": "4a7cd7eaed4e6acfa867b8349201676c5c372b01e885f61d7052855c31ef7c8f"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.14",
+        "bytes": 376832,
+        "sha256": "4332ade9be43c2bf13fcc6571ed2d42fa7488dbb98aa436da8366ebb9d62c7b5"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.15",
+        "bytes": 104628224,
+        "sha256": "84b2f6e50a79ac4beb683f17f0a5d5e78b5a6cbde72770bbdfb58a8f9ead15cf"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.16",
+        "bytes": 409600,
+        "sha256": "b60e00b31db10a262976b73147d11fcc303648be1f50132805856917f245c69b"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.17",
+        "bytes": 115261440,
+        "sha256": "327888d1dffcb0041c836b533f295ceb8c87b70f4698d009636d11b88ef7c7d3"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.18",
+        "bytes": 393216,
+        "sha256": "cbce57492f3910c5c2b950c18db8a12eb4b7e4a36bf9690542c8f6ab956e7675"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.19",
+        "bytes": 107970560,
+        "sha256": "1cfef20a417a45d6532f64b1c15065f6d4a88157fa167314e0b76ab4fdb59240"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.20",
+        "bytes": 442368,
+        "sha256": "a6ce4d366ad34f90523cd3b54c7c63c0def6609470b9c301c2ca548a5e5c5bec"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.21",
+        "bytes": 113278976,
+        "sha256": "101b852098724c6d6d5d76361ac8631ff5b5ad1c6ee43a752be0201b8388f613"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.22",
+        "bytes": 294912,
+        "sha256": "fed9ed36d326b93cfaad4117d0f2e035229a8c37eaefb03c30e2fc78aaddd34c"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.23",
+        "bytes": 107675648,
+        "sha256": "3b8b3d970cfb6a0baf4c526230da7e59edb24a70cc319d4b2287012221916302"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.24",
+        "bytes": 360448,
+        "sha256": "2de5f7838e4bb8356d4670cdc4c925c92f7c573bd50bb32266c45b021bcafcdf"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.25",
+        "bytes": 112279552,
+        "sha256": "2276309d3cdef453592537293d000afdc219e45d1267598f57f80c3f0c979d3b"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.26",
+        "bytes": 442368,
+        "sha256": "cdcd55922063d5bf26ff545b8dcd9d75456af9a3acd9a1eb0d201723a6ca30f6"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.27",
+        "bytes": 111132672,
+        "sha256": "440c87647ed244451ace8f124ddd5d1ae76c0bc768b08db22630807ffe1a3f9e"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.28",
+        "bytes": 507904,
+        "sha256": "a60033cc420818112f638c4615a40f94c533acffdad3bb77c23cfdbf5a2549a2"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.29",
+        "bytes": 113197056,
+        "sha256": "92b1729fd32631ed6f0140b7e64f44feea977b55486947f2a925b97ab14cd3e9"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.30",
+        "bytes": 327680,
+        "sha256": "59d2223ab54ea821b837fa454b4a980eb79efcacbc5da9570190ce28292eea6c"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.31",
+        "bytes": 67960832,
+        "sha256": "35f72bd3b25cf374fce704266965711547188f447889d55a27e19cb0a14e7428"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.32",
+        "bytes": 344064,
+        "sha256": "8f62e8b5813282d0b108b986c67797566d505117bab9229dd75429d029a06adf"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.33.dylddata",
+        "bytes": 226721792,
+        "sha256": "07d483b1b3aceb0a57b16c97efce421c5d9827256811418dd0e8bf076621b622"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.34.dyldlinkedit",
+        "bytes": 27410432,
+        "sha256": "2ca97d9b160600576700f7f3097a1a4aa5f5fd4409e23e5ba821f3b9d883221f"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.35",
+        "bytes": 115818496,
+        "sha256": "755a1c0b35778d527f3a0572dc7cbf45b9df25be12431b121d813cf478806022"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.36",
+        "bytes": 524288,
+        "sha256": "cf438c101b9a6d89d6fc3022673637635eb0559d8e7ba64464721bad553d6f64"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.37",
+        "bytes": 115818496,
+        "sha256": "1328b6c56e1eeb0225a2d9899c18d97a3d422023c7597e54bac417ad766e5fa9"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.38",
+        "bytes": 638976,
+        "sha256": "277d857470bffc940bc85be2ae3218bb8bc454125a68b4cc50235386ad1bfe0e"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.39",
+        "bytes": 106545152,
+        "sha256": "30f03f0558c16b0c9f6a3a4352058d6ce6de6adf028dad57c38ba928d5836460"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.40",
+        "bytes": 606208,
+        "sha256": "d68b59033f19c6245a4345279ba115d95f320439245535f10805c8548f9d9997"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.41",
+        "bytes": 115965952,
+        "sha256": "bd67e8fc93d943d58ac4537db09488c45a87ac209fc73949d8ec161fa12e3606"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.42",
+        "bytes": 491520,
+        "sha256": "60159a43614f7e7250f73c1676a092f766be9e8ee3ad4ec71dea0893fe601c6d"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.43",
+        "bytes": 115326976,
+        "sha256": "a6bd99912701d28207d63058bb6f6371769fe08cb87e92a7c9d179ad6e0f9684"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.44",
+        "bytes": 606208,
+        "sha256": "2d4f4c8233c190011ac8dca0c2390810c4ee6427629ddf404a54e4acb2aec50b"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.45",
+        "bytes": 114573312,
+        "sha256": "1639e03c2141a7f834979c8cec8ca541ec8fcf085c739482e1cc331651f53f5e"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.46",
+        "bytes": 770048,
+        "sha256": "c9c739451332c6b621a8f987c7447757720198977661fca475ebfcb706057236"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.47",
+        "bytes": 115884032,
+        "sha256": "c3b750087af334f35577e3ad8bc526b84f8d60631cefbdff00c392995bc452fa"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.48",
+        "bytes": 786432,
+        "sha256": "821c0c6c007616a9c057a6dbeb70b206232b02d4e50632f494015cd500f1dd0d"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.49",
+        "bytes": 1458176,
+        "sha256": "fc1f77d47ff8e203c122212a430952c63b8b7fd1ad058f23664df446c0c942b2"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.50",
+        "bytes": 49152,
+        "sha256": "6f4055cbb42271adef113107413036673554dd1841c07cf2fbdb9fecc56bab09"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.51.dylddata",
+        "bytes": 118456320,
+        "sha256": "7c7cf2219c7a81277744108838ceeaf2ff4e4b369357d3c19a78200d9df5a2a2"
+      },
+      {
+        "file": "dyld_shared_cache_arm64.52.dyldlinkedit",
+        "bytes": 404865024,
+        "sha256": "5da109fd9ea4f3d62b90dfb0699c03be56adea6ee5d36c6b9bbe5f5a588390ea"
+      }
+    ],
+    "total_bytes": 3301588992,
+    "elapsed_seconds": 16.56443557300372,
+    "phone_accessed": false,
+    "decoder": "eafer/libzbitmap 54bca4a13703e176d252e2fad4b4b4c162e5deb5, bounded 64KiB resource blocks",
+    "native_decoder_source_sha256": "733d24a23a40fa7009196501de3098b29fe623670a9df33744523779388403a6",
+    "native_decoder_binary_sha256": "ffba3baa9534805c5b739d17f7987bb2db510287814e5b62b759e6852a9f319a"
+  },
+  "auditor_provenance": {
+    "upstream_revision": "37987aea410691df3c1e0e146a1bfd6127932149",
+    "apple_dyld_reference": "a571176e8e00c47e95b95e3156820ebec0cbd5e6",
+    "header_sha256": {
+      "dyld_cache_format.h": "8929a8290017bdc3370fbcf091ec7a65b313f3fb9e764d4bbff4c6d88e1a1dad",
+      "mach-o/fixup-chains.h": "f64ea237552478f38c8bda946bfa802589b35400c3572b4d32b89cfa1f40442c"
+    },
+    "original_script_sha256": "29af40bb3876dc55e360233f7f6b45b47fa7296f69b8141554e29f0ca18f0cb3",
+    "adapted_script_sha256": "1466cf8da709a178d64d09035295417bcd978f4eea343133914050450900333c",
+    "adaptations": [
+      "Exact fetched header hashes replace full reference checkout Git guard",
+      "Linux clang++ replaces xcrun clang++",
+      "Local extracted immutable cache directory replaces macOS mount path"
+    ],
+    "signature_and_mapping_validation_logic_changed": false
+  },
+  "file_reader_note": "Unencrypted FileStream reads use original APFS extent lookup with bounded subrange reads; native bounded LZBITMAP replaces Python decoder. Every complete output signing block subsequently verified against original CodeDirectory.",
+  "apple_trust_chain_verified": false,
+  "phone_accessed": false,
+  "ipados_boot_demonstrated": false,
+  "existing_upstream_hash_cache_available": true,
+  "current_kernel_hash_cache_enabled": false,
+  "kernel_large_hash_fault_path_qualified": false
+}
