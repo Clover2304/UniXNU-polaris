@@ -4,7 +4,11 @@
 #include "UfsQuery.h"
 
 constexpr unsigned UFS_SCSI_PRDT=0x1400, UFS_SCSI_DATA=0x2000;
-enum class PolarisUfsScsiKind { Inquiry, Capacity10, Read10=0x28 };
+enum class PolarisUfsScsiKind { Inquiry, Capacity10, Read10=0x28, EspRead10=0x100 };
+constexpr uint32_t UFS_ESP_START=393216, UFS_ESP_BLOCKS=32768;
+static inline bool polaris_ufs_scsi_is_read(PolarisUfsScsiKind kind) {
+    return kind==PolarisUfsScsiKind::Read10 || kind==PolarisUfsScsiKind::EspRead10;
+}
 struct PolarisUfsScsiResult {
     enum State { Disabled, InvalidRequest, Preflight, ReadFailed, StateChanged,
         StartTimeout, Timeout, OcsError, ResponseError, ScsiStatus, PayloadError,
@@ -37,7 +41,7 @@ static inline const char *polaris_ufs_scsi_state(PolarisUfsScsiResult::State s) 
 }
 static inline unsigned polaris_ufs_scsi_bytes(PolarisUfsScsiKind kind) {
     return kind==PolarisUfsScsiKind::Inquiry?36:kind==PolarisUfsScsiKind::Capacity10?8:
-        kind==PolarisUfsScsiKind::Read10?4096:0;
+        polaris_ufs_scsi_is_read(kind)?4096:0;
 }
 static inline void polaris_ufs_scsi_descriptor(uint8_t *d,uint64_t pa) {
     polaris_ufs_nop_descriptor(d,pa);
@@ -48,9 +52,9 @@ static inline void polaris_ufs_scsi_request(uint8_t *p,PolarisUfsScsiKind kind,u
     for(unsigned i=0;i<32;i++)p[i]=0;
     unsigned bytes=polaris_ufs_scsi_bytes(kind);
     p[0]=1;p[1]=0x40;p[14]=static_cast<uint8_t>(bytes>>8);p[15]=static_cast<uint8_t>(bytes); // COMMAND, READ, LUN/tag 0
-    p[16]=kind==PolarisUfsScsiKind::Inquiry?0x12:kind==PolarisUfsScsiKind::Read10?0x28:0x25;
+    p[16]=kind==PolarisUfsScsiKind::Inquiry?0x12:polaris_ufs_scsi_is_read(kind)?0x28:0x25;
     if(kind==PolarisUfsScsiKind::Inquiry)p[20]=36; // EVPD=0, standard 36-byte INQUIRY only
-    if(kind==PolarisUfsScsiKind::Read10) {
+    if(polaris_ufs_scsi_is_read(kind)) {
         p[18]=static_cast<uint8_t>(lba>>24);p[19]=static_cast<uint8_t>(lba>>16);
         p[20]=static_cast<uint8_t>(lba>>8);p[21]=static_cast<uint8_t>(lba);p[24]=1; // exactly one logical block
     }
@@ -125,14 +129,15 @@ static inline PolarisUfsScsiResult polaris_ufs_scsi_read(const PolarisUfsNopIo &
     uint64_t pa,PolarisUfsScsiKind kind,bool enabled,unsigned lba=0) {
     PolarisUfsScsiResult r;r.kind=kind;r.lba=lba;if(!enabled)return r;
     r.state=PolarisUfsScsiResult::InvalidRequest;r.bytes=polaris_ufs_scsi_bytes(kind);
-    if(!r.bytes || (kind==PolarisUfsScsiKind::Read10?lba>=6:lba!=0))return r;
+    if(!r.bytes || (kind==PolarisUfsScsiKind::Read10?lba>=6:
+       kind==PolarisUfsScsiKind::EspRead10?(lba<UFS_ESP_START || lba-UFS_ESP_START>=UFS_ESP_BLOCKS):lba!=0))return r;
     r.state=PolarisUfsScsiResult::Preflight;
     if(owned.state!=PolarisUfsNopResult::Success || !owned.guards || !owned.responseRead || !owned.smmuUnchanged ||
        !owned.stopped || owned.finalRun || owned.finalDb || owned.finalBase!=pa || owned.dma!=pa ||
        unit.state!=PolarisUfsDescriptor::Success || unit.idn!=2 || unit.length<19 || unit.data[1]!=2 || unit.data[2] ||
        unit.data[3]!=1 || unit.data[10]<9 || unit.data[10]>16 || !polaris_ufs_be64(unit.data+11) ||
        polaris_ufs_be64(unit.data+11)>(UINT64_MAX>>unit.data[10]) ||
-       (kind==PolarisUfsScsiKind::Read10 && (unit.data[10]!=12 || polaris_ufs_be64(unit.data+11)<=lba)) ||
+       (polaris_ufs_scsi_is_read(kind) && (unit.data[10]!=12 || polaris_ufs_be64(unit.data+11)<=lba)) ||
        !buffer || (pa&4095u) || pa<0x100000000ULL || pa>0x140000000ULL-UFS_NOP_BYTES)return r;
     r.dataPa=pa+UFS_SCSI_DATA;
     auto read=[&](unsigned off,uint32_t &v){return io.read(io.context,off,&v);};

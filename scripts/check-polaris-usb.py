@@ -4,8 +4,77 @@
 Requires PyUSB and libusb. This talks to the XNU 1209:0001 diagnostic device;
 it does not use fastboot/ADB and does not submit a reboot or memory-write command.
 """
-import argparse,hashlib,json,re,secrets,time,struct,zlib
+import argparse,hashlib,json,re,secrets,time,struct,zlib,subprocess
 from pathlib import Path
+
+def verify_ufs_esp(build,raw,prior,reference):
+    if prior.get('source_commit')!=build or not prior.get('ufs_bounded_read_verified') or not prior.get('primary_gpt_verified'):
+        raise ValueError('ESP file requires verified native GPT and exact source')
+    userdata=[p for p in prior['gpt_partitions'] if p['name']=='userdata']
+    if len(userdata)!=1 or userdata[0]['first_lba']!=393216 or userdata[0]['bytes']<128*1024*1024:
+        raise ValueError('ESP is not within the verified userdata partition')
+    if reference.stat().st_size!=128*1024*1024:raise ValueError('requires the exact 128-MiB updated ESP reference')
+    expected=bytes((i*37+(i>>8)*11+0x51)&255 for i in range(8193))
+    contents=subprocess.run(['mtype','-i',str(reference),'::/EFI/UniXNU/READTEST.BIN'],check=True,capture_output=True,timeout=10).stdout
+    if contents!=expected:raise ValueError('independent ESP fixture content differs')
+    chain_text=subprocess.run(['mshowfat','-i',str(reference),'::/EFI/UniXNU/READTEST.BIN'],check=True,capture_output=True,text=True,timeout=10).stdout
+    expected_chain=[]
+    for m in re.finditer(r'<(\d+)(?:-(\d+))?>',chain_text):
+        first=int(m[1]);last=int(m[2] or m[1])
+        if last<first or last-first>=32:raise ValueError('reference file chain exceeds bound')
+        expected_chain.extend(range(first,last+1))
+    if not 1<=len(expected_chain)<=32:raise ValueError('reference file chain missing or too long')
+    lines=raw.splitlines();pa=prior['ufs_nop_dma']['pa'];cursor=1
+    if not lines or not raw.endswith(b'\n') or lines[-1]!=b'POLARIS_UFS_ESP_END' or len(raw)>131072:raise ValueError('incomplete ESP response')
+    h=re.fullmatch(rb'POLARIS_UFS_ESP build='+build.encode()+rb' state=ok error=9 count=(\d+) writes=(\d+) doorbells=(\d+) gpt=1 smmu_unchanged=1 start=393216 blocks=32768 media_writes=0 smmu_writes=0 retained=1 pa='+f'{pa:016x}'.encode(),lines[0])
+    if not h:raise ValueError('ESP stage failed identity, GPT, bounds or SMMU checks')
+    count,writes,doorbells=map(int,h.groups())
+    if not 1<=count<=128 or writes!=3*count or doorbells!=count:raise ValueError('ESP command budget/count invalid')
+    p=re.fullmatch(rb'POLARIS_UFS_ESP_FAT sector_bytes=512 spc=(\d+) reserved=(\d+) fats=2 fat_sectors=(\d+) total_sectors=262144 data_sector=(\d+) root=(\d+) clusters=(\d+)',lines[cursor]);cursor+=1
+    if not p:raise ValueError('invalid FAT geometry record')
+    spc,reserved,fat_sectors,data_sector,root,clusters=map(int,p.groups())
+    with reference.open('rb') as disk:
+        b=disk.read(512)
+        if (spc,reserved,fat_sectors,root)!=(b[13],struct.unpack_from('<H',b,14)[0],struct.unpack_from('<I',b,36)[0],struct.unpack_from('<I',b,44)[0]):raise ValueError('FAT geometry differs from updated reference')
+        if not spc or spc>64 or spc&(spc-1) or not reserved or not 1<=fat_sectors<=4096 or data_sector!=reserved+2*fat_sectors or data_sector>=262144 or clusters!=(262144-data_sector)//spc or not 65525<=clusters<0xffffff5 or (clusters+2)*4>fat_sectors*512 or not 2<=root<clusters+2:
+            raise ValueError('invalid FAT32 cluster geometry')
+        p=re.fullmatch(rb'POLARIS_UFS_ESP_FILE path=EFI/UniXNU/READTEST.BIN bytes=8193 clusters=(\d+)',lines[cursor]);cursor+=1
+        if not p or int(p[1])!=len(expected_chain) or len(expected_chain)!=(8193+spc*512-1)//(spc*512):raise ValueError('file length/chain differs from mtools')
+        for n,cluster in enumerate(expected_chain):
+            if cursor>=len(lines) or lines[cursor]!=(f'POLARIS_UFS_ESP_CHAIN n={n} cluster={cluster}').encode():raise ValueError('FAT chain differs from independent mtools lookup')
+            if not 2<=cluster<clusters+2:raise ValueError('FAT cluster out of bounds')
+            cursor+=1
+        commands=[]
+        for n in range(count):
+            if cursor>=len(lines):raise ValueError('ESP command truncated')
+            pattern=(rb'POLARIS_UFS_ESP_CMD n='+str(n).encode()+rb' lba=(\d+) opcode=28 lun=00 blocks=1 state=ok ocs=0 response=00 status=00 flags=([0-9a-f]{2}) bytes=4096 residual=0 segment=(0|2) sense_len=0 guards=1 stopped=1 polls=(\d+) run=00000000 db=00000000 is=([0-9a-f]{8}) upiu=([0-9a-f]{68})')
+            m=re.fullmatch(pattern,lines[cursor]);cursor+=1
+            if not m:raise ValueError('ESP READ command did not complete GOOD')
+            lba,flags,segment,polls,is_value=int(m[1]),int(m[2],16),int(m[3]),int(m[4]),int(m[5],16);upiu=bytes.fromhex(m[6].decode())
+            if not 393216<=lba<425984 or flags&0x60 or not 1<=polls<=5000 or is_value&0x71884 or upiu[0]!=0x21 or upiu[1]!=flags or any(upiu[i] for i in (2,3,6,7,8)) or int.from_bytes(upiu[10:12],'big')!=segment or any(upiu[12:16]) or (segment and any(upiu[32:34])):
+                raise ValueError('ESP READ response or partition bounds invalid')
+            if cursor>=len(lines):raise ValueError('ESP DMA record truncated')
+            m=re.fullmatch(rb'POLARIS_UFS_ESP_DMA n='+str(n).encode()+rb' data_pa=([0-9a-f]{16}) prdt=([0-9a-f]{32}) crc32=([0-9a-f]{8})',lines[cursor]);cursor+=1
+            if not m or int(m[1],16)!=pa+8192 or struct.unpack('<QII',bytes.fromhex(m[2].decode()))!=(pa+8192,0,4095):raise ValueError('ESP PRDT differs from owned data page')
+            disk.seek((lba-393216)*4096);block=disk.read(4096)
+            if len(block)!=4096 or zlib.crc32(block)!=int(m[3],16):raise ValueError('ESP block CRC differs from updated image')
+            commands.append(dict(lba=lba,bytes=4096,polls=polls,crc32=zlib.crc32(block)))
+    data=bytearray()
+    while len(data)<8193:
+        if cursor>=len(lines):raise ValueError('ESP file data truncated')
+        m=re.fullmatch(rb'POLARIS_UFS_ESP_DATA offset='+str(len(data)).encode()+rb' hex=([0-9a-f]+)',lines[cursor]);cursor+=1
+        if not m or len(m[1])!=2*min(32,8193-len(data)):raise ValueError('ESP file data gap, overflow or duplication')
+        data.extend(bytes.fromhex(m[1].decode()))
+    if data!=contents:raise ValueError('native FAT file differs byte for byte')
+    if cursor+2!=len(lines):raise ValueError('unexpected ESP records')
+    m=re.fullmatch(rb'POLARIS_UFS_ESP_FAULT global_before=([0-9a-f]{8}) bank_before=([0-9a-f]{8}) global_after=([0-9a-f]{8}) bank_after=([0-9a-f]{8})',lines[cursor])
+    if not m:raise ValueError('ESP fault record missing')
+    faults=dict(zip(('global_before','bank_before','global_after','bank_after'),[int(x,16) for x in m.groups()]))
+    if faults['global_before'] or faults['global_after'] or (faults['bank_before']|faults['bank_after'])&0xc00001fe:raise ValueError('SMMU fault around ESP reads')
+    return dict(ufs_fat32_file_verified=True,ufs_esp_sha256=hashlib.sha256(raw).hexdigest(),ufs_esp_faults=faults,
+                ufs_esp_commands=commands,ufs_esp_file_sha256=hashlib.sha256(data).hexdigest(),ufs_esp_file_bytes=len(data),
+                ufs_esp_chain=expected_chain,ufs_esp_geometry=dict(sector_bytes=512,spc=spc,reserved=reserved,fat_sectors=fat_sectors,data_sector=data_sector,root=root,clusters=clusters),
+                ufs_native_media_read_verified=True,ufs_filesystem_mount_verified=False,media_write_verified=False)
 
 def verify_primary_gpt(data,capacity):
     if len(data)!=6*4096 or capacity['block_bytes']!=4096:raise ValueError('requires six 4-KiB sectors')
@@ -316,6 +385,8 @@ def main():
     p.add_argument('--ufs-inventory',action='store_true',help='also collect the read-only candidate stream/queue inventory')
     p.add_argument('--ufs-nop',action='store_true',help='verify the cached single owned-queue NOP result')
     p.add_argument('--ufs-query',action='store_true',help='verify cached read-only device and unit descriptor results')
+    p.add_argument('--ufs-esp',action='store_true',help='verify cached FAT32 file against updated ESP image')
+    p.add_argument('--ufs-esp-reference',type=Path)
     p.add_argument('--ufs-read',action='store_true',help='verify six cached fixed READ(10) sectors against independent reference')
     p.add_argument('--ufs-read-reference',type=Path,help='six 4-KiB sectors captured independently before boot')
     p.add_argument('--ufs-scsi',action='store_true',help='verify cached INQUIRY and READ CAPACITY PRDT results')
@@ -326,6 +397,7 @@ def main():
     if a.ufs_query and not a.ufs_nop:p.error('--ufs-query requires --ufs-nop')
     if a.ufs_scsi and not a.ufs_query:p.error('--ufs-scsi requires --ufs-query')
     if a.ufs_read and (not a.ufs_scsi or not a.ufs_read_reference):p.error('--ufs-read requires --ufs-scsi and --ufs-read-reference')
+    if a.ufs_esp and (not a.ufs_read or not a.ufs_esp_reference):p.error('--ufs-esp requires --ufs-read and --ufs-esp-reference')
     import usb.core,usb.util
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False)
     report=dict(passed=False,physical_polaris=False,source_commit=a.expected_build,transport='native XNU polling USB CDC',
@@ -386,6 +458,10 @@ def main():
             raw=exchange('ufs-read',lambda d:b'POLARIS_UFS_READ_END\n' in d,30)
             (out/'ufs-read.raw').write_bytes(raw)
             report.update(verify_ufs_read(a.expected_build,raw,report,a.ufs_read_reference.read_bytes()))
+        if a.ufs_esp:
+            raw=exchange('ufs-esp',lambda d:b'POLARIS_UFS_ESP_END\n' in d,30)
+            (out/'ufs-esp.raw').write_bytes(raw)
+            report.update(verify_ufs_esp(a.expected_build,raw,report,a.ufs_esp_reference))
         values=verify_response(a.expected_build,nonce,pong,echo,status,log)
         report.update(values,passed=True,physical_polaris=True,nonce=nonce,
                       native_enumeration_verified=True,bidirectional_roundtrip_verified=True,build_identity_verified=True,

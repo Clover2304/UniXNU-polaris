@@ -66,6 +66,8 @@ def main():
     aliases = Path(tempfile.mkdtemp(prefix='polaris-tools-', dir=os.environ.get('RUNNER_TEMP')))
     os.environ['PATH'] = str(aliases) + os.pathsep + os.environ['PATH']
     required = {'clang': 'clang', 'clang++': 'clang', 'ld.lld': 'lld'}
+    if a.profile == 'host':
+        required.update({name: 'mtools' for name in ('mformat','mcopy','mmd','mtype','mshowfat')})
     if a.profile != 'host':
         required.update({name: 'llvm' for name in
                          ('llvm-nm', 'llvm-objcopy', 'llvm-objdump', 'llvm-readelf', 'llvm-size')})

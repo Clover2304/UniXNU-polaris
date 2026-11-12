@@ -22,6 +22,7 @@
 #include "UfsQuery.h"
 #include "UfsScsi.h"
 #include "UfsRead.h"
+#include "UfsFat.h"
 
 #ifndef POLARIS_USB_BUILD_ID
 #define POLARIS_USB_BUILD_ID "local-unqualified"
@@ -73,6 +74,14 @@ struct TerminalSession {
     unsigned ufsReadCount=0;
     bool ufsReadEnabled=false,ufsReadSmmuUnchanged=false;
     uint32_t ufsReadFaultBefore[2]{},ufsReadFaultAfter[2]{};
+    PolarisFatWork ufsEspWork;
+    PolarisFatResult ufsEspResult;
+    PolarisUfsScsiResult ufsEspCommands[UFS_FAT_MAX_READS];
+    unsigned ufsEspCount=0;
+    uint32_t ufsEspBlockCrc[UFS_FAT_MAX_READS]{};
+    bool ufsEspEnabled=false,ufsEspGpt=false,ufsEspSmmuUnchanged=false;
+    uint64_t ufsEspStarted=0;
+    uint32_t ufsEspFaultBefore[2]{},ufsEspFaultAfter[2]{};
     PolarisBytes<131072> reply;
     PolarisLine input;
     uint8_t tx[DMA_EP3_MAX_CHUNK]{};
@@ -308,6 +317,58 @@ static void ufsReadText(TerminalSession &s,bool response) {
     snprintf(text,sizeof(text),"POLARIS_UFS_READ_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x\nPOLARIS_UFS_READ_END\n",
         s.ufsReadFaultBefore[0],s.ufsReadFaultBefore[1],s.ufsReadFaultAfter[0],s.ufsReadFaultAfter[1]);emit();
 }
+static bool ufsEspRead(void *context,uint32_t block,uint8_t *output) {
+    auto &s=*static_cast<TerminalSession *>(context);
+    if(!s.ufsEspGpt || !s.ufsEspSmmuUnchanged || block>=UFS_ESP_BLOCKS ||
+       s.ufsEspCount>=UFS_FAT_MAX_READS || nowMs()-s.ufsEspStarted>10000)return false;
+    auto &r=s.ufsEspCommands[s.ufsEspCount++];
+    r=polaris_ufs_scsi_read({&s,ufsNopRead,ufsNopWrite,ufsNopDelay,ufsNopCache},
+        s.ufsNop,s.ufsDescriptors[1],s.ufsDma,s.ufsDmaPhys,PolarisUfsScsiKind::EspRead10,true,UFS_ESP_START+block);
+    unsigned cb=(s.ufsInventory.pages+2u)*4096u;
+    auto after=polaris_ufs_inventory({&s,ufsRead},{&s,ufsSmmuRead},true,true);
+    s.ufsEspSmmuUnchanged=polaris_ufs_nop_same_smmu(s.ufsInventory,after);
+    if(!ufsSmmuRead(&s,0x48,&s.ufsEspFaultAfter[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsEspFaultAfter[1]) ||
+       polaris_ufs_nop_fault(s.ufsEspFaultAfter[0],s.ufsEspFaultAfter[1]))s.ufsEspSmmuUnchanged=false;
+    if(r.state!=PolarisUfsScsiResult::Success || !s.ufsEspSmmuUnchanged)return false;
+    s.ufsEspBlockCrc[s.ufsEspCount-1]=polaris_fat_crc(s.ufsDma+UFS_SCSI_DATA,4096);
+    for(unsigned i=0;i<4096;i++)output[i]=s.ufsDma[UFS_SCSI_DATA+i];
+    return true;
+}
+static void runUfsEsp(TerminalSession &s,bool enabled) {
+    s.ufsEspEnabled=enabled;if(!enabled)return;
+    s.ufsEspResult.state=PolarisFatResult::Preflight;
+    if(!s.ufsReadSmmuUnchanged || !polaris_ufs_esp_gpt(s.ufsSectors,s.ufsReadCount,s.ufsScsi[1]))return;
+    s.ufsEspGpt=true;unsigned cb=(s.ufsInventory.pages+2u)*4096u;
+    if(!ufsSmmuRead(&s,0x48,&s.ufsEspFaultBefore[0]) || !ufsSmmuRead(&s,cb+0x58,&s.ufsEspFaultBefore[1]) ||
+       polaris_ufs_nop_fault(s.ufsEspFaultBefore[0],s.ufsEspFaultBefore[1]))return;
+    s.ufsEspSmmuUnchanged=true;s.ufsEspStarted=nowMs();
+    PolarisFatReader reader({&s,ufsEspRead},s.ufsEspWork,s.ufsEspResult);reader.run();
+}
+static void ufsEspText(TerminalSession &s,bool response) {
+    char text[512],hex[69];auto emit=[&](){if(response)respond(s,text);else console("%s",text);};
+    const auto &r=s.ufsEspResult;unsigned writes=0,doorbells=0;
+    for(unsigned i=0;i<s.ufsEspCount;i++){writes+=s.ufsEspCommands[i].writes;doorbells+=s.ufsEspCommands[i].doorbells;}
+    bool ok=r.state==PolarisFatResult::Success && s.ufsEspSmmuUnchanged && r.reads==s.ufsEspCount;
+    snprintf(text,sizeof(text),"POLARIS_UFS_ESP build=%s state=%s error=%u count=%u writes=%u doorbells=%u gpt=%u smmu_unchanged=%u start=%u blocks=%u media_writes=0 smmu_writes=0 retained=%u pa=%016llx\n",
+        POLARIS_USB_BUILD_ID,!s.ufsEspEnabled?"disabled":ok?"ok":"failed",unsigned(r.state),s.ufsEspCount,writes,doorbells,s.ufsEspGpt,s.ufsEspSmmuUnchanged,UFS_ESP_START,UFS_ESP_BLOCKS,s.ufsDmaDesc!=nullptr,s.ufsDmaPhys);emit();
+    snprintf(text,sizeof(text),"POLARIS_UFS_ESP_FAT sector_bytes=%u spc=%u reserved=%u fats=2 fat_sectors=%u total_sectors=%u data_sector=%u root=%u clusters=%u\n",
+        r.sectorBytes,r.sectorsPerCluster,r.reserved,r.fatSectors,r.totalSectors,r.dataSector,r.rootCluster,r.clusters);emit();
+    snprintf(text,sizeof(text),"POLARIS_UFS_ESP_FILE path=EFI/UniXNU/READTEST.BIN bytes=%u clusters=%u\n",r.fileBytes,r.clusterCount);emit();
+    for(unsigned i=0;i<r.clusterCount && i<32;i++){snprintf(text,sizeof(text),"POLARIS_UFS_ESP_CHAIN n=%u cluster=%u\n",i,r.chain[i]);emit();}
+    if(response)for(unsigned i=0;i<s.ufsEspCount;i++) {
+        const auto &c=s.ufsEspCommands[i];queryHex(c.upiu,34,hex);
+        snprintf(text,sizeof(text),"POLARIS_UFS_ESP_CMD n=%u lba=%u opcode=28 lun=00 blocks=1 state=%s ocs=%u response=%02x status=%02x flags=%02x bytes=%u residual=%u segment=%u sense_len=%u guards=%u stopped=%u polls=%u run=%08x db=%08x is=%08x upiu=%s\n",
+            i,c.lba,polaris_ufs_scsi_state(c.state),c.ocs,c.response,c.status,c.flags,c.bytes,c.residual,c.segment,c.senseLength,c.guards,c.stopped,c.polls,c.finalRun,c.finalDb,c.isAfter,hex);emit();
+        queryHex(c.prdt,16,hex);snprintf(text,sizeof(text),"POLARIS_UFS_ESP_DMA n=%u data_pa=%016llx prdt=%s crc32=%08x\n",i,c.dataPa,hex,s.ufsEspBlockCrc[i]);emit();
+        if(c.senseLength){queryHex(c.sense,c.senseLength,hex);snprintf(text,sizeof(text),"POLARIS_UFS_ESP_SENSE n=%u hex=%s\n",i,hex);emit();}
+    }
+    if(response && ok)for(unsigned offset=0;offset<r.fileBytes;offset+=32) {
+        unsigned count=r.fileBytes-offset;if(count>32)count=32;queryHex(r.data+offset,count,hex);
+        snprintf(text,sizeof(text),"POLARIS_UFS_ESP_DATA offset=%u hex=%s\n",offset,hex);emit();
+    }
+    snprintf(text,sizeof(text),"POLARIS_UFS_ESP_FAULT global_before=%08x bank_before=%08x global_after=%08x bank_after=%08x\nPOLARIS_UFS_ESP_END\n",
+        s.ufsEspFaultBefore[0],s.ufsEspFaultBefore[1],s.ufsEspFaultAfter[0],s.ufsEspFaultAfter[1]);emit();
+}
 static void handleCommand(TerminalSession &s,const char *command) {
     polaris_usb_stats[5]=polaris_usb_stats[5]+1;
     char text[512];
@@ -347,7 +408,8 @@ static void handleCommand(TerminalSession &s,const char *command) {
     else if(!strcmp(command,"ufs-query"))ufsQueryText(s,true);
     else if(!strcmp(command,"ufs-scsi"))ufsScsiText(s,true);
     else if(!strcmp(command,"ufs-read"))ufsReadText(s,true);
-    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map ufs-nop ufs-query ufs-scsi ufs-read help\n");
+    else if(!strcmp(command,"ufs-esp"))ufsEspText(s,true);
+    else if(!strcmp(command,"help"))respond(s,"POLARIS_COMMANDS ping echo status log ufs ufs-map ufs-nop ufs-query ufs-scsi ufs-read ufs-esp help\n");
     else respond(s,"ERR unknown-command\n");
 }
 #include "UsbEvents.h"
@@ -523,6 +585,9 @@ static void worker(void *,wait_result_t) {
     unsigned readEnable=0;
     bool read=scsi && PE_parse_boot_argn("polaris-ufs-read",&readEnable,sizeof(readEnable)) && readEnable==1;
     runUfsRead(*s,read);if(read)ufsReadText(*s,false);
+    unsigned espEnable=0;
+    bool esp=read && PE_parse_boot_argn("polaris-ufs-esp",&espEnable,sizeof(espEnable)) && espEnable==1;
+    runUfsEsp(*s,esp);if(esp)ufsEspText(*s,false);
     uint64_t started=nowMs(),next=started+5000;bool fallback=s->hw.phyInitMode!=0;
     for(;;) {
         pollUsbEvents(*s);

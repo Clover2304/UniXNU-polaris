@@ -31,7 +31,7 @@ struct ReadPeer {
         if(mode==Residual)p[15]=1;
         if(mode==CheckCondition){p[7]=2;p[11]=20;p[33]=18;std::memset(p+34,0,18);p[34]=0x70;p[36]=6;p[46]=0x29;}
         if(mode==SenseTooLong){p[7]=2;p[11]=20;p[32]=p[33]=0xff;}
-        unsigned lba=device[UFS_NOP_UCD+21];
+        unsigned lba=(unsigned(device[UFS_NOP_UCD+18])<<24)|(unsigned(device[UFS_NOP_UCD+19])<<16)|(unsigned(device[UFS_NOP_UCD+20])<<8)|device[UFS_NOP_UCD+21];
         if(mode!=DataMissing)for(unsigned i=0;i<(mode==PartialData?4095u:4096u);i++)device[UFS_SCSI_DATA+i]=expected(lba,i);
         if(mode==Overrun)device[UFS_SCSI_DATA+4096]^=1;
         if(mode==CorruptPrdt)device[UFS_SCSI_PRDT+12]^=1;
@@ -52,7 +52,9 @@ struct ReadPeer {
             const uint8_t utrd[]={0,0,0,0x15,0,0,0,0,15,0,0,0,0,0,0,0,0,0x10,0,2,1,0,0,0,0x80,0,0x80,0,1,0,0,1};
             assert(!std::memcmp(utrd,f.device,32));
             uint8_t request[]={1,0x40,0,0,0,0,0,0,0,0,0,0,0,0,0x10,0,0x28,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0};
-            unsigned lba=f.device[UFS_NOP_UCD+21];assert(lba<6);request[21]=static_cast<uint8_t>(lba);
+            unsigned lba=(unsigned(f.device[UFS_NOP_UCD+18])<<24)|(unsigned(f.device[UFS_NOP_UCD+19])<<16)|(unsigned(f.device[UFS_NOP_UCD+20])<<8)|f.device[UFS_NOP_UCD+21];
+            assert(lba<6 || (lba>=393216 && lba<425984));
+            request[18]=uint8_t(lba>>24);request[19]=uint8_t(lba>>16);request[20]=uint8_t(lba>>8);request[21]=uint8_t(lba);
             assert(!std::memcmp(request,f.device+UFS_NOP_UCD,32));
             const uint8_t prdt[]={0,0x20,0,2,1,0,0,0,0,0,0,0,0xff,0x0f,0,0};
             assert(!std::memcmp(prdt,f.device+UFS_SCSI_PRDT,16));
@@ -82,6 +84,15 @@ int main() {
         for(unsigned at=0;at<4096;at++)assert(sector.data[at]==ReadPeer::expected(lba,at));
     }
     assert(good.submissions==6 && good.writes.size()==18 && good.clean==6 && good.invalidate==6);
+    for(unsigned lba:{393215u,393216u,425983u,425984u}) {
+        ReadPeer f;f.unit.data[16]=7;f.unit.data[17]=0xa1;f.unit.data[18]=0x20;
+        auto r=polaris_ufs_scsi_read({&f,ReadPeer::read,ReadPeer::write,ReadPeer::delay,ReadPeer::cache},
+            f.owned,f.unit,f.cpu,f.pa,PolarisUfsScsiKind::EspRead10,true,lba);
+        if(lba==393216 || lba==425983) {
+            assert(r.state==PolarisUfsScsiResult::Success && f.submissions==1 && r.bytes==4096);
+            for(unsigned at=0;at<4096;at++)assert(f.cpu[UFS_SCSI_DATA+at]==ReadPeer::expected(lba,at));
+        } else assert(r.state==PolarisUfsScsiResult::InvalidRequest && f.writes.empty());
+    }
     for(unsigned mode=0;mode<8;mode++) {
         ReadPeer f;PolarisUfsSector sector;
         if(mode==0)f.capacity.guards=false;if(mode==1)f.capacity.kind=PolarisUfsScsiKind::Inquiry;
