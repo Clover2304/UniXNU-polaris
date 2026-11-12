@@ -182,3 +182,20 @@ RAM fixture 采用当前 N4KROOT v3，保留原版 `/sbin/launchd`、`/usr/lib/d
 [真实注册证据](apple-apfs-registration.json)：在同一个 12 组件候选上，观察原版 APFS kmod_start 实际执行，跟随源内核 vfs_fsadd 到原调用栈返回，返回值为 0，返回 PC 位于未改写的原 APFS 可执行区段。输出表含 apfs，操作表指针和捕获的 144 字节与原版表完全一致。省略 APFS 的候选保留相同 native source、平台参数和已初始化原 crypto；真实加载 API 返回非零且未返回注册表，拒绝对照通过。旧 native_apfs_registered 诊断扫描仍为 0，后续以实际调用、返回表和挂载验收，不能用该旧计数器替代结果。
 
 原 APFS 模块启动与 VFS 注册现在为模拟通过，磁盘读取、实际挂载与完整共享缓存仍未通过。NativeAES 和 NativeVirtioBlock 的实际 CI 对象已编译，分别 181 和 190 槽；主机符号比较脚本曾在平台工具的解码结果上失败，保留的原对象改用 LLVM 明确的 no-strip 模式后，所有方法签名比对通过。该修正保持全表检查，新内核仍需重新链接与运行。构建依赖已区分：仅存储辅助脚本/专用配置的变化由存储工作流构建，公共内核、驱动、测试和板配置仍触发完整 RAM 根回归。
+
+
+## G2/G3：只读 APFS 文件分页已模拟通过（caf4c4c）
+
+[存储 CI 43181491189](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43181491189)已通过，实际链接固定上游 NativeAES / NativeVirtioBlock；编译对象的全部 181 / 190 个方法槽与已测原接口逐项一致。原 RAM 根的[完整回归 43178890800](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43178890800)另行通过。本轮没有更新或访问手机，真机仍保留已验收的 57a7d7f 小缓存探针。
+
+[运行证据](apple-storage-runtime.json)记录了真实 QEMU 4K 来宾中的两卷只读挂载、文件读取和小缓存分页。OS 卷 UUID 为 `04769D26-2CA0-4825-B443-E2E5F88300F2`，SystemCryptex 为 `8846FE78-2910-4297-AF97-D59BB6F8FC16`；同一 IORegistry 条目还核对卷名与实际 BSD 名，本次分别为 disk3s1 / disk2s1。设备编号不能作为跨启动的固定身份。前两轮测试把卷角色反置，造成目标路径不存在；失败记录保留，已更正配置和卷身份验收。
+
+正确卷上打开 launchd 最初返回 EIO。主机核对原 launchd/dyld 均为 type 4 的 zlib 压缩文件；保持同一原始源内核、同一自制程序和只读输入，在原 12 组件组合上加入同版本 AppleFSCompressionTypeZlib 后通过，共 13 个原组件的可执行区段保持原字节。原 launchd/dyld 分别读取并比较 256 字节文件前缀，SEEK_END 核对大小 561856 / 937056；没有在来宾中计算两文件的完整哈希。
+
+自制 PID 1 从原 SystemCryptex 的真实 APFS 文件打开 49,152 字节 subcache，执行签名登记、32 KiB RX 私有映射、8 页读取、释放和关闭。实际观察两个完整 16K 签名块、八次 4K 页校验、一个就绪哈希缓存；bad_hash/no_hash 为 0，327 次底层读取零失败。对只读 OS 文件请求写打开返回 EROFS，未执行文件写入。NativeAES 已注册、接口/KAT 通过、完成 3 次请求；unsupported_key=1 是 KAT 的预期拒绝项，本轮镜像未加密，不代表加密卷已验证。
+
+同一最终内核关闭缓存诊断授权后，两卷挂载与原文件读取仍正常，缓存签名登记实际返回 EPERM；完整块、页校验和就绪缓存计数均为 0，进程继续心跳。缺少解压组件的 EIO、此前缺传输的 ENOENT 和缺 APFS 的真实加载拒绝记录均保留。自制探针源码与生成器已保存；公开生成器重建的程序和 RAM 根与本次正向运行逐字节一致，含 Apple 前缀字节的生成头只留在私有输出。
+
+这一项把服务器路径从“组件注册”推进到“真实文件分页”。完整 53 文件共享缓存映射、原缓存指令执行、libSystem/TLS、原版 launchd 主函数和 iPadOS 界面仍未通过；真机通用 UFS 块设备/文件分页需要独立接入，不能用 QEMU VirtIO 结果替代。
+
+接下来先在服务器复用这套只读两卷后端，给原版 dyld 提供完整缓存路径，观察实际映射及首个缺失接口；保留签名拒绝和自制程序基线。到需要验证原生 UFS 后端时再安排 Mass Storage 更新，当前无需操作手机。
