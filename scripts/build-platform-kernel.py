@@ -224,7 +224,7 @@ def main():
     if source_mockfs:
         check.symbols(data, {'_polaris_apple_probe_enabled', '_polaris_apple_signature_accepted',
                              '_polaris_apple_signature_rejected', '_polaris_apple_launchd_accepted',
-                             '_polaris_apple_dyld_accepted'})
+                             '_polaris_apple_dyld_accepted', '_polaris_apple_launcher_accepted'})
         if not apple_probe_available:
             raise SystemExit('Missing opt-in exact-original Apple execution probe')
     native4k_signature_cache = ctx.config.get('XNU_NATIVE_CS_HASH_CACHE') is True
@@ -248,6 +248,7 @@ def main():
               'native_aes_linked':ctx.config.get('XNU_NATIVE_AES') is True,
               'source_mockfs': source_mockfs, 'mockfs_symbols': mockfs_symbols,
               'apple_probe_available': apple_probe_available,
+              'apple_launcher_policy': 'opt-in-pid1-native4k-exact-owner-no-privileges-v1' if apple_probe_available else None,
               'native4k_signature_hash_cache': native4k_signature_cache,
               'cache_probe_policy': 'pid1-original-system-cache-cdhashes-v1' if native4k_signature_cache else None,
               'apple_probe_policy': 'pid1-two-original-cdhashes-no-entitlement-grant-v1' if apple_probe_available else None,

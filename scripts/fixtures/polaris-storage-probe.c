@@ -5,6 +5,7 @@ void bzero(void *p,u64 n){volatile u8 *b=p;for(u64 i=0;i<n;i++)b[i]=0;}
 volatile u64 results[4],user_page_size,old_length=8,storage_results[24];
 __attribute__((noinline)) void checkpoint(void){__asm__ volatile("":::"memory");}
 __attribute__((noinline)) void storage_checkpoint(void){__asm__ volatile("":::"memory");}
+__attribute__((noinline)) void storage_exec_checkpoint(void){__asm__ volatile("":::"memory");}
 __attribute__((noinline)) void storage_resident_checkpoint(void){__asm__ volatile("":::"memory");}
 __attribute__((noreturn,noinline)) void reboot_return(void){for(;;)__asm__ volatile("b .");}
 static void emit(const char *s,u64 n){(void)CALL(4,1,s,n,0);}
@@ -32,11 +33,32 @@ static int prefix_file(const char *path,const u8 *expected,u64 expected_size,u64
 }
 static void probe(void){
  if(!check(CALL(136,"/dev/osroot",0755,0,0),2))return;
+#ifndef STORAGE_LAUNCH_APPLE
  if(!check(CALL(136,"/dev/cachefs",0755,0,0),3))return;
+#endif
  if(!mount_volume(STORAGE_OS_DEVICE,"/dev/osroot",4))return;
+#ifdef STORAGE_LAUNCH_APPLE
+ if(!mount_volume(STORAGE_CACHE_DEVICE,"/dev/osroot/dev",6))return;
+#else
  if(!mount_volume(STORAGE_CACHE_DEVICE,"/dev/cachefs",6))return;
+#endif
  if(!prefix_file("/dev/osroot/sbin/launchd",expected_launchd,561856,10))return;
  if(!prefix_file("/dev/osroot/usr/lib/dyld",expected_dyld,937056,14))return;
+#ifdef STORAGE_LAUNCH_APPLE
+ if(!check(CALL(61,"/dev/osroot",0,0,0),40))return;
+ if(!check(CALL(12,"/",0,0,0),41))return;
+ struct reply cache=CALL(5,"/dev/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64",0,0,0);
+ if(!check(cache,42))return;
+ if(!check(CALL(6,cache.value,0,0,0),43))return;
+ storage_results[0]=200;storage_exec_checkpoint();
+#ifndef STORAGE_STOP_BEFORE_EXEC
+ const char *argv[]={"/sbin/launchd",0};
+ const char *envp[]={"DYLD_SHARED_CACHE_DIR=/dev/System/Library/Caches/com.apple.dyld",0};
+ struct reply exec=CALL(59,argv[0],argv,envp,0);
+ storage_results[0]=44;storage_results[1]=ERROR(exec)?exec.value:994;
+#endif
+ return;
+#else
  struct reply r=CALL(5,"/dev/cachefs/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64.02",0,0,0);
  if(!check(r,30))return;s64 fd=r.value;u64 signature[3]={0,32768,16384};
  r=CALL(92,fd,97,signature,0);storage_results[18]=r.value;storage_results[19]=signature[0];
@@ -53,6 +75,7 @@ static void probe(void){
  if(!ERROR(r)){(void)CALL(6,r.value,0,0,0);storage_results[0]=37;storage_results[1]=993;return;}
  if(r.value!=30){storage_results[0]=38;storage_results[1]=r.value;return;}
  storage_results[0]=100;
+#endif
 }
 POLARIS_ENTRY(storage_start)
 __attribute__((noreturn,used)) void storage_start(u64 sp){
@@ -73,7 +96,9 @@ __attribute__((noreturn,used)) void storage_start(u64 sp){
  }
  static const char ok[]="POLARIS_STORAGE_OK mounts=2 original_prefixes=2 cache16k=2 pages4k=8 cleanup=OK readonly=OK\n";
  static const char fail[]="POLARIS_STORAGE_FAILED stage=";
+ static const char prepared[]="POLARIS_STORAGE_PREPARED mounts=2 chroot=OK cache_path=OK\n";
  if(storage_results[0]==100)emit(ok,sizeof(ok)-1);
+ else if(storage_results[0]==200)emit(prepared,sizeof(prepared)-1);
  else{emit(fail,sizeof(fail)-1);print_number(storage_results[0]);emit(" errno=",7);print_number(storage_results[1]);emit("\n",1);}
  storage_checkpoint();
  for(;;){storage_results[22]++;storage_resident_checkpoint();pause_second();}

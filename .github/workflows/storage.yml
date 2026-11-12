@@ -2,7 +2,7 @@ name: Read-only storage component inputs
 on:
   push:
     branches: ['work/polaris-ramdisk']
-    paths: ['.github/workflows/storage.yml', 'configs/polaris_storage_defconfig', 'configs/polaris_storage_io_defconfig', 'scripts/build-storage-reference.py', 'scripts/build-storage-drivers.py', 'research/apple-storage-bindings.json']
+    paths: ['.github/workflows/storage.yml', 'configs/polaris_storage_defconfig', 'configs/polaris_storage_io_defconfig', 'scripts/build-storage-reference.py', 'scripts/build-storage-drivers.py', 'research/apple-storage-bindings.json', 'kernel-overrides/**', 'scripts/build-platform-kernel.py', 'drivers/**', 'board.toml', 'upstream.json']
   workflow_dispatch:
     inputs:
       defconfig:

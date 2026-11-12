@@ -21,6 +21,21 @@
 +}
 +#endif
 --- /dev/null
++++ b/bsd/kern/polaris_apple_launcher.h
+@@ -0,0 +1,12 @@
++/* Own mount/exec diagnostic: explicit modes, exact owner, native 4K, PID1. */
++#ifndef POLARIS_APPLE_LAUNCHER_H
++#define POLARIS_APPLE_LAUNCHER_H
++static inline int
++polaris_apple_launcher_blob(const struct cs_blob *blob, int pid,
++    int mode, int apple_mode, const char *expected)
++{
++ if(mode!=1 || apple_mode!=1 || pid!=1 || !blob ||
++    blob->csb_hash_pageshift!=12 || !(blob->csb_flags&CS_VALID))return 0;
++ return polaris_process_blob_policy(blob,pid,0,0,expected)==0;
++}
++#endif
+--- /dev/null
 +++ b/bsd/kern/polaris_cache_policy.h
 @@ -0,0 +1,73 @@
 +/* Boot-owner cache diagnostic. Exact original System cache CDHashes only.
@@ -98,13 +113,15 @@
 +#endif
 --- a/bsd/kern/ubc_subr.c
 +++ b/bsd/kern/ubc_subr.c
-@@ -4373,9 +4373,38 @@
+@@ -4373,9 +4373,48 @@
  volatile uint32_t polaris_child_signature_accepted, polaris_child_signature_rejected;
  
  #include "polaris_process_policy.h"
 +#include "polaris_apple_probe.h"
++#include "polaris_apple_launcher.h"
 +#include "polaris_cache_policy.h"
 +volatile uint32_t polaris_cache_signature_accepted, polaris_cache_signature_rejected;
++volatile uint32_t polaris_apple_launcher_accepted;
 +volatile uint32_t polaris_apple_signature_accepted, polaris_apple_signature_rejected;
 +volatile uint32_t polaris_apple_launchd_accepted, polaris_apple_dyld_accepted;
 +int
@@ -126,6 +143,14 @@
 +		return 0;
 +	}
 +	if(polaris_apple_probe_enabled()) {
++		char owner[CS_CDHASH_LEN*2+2]={0};
++		int launcher_mode=0;
++		(void)PE_parse_boot_argn("polaris-apple-launcher",&launcher_mode,sizeof(launcher_mode));
++		(void)PE_parse_boot_arg_str("polaris-init-cdhash",owner,sizeof(owner));
++		if(polaris_apple_launcher_blob(blob,proc_selfpid(),launcher_mode,1,owner)) {
++			polaris_apple_launcher_accepted++;
++			return 0;
++		}
 +		unsigned kind=polaris_apple_blob_kind(blob,proc_selfpid(),1);
 +		if(!kind) { polaris_apple_signature_rejected++;return EPERM; }
 +		polaris_apple_signature_accepted++;

@@ -23,8 +23,12 @@ def main():
     parser.add_argument('--cache-device',required=True,help='Same-entry SystemCryptex UUID/BSD name observed in this guest')
     parser.add_argument('--discovery',action='store_true')
     parser.add_argument('--policy-off',action='store_true')
+    parser.add_argument('--launch-apple',action='store_true',help='Mount both read-only volumes, chroot, then exec original launchd')
+    parser.add_argument('--stop-before-exec',action='store_true',help='Qualify the actual mount/chroot/cache path before exec')
     parser.add_argument('--out',type=Path,required=True)
     a=parser.parse_args()
+    if a.stop_before_exec and not a.launch_apple:parser.error('--stop-before-exec requires --launch-apple')
+    if a.discovery and a.launch_apple:parser.error('--discovery and --launch-apple are separate instruments')
     assert all(re.fullmatch(r'/dev/disk\d+s\d+',s) for s in [a.os_device,a.cache_device])
     a.out=a.out.resolve();a.out.mkdir(parents=True,exist_ok=False)
     lines=['#define STORAGE_OS_DEVICE '+json.dumps(a.os_device),'#define STORAGE_CACHE_DEVICE '+json.dumps(a.cache_device)]
@@ -39,17 +43,19 @@ def main():
     clang=shutil.which('clang');linker=shutil.which('ld64.lld') or str(next(Path('/usr/lib').glob('llvm-*/bin/ld64.lld')))
     subprocess.run([clang,'--target=arm64-apple-ios17.0','-O2','-ffreestanding','-fno-builtin',
         '-fno-stack-protector','-mgeneral-regs-only','-I',scripts/'fixtures','-I',a.out,
-        *(['-DSTORAGE_DISCOVERY=1'] if a.discovery else []),'-c',scripts/'fixtures/polaris-storage-probe.c','-o',a.out/'init.o'],check=True)
+        *(['-DSTORAGE_DISCOVERY=1'] if a.discovery else []),
+        *(['-DSTORAGE_LAUNCH_APPLE=1'] if a.launch_apple else []),
+        *(['-DSTORAGE_STOP_BEFORE_EXEC=1'] if a.stop_before_exec else []),'-c',scripts/'fixtures/polaris-storage-probe.c','-o',a.out/'init.o'],check=True)
     subprocess.run([linker,'-arch','arm64','-e','_start','-platform_version','ios','17.0','17.0',
         '-no_pie','-no_adhoc_codesign','-headerpad','0x400','-o',a.out/'unsigned.macho',a.out/'init.o'],check=True)
     image=own.static_and_sign((a.out/'unsigned.macho').read_bytes());identity=own.inspect(image)
-    addresses=checker.symbols(image,{'_start','_storage_start','_storage_results','_storage_checkpoint','_storage_resident_checkpoint'})
+    addresses=checker.symbols(image,{'_start','_storage_start','_storage_results','_storage_checkpoint','_storage_resident_checkpoint','_storage_exec_checkpoint'})
     root=tree.encode_tree([(0,tree.DIR,'dev',b''),(0,tree.DIR,'sbin',b''),(0,tree.DIR,'tmp',b''),
         (2,tree.EXEC,'launchd',image),(0,tree.RAM,'probe.bin',bytes(4096))])
     (a.out/'launchd.macho').write_bytes(image);(a.out/'root.img').write_bytes(root)
-    report=dict(init=identity,addresses=addresses,discovery_only=a.discovery,cache_policy_off=a.policy_off,os_device=a.os_device,cache_device=a.cache_device,
+    report=dict(init=identity,addresses=addresses,discovery_only=a.discovery,cache_policy_off=a.policy_off,launch_apple=a.launch_apple,stop_before_exec=a.stop_before_exec,os_device=a.os_device,cache_device=a.cache_device,
         root_sha256=hashlib.sha256(root).hexdigest(),root_bytes=len(root),tree_entries=tree.decode_tree(root),
-        boot_args='polaris-io=1 polaris-process=1 '+('' if a.policy_off else 'polaris-cache-probe=1 ')+'polaris-init-cdhash='+identity['cdhash'],
+        boot_args='polaris-io=1 polaris-process=1 '+('polaris-apple-probe=1 polaris-apple-launcher=1 ' if a.launch_apple else '')+('' if a.policy_off else 'polaris-cache-probe=1 ')+'polaris-init-cdhash='+identity['cdhash'],
         filesystem_mounted=False,original_program_code_executed=False,hardware_tested=False)
     (a.out/'storage.json').write_text(json.dumps(report,indent=2)+'\n')
     print('Built own offline storage process:',a.out,'root bytes',len(root))
