@@ -67,16 +67,17 @@ jobs:
           assert '-DXNU_NATIVE_TRUST_CACHE=1' in args
           llvm=Path(subprocess.check_output(['brew','--prefix','llvm'],text=True).strip())/'bin'
           reloc=subprocess.check_output([llvm/'llvm-objdump','-r',obj],text=True)
-          calls=[line.strip() for line in reloc.splitlines() if re.search(r'ARM64_RELOC_BRANCH26\s+_trust_cache_init(?:\s|$)',line)]
-          assert len(calls)==1,'The actual startup object must call trust_cache_init'
+          calls=[line.strip() for line in reloc.splitlines() if re.search(r'ARM64_RELOC_BRANCH26\s+_trust_cache_runtime_init(?:\s|$)',line)]
+          static_calls=[line.strip() for line in reloc.splitlines() if re.search(r'ARM64_RELOC_BRANCH26\s+_load_static_trust_cache(?:\s|$)',line)]
+          assert len(calls)==len(static_calls)==1,'The actual startup object must initialize the runtime and load static trust inputs'
           out=Path('out/storage-annotation')
           (out/'startup-compile-record.json').write_text(json.dumps(j,indent=2)+'\n')
           report=dict(compiled=True,actual_startup_trust_cache_mode=1,branch_relocations=calls,
-              object_sha256=hashlib.sha256(obj.read_bytes()).hexdigest(),
+              static_load_relocations=static_calls,object_sha256=hashlib.sha256(obj.read_bytes()).hexdigest(),
               compile_record_sha256=hashlib.sha256(record.read_bytes()).hexdigest(),
               runtime_initialized=False,original_security_modules_loaded=False,phone_accessed=False)
           (out/'security-bootstrap.json').write_text(json.dumps(report,indent=2)+'\n')
-          print('PASS: actual source startup.o contains one trust_cache_init call; runtime still unqualified')
+          print('PASS: actual startup.o calls trust_cache_runtime_init and load_static_trust_cache; runtime still unqualified')
           PYCODE
       - uses: actions/upload-artifact@v4
         if: always()
