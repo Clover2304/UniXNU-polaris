@@ -7,6 +7,56 @@ it does not use fastboot/ADB and does not submit a reboot or memory-write comman
 import argparse,hashlib,json,re,secrets,time,struct,zlib,subprocess
 from pathlib import Path
 
+def verify_ufs_node(build,raw,prior,reference,log):
+    if prior.get('source_commit')!=build or not prior.get('ufs_fat32_file_verified'):
+        raise ValueError('node requires exact-source native FAT file verification')
+    marker=b'POLARIS_UFS_NODE_OK bytes=8193 cross=3 repeat=2 eof=OK readonly=OK reopen=OK'
+    if marker not in log:raise ValueError('userspace node acceptance checkpoint missing')
+    lines=raw.splitlines();pa=prior['ufs_nop_dma']['pa']
+    if len(raw)>131072 or not raw.endswith(b'\n') or not lines or lines[-1]!=b'POLARIS_UFS_NODE_END':
+        raise ValueError('incomplete node response')
+    h=re.fullmatch(rb'POLARIS_UFS_NODE build='+build.encode()+rb' state=ok mode=hardware ready=1 failed=0 error=0 queue=0 submitted=9 completed=9 cancelled=0 busy=0 errors=0 count=(\d+) writes=(\d+) doorbells=(\d+) smmu_unchanged=1 media_writes=0 smmu_writes=0 pa='+f'{pa:016x}'.encode(),lines[0])
+    if not h:raise ValueError('node identity, mode, lifecycle or error counters failed')
+    count,writes,doorbells=map(int,h.groups())
+    if not 1<=count<=128 or writes!=3*count or doorbells!=count:raise ValueError('node command budget invalid')
+    m=re.fullmatch(rb'POLARIS_UFS_NODE_VFS opens=2 reads=(\d+) bytes=20502 denied=2 path=/dev/polaris-esp-file size=8193',lines[1])
+    if not m or not 12<=int(m[1])<=16:raise ValueError('unexpected actual devfs syscall counters')
+    reads=int(m[1]);geometry=prior['ufs_esp_geometry'];chain=prior['ufs_esp_chain'];cluster_bytes=geometry['spc']*512
+    expected=[]
+    for offset,length in [(0,4096),(4096,4096),(8192,1),(1023,2050),(4095,2050),(8192,1),(0,4096),(0,4096),(37,16)]:
+        done=0;cached=None
+        while done<length:
+            off=offset+done;which=off//cluster_bytes
+            if which>=len(chain):raise ValueError('validated chain is too short for node request')
+            position=(geometry['data_sector']+(chain[which]-2)*geometry['spc'])*512+off%cluster_bytes
+            block=position//4096
+            n=min(length-done,cluster_bytes-off%cluster_bytes,4096-position%4096)
+            if block!=cached:expected.append(393216+block);cached=block
+            done+=n
+    if len(expected)!=count:raise ValueError('fresh read count differs from independent request mapping')
+    cursor=2;commands=[]
+    with reference.open('rb') as disk:
+        for n,lba in enumerate(expected):
+            if cursor+1>=len(lines):raise ValueError('node command truncated')
+            pattern=(rb'POLARIS_UFS_NODE_CMD n='+str(n).encode()+rb' lba='+str(lba).encode()+rb' opcode=28 lun=00 blocks=1 state=ok ocs=0 response=00 status=00 flags=([0-9a-f]{2}) bytes=4096 residual=0 segment=(0|2) sense_len=0 guards=1 stopped=1 polls=(\d+) run=00000000 db=00000000 is=([0-9a-f]{8}) upiu=([0-9a-f]{68})')
+            m=re.fullmatch(pattern,lines[cursor]);cursor+=1
+            if not m:raise ValueError('node READ order or GOOD completion invalid')
+            flags,segment,polls,is_value=int(m[1],16),int(m[2]),int(m[3]),int(m[4],16);upiu=bytes.fromhex(m[5].decode())
+            if not 393216<=lba<425984 or flags&0x60 or not 1<=polls<=5000 or is_value&0x71884 or upiu[0]!=0x21 or upiu[1]!=flags or any(upiu[i] for i in (2,3,6,7,8)) or int.from_bytes(upiu[10:12],'big')!=segment or any(upiu[12:16]) or (segment and any(upiu[32:34])):
+                raise ValueError('node READ response or partition bounds invalid')
+            m=re.fullmatch(rb'POLARIS_UFS_NODE_DMA n='+str(n).encode()+rb' data_pa=([0-9a-f]{16}) prdt=([0-9a-f]{32}) crc32=([0-9a-f]{8})',lines[cursor]);cursor+=1
+            if not m or int(m[1],16)!=pa+8192 or struct.unpack('<QII',bytes.fromhex(m[2].decode()))!=(pa+8192,0,4095):raise ValueError('node PRDT differs from owned page')
+            disk.seek((lba-393216)*4096);block=disk.read(4096)
+            if len(block)!=4096 or zlib.crc32(block)!=int(m[3],16):raise ValueError('node physical page CRC differs from image')
+            commands.append(dict(lba=lba,bytes=4096,polls=polls,crc32=zlib.crc32(block)))
+    if cursor+2!=len(lines):raise ValueError('unexpected node records')
+    m=re.fullmatch(rb'POLARIS_UFS_NODE_FAULT global_before=00000000 bank_before=([0-9a-f]{8}) global_after=00000000 bank_after=([0-9a-f]{8})',lines[cursor])
+    if not m or any(int(x,16)&0xc00001fe for x in m.groups()):raise ValueError('SMMU fault around node reads')
+    return dict(ufs_node_verified=True,ufs_node_mode='hardware',ufs_node_sha256=hashlib.sha256(raw).hexdigest(),
+                ufs_node_commands=commands,ufs_node_requests=9,ufs_node_syscall_reads=reads,ufs_node_bytes=20502,
+                ufs_node_fresh_reads_verified=True,ufs_node_readonly_verified=True,ufs_filesystem_mount_verified=False,
+                media_write_verified=False)
+
 def verify_ufs_esp(build,raw,prior,reference):
     if prior.get('source_commit')!=build or not prior.get('ufs_bounded_read_verified') or not prior.get('primary_gpt_verified'):
         raise ValueError('ESP file requires verified native GPT and exact source')
@@ -385,6 +435,7 @@ def main():
     p.add_argument('--ufs-inventory',action='store_true',help='also collect the read-only candidate stream/queue inventory')
     p.add_argument('--ufs-nop',action='store_true',help='verify the cached single owned-queue NOP result')
     p.add_argument('--ufs-query',action='store_true',help='verify cached read-only device and unit descriptor results')
+    p.add_argument('--ufs-node',action='store_true',help='verify bounded native devfs file reads')
     p.add_argument('--ufs-esp',action='store_true',help='verify cached FAT32 file against updated ESP image')
     p.add_argument('--ufs-esp-reference',type=Path)
     p.add_argument('--ufs-read',action='store_true',help='verify six cached fixed READ(10) sectors against independent reference')
@@ -398,6 +449,7 @@ def main():
     if a.ufs_scsi and not a.ufs_query:p.error('--ufs-scsi requires --ufs-query')
     if a.ufs_read and (not a.ufs_scsi or not a.ufs_read_reference):p.error('--ufs-read requires --ufs-scsi and --ufs-read-reference')
     if a.ufs_esp and (not a.ufs_read or not a.ufs_esp_reference):p.error('--ufs-esp requires --ufs-read and --ufs-esp-reference')
+    if a.ufs_node and not a.ufs_esp:p.error('--ufs-node requires --ufs-esp')
     import usb.core,usb.util
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False)
     report=dict(passed=False,physical_polaris=False,source_commit=a.expected_build,transport='native XNU polling USB CDC',
@@ -462,6 +514,10 @@ def main():
             raw=exchange('ufs-esp',lambda d:b'POLARIS_UFS_ESP_END\n' in d,30)
             (out/'ufs-esp.raw').write_bytes(raw)
             report.update(verify_ufs_esp(a.expected_build,raw,report,a.ufs_esp_reference))
+        if a.ufs_node:
+            raw=exchange('ufs-node',lambda d:b'POLARIS_UFS_NODE_END\n' in d,30)
+            (out/'ufs-node.raw').write_bytes(raw)
+            report.update(verify_ufs_node(a.expected_build,raw,report,a.ufs_esp_reference,log))
         values=verify_response(a.expected_build,nonce,pong,echo,status,log)
         report.update(values,passed=True,physical_polaris=True,nonce=nonce,
                       native_enumeration_verified=True,bidirectional_roundtrip_verified=True,build_identity_verified=True,

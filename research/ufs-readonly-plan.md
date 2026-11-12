@@ -289,3 +289,45 @@ FORMAT=0x400，无新增故障位。两个独立 USB 采样读取相同缓存，
 范围仍为一个固定路径、只读、有限簇链解析器。没有 VFS 挂载、通用块设备、介质
 写入或 Apple 用户态。下一轮接只读块设备/VFS 接口，把存储读取接入正常文件访问
 路径，并分别验证偏移/边界、EOF、错误传递和重复读取；继续保留 RAM 根与成功镜像。
+
+### 第八轮候选：通过 devfs 访问固定 UFS 文件
+
+源码候选 `8959e7f` 新增 `/dev/polaris-esp-file`，是 root 只读字符设备，内容限定为
+已经核验簇链的 8193 字节 `EFI/UniXNU/READTEST.BIN`。继续使用 RAM 根，尚不注册
+通用块盘、不挂载 FAT。它把既有原生读取接入普通 EL0 `open/read/pread/close` 路径。
+
+系统调用只提交偏移和长度；唯一 USB/UFS 工作线程处理请求，复用原有高于 4 GiB
+的数据页和单项 PRDT，逐次重新读取物理块，不从启动时的文件内容缓存返回。
+单次最多 4096 字节；每次请求内部可复用刚读的同一物理页，跨请求不复用。
+每次启动上限 64 个请求、128 条只读 READ(10)，请求期限 5 秒，硬件失败停止后续
+请求。队列保留自有缓冲区：Pending 超时可以撤销；Working 超时进入 Abandoned，
+由工作线程完成后释放槽位，避免超时线程的栈/堆对象被 DMA 或后台工作继续使用。
+不持队列锁执行 MMIO、等待或 `uiomove`。
+
+PID 1 的独立候选程序验证：8193 字节顺序读取、1023/4095/8192 偏移、跨簇/物理页、
+EOF/越过 EOF、零长度、负偏移、重复读取、只读/读写打开被拒绝、只读 fd 写入被拒绝、
+关闭后重新打开。预期 `POLARIS_UFS_NODE_OK bytes=8193 cross=3 repeat=2 eof=OK readonly=OK reopen=OK`；
+成功后继续常驻心跳和原有 IO/PROC/TMP/1000 次进程基线。目标是 9 个数据请求，
+累计返回 20502 字节；EOF 等无数据请求不提交硬件命令。
+
+`ufs-node` 只返回缓存的完成轨迹和计数，不接受任意偏移或触发介质操作。主机以
+本次更新后的实际 ESP 为参考，独立推算每个请求应访问的物理块序列，检查实际命令
+顺序、块 CRC、PRDT、完成状态、保护区、停止状态、SMMU 故障位，以及 EL0 成功标记。
+`mode=model` 不得通过硬件验收。QEMU 使用独立的 `polaris-ufs-node-model=1`，还必须
+匹配 QEMU 根 ADT；它仅替代物理读取后端，实际 devfs 和用户系统调用仍执行。
+手机包只允许 `polaris-ufs-node=1`，明确禁止 model 参数。
+
+当前状态：[完整 CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43132575295) 通过，
+包含 83 项主机测试与 16 份运行验收（原 15 项基线加 devfs 模型）；补充的 19 项
+本地 UFS 回归通过。QEMU 实际系统调用的计数为 opens=2、reads=12、bytes=20502、
+denied=2，原有进程自检与常驻运行通过。最终手机打包镜像关闭硬件参数并显式启用
+QEMU 模型后，画面显示 NODE_OK，心跳 5→8；这不代表原生 UFS 接口已验收。
+
+已通过 Mass Storage 更新文件，完整 128 MiB 启动卷直接回读与缓存同步通过，最终
+实际 FAT32 布局的文件映射模型通过。标题为 `polaris: UFS NODE READ`；启动卷 SHA256
+`52ca01625f062a58b43ed6ee69f955b46481d9747c08ad6a719d88be0f04ce47`。
+按用户要求已停止，未重启设备。**本轮真机接口待验收**，上一成功真机基线仍为
+`2791907`。成功包 `artifacts/ufs-node-ready/`，实际镜像
+`private/ufs-node-deploy/update/updated-esp.img`，记录
+`private/ufs-node-deploy/state.json`。普通重启后再以原生 CDC 核对精确源码、NODE_OK、
+9 个请求的命令轨迹及两个独立采样间的心跳；不能将文件回读或 QEMU 模型记为硬件通过。
