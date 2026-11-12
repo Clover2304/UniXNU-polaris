@@ -15,3 +15,6 @@ CONFIG_XNU_DT_PANIC_REGION=y
 # CONFIG_XNU_NATIVE_UFS is not set
 # CONFIG_XNU_NATIVE_ADRENO is not set
 # CONFIG_XNU_NATIVE_LEGACY_DISPLAY is not set
+
+# Authenticate complete original 16K signing blocks, then validate native 4K faults.
+CONFIG_XNU_NATIVE_CS_HASH_CACHE=y

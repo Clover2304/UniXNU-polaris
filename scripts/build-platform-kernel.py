@@ -205,6 +205,11 @@ def main():
                              '_polaris_apple_dyld_accepted'})
         if not apple_probe_available:
             raise SystemExit('Missing opt-in exact-original Apple execution probe')
+    native4k_signature_cache = ctx.config.get('XNU_NATIVE_CS_HASH_CACHE') is True
+    if native4k_signature_cache:
+        check.symbols(data, {'_cs_native4k_hash_cache_version', '_cs_native4k_full_blocks',
+                             '_cs_native4k_page_checks', '_cs_native4k_ready_blobs',
+                             '_polaris_cache_signature_accepted', '_polaris_cache_signature_rejected'})
     prelinked = None
     if do_prelink:
         print('Prelink pass: composing with the original iPadOS 17 kernelcache', flush=True)
@@ -215,6 +220,8 @@ def main():
               'defconfig': args.defconfig, 'crypto_bootstrap': ctx.config.get('XNU_CRYPTO_BOOTSTRAP'),
               'source_mockfs': source_mockfs, 'mockfs_symbols': mockfs_symbols,
               'apple_probe_available': apple_probe_available,
+              'native4k_signature_hash_cache': native4k_signature_cache,
+              'cache_probe_policy': 'pid1-original-system-cache-cdhashes-v1' if native4k_signature_cache else None,
               'apple_probe_policy': 'pid1-two-original-cdhashes-no-entitlement-grant-v1' if apple_probe_available else None,
               'init_signature_policy': init_signature_policy,
               'ram_io_available': ram_io_available,
