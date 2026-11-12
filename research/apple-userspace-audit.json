@@ -1,0 +1,175 @@
+{
+  "target": "iPad7,1 / 17.7.11 / 21H461",
+  "files": [
+    {
+      "path": "sbin/launchd",
+      "sha256": "8cec9a3c44a443b08e977ccc5d577850316ad428c575dc01f09b018dbd5b6a25",
+      "arm64_subtype": 0,
+      "minimum_ios": "17.7",
+      "segments_directly_4k_mappable": true,
+      "segments": [
+        {
+          "name": "__PAGEZERO",
+          "va": "0x0",
+          "vmsize": 4294967296,
+          "fileoff": 0,
+          "filesize": 0
+        },
+        {
+          "name": "__TEXT",
+          "va": "0x100000000",
+          "vmsize": 442368,
+          "fileoff": 0,
+          "filesize": 442368
+        },
+        {
+          "name": "__DATA_CONST",
+          "va": "0x10006c000",
+          "vmsize": 32768,
+          "fileoff": 442368,
+          "filesize": 32768
+        },
+        {
+          "name": "__DATA",
+          "va": "0x100074000",
+          "vmsize": 16384,
+          "fileoff": 475136,
+          "filesize": 16384
+        },
+        {
+          "name": "__LINKEDIT",
+          "va": "0x100078000",
+          "vmsize": 81920,
+          "fileoff": 491520,
+          "filesize": 70336
+        }
+      ],
+      "code_directories": [
+        {
+          "slot": 0,
+          "original_static_trustcache_index": 279,
+          "identifier": "com.apple.xpc.launchd",
+          "flags": "0x2",
+          "hash_page_bytes": 4096,
+          "code_slots_verified": 131,
+          "cdhash": "1d52c69747dffc4b1937d241bdbc9cee3b22df18"
+        }
+      ]
+    },
+    {
+      "path": "usr/lib/dyld",
+      "sha256": "f8df3c58fae6e409db740df22c98aa699aee110b73523541a63f1bd5e23cf705",
+      "arm64_subtype": 0,
+      "minimum_ios": "17.7",
+      "segments_directly_4k_mappable": true,
+      "segments": [
+        {
+          "name": "__TEXT",
+          "va": "0x0",
+          "vmsize": 524288,
+          "fileoff": 0,
+          "filesize": 524288
+        },
+        {
+          "name": "__DATA_CONST",
+          "va": "0x80000",
+          "vmsize": 32768,
+          "fileoff": 524288,
+          "filesize": 32768
+        },
+        {
+          "name": "__DATA",
+          "va": "0x88000",
+          "vmsize": 16384,
+          "fileoff": 557056,
+          "filesize": 16384
+        },
+        {
+          "name": "__DATA_DIRTY",
+          "va": "0x8c000",
+          "vmsize": 16384,
+          "fileoff": 573440,
+          "filesize": 16384
+        },
+        {
+          "name": "__LINKEDIT",
+          "va": "0x90000",
+          "vmsize": 360448,
+          "fileoff": 589824,
+          "filesize": 347232
+        }
+      ],
+      "code_directories": [
+        {
+          "slot": 0,
+          "original_static_trustcache_index": 1755,
+          "identifier": "com.apple.darwin.ignition",
+          "flags": "0x2",
+          "hash_page_bytes": 4096,
+          "code_slots_verified": 223,
+          "cdhash": "b479f90e05545314cb843410c3d98ef84d926710"
+        }
+      ]
+    }
+  ],
+  "code_page_hashes_verified": true,
+  "original_static_trustcache_sha256": "da88460e6e513438d5307e5c526f76497a74754476a24da29f239f0c90120fc2",
+  "apple_trust_chain_verified": false,
+  "native_4k_userspace_execution_observed": false,
+  "ipados_boot_demonstrated": false,
+  "audited_at_utc": "2026-11-12",
+  "kernel_source_baseline": "abc75cfb6a7f3a209af4865f575a9b70387c916e",
+  "upstream_revision": "37987aea410691df3c1e0e146a1bfd6127932149",
+  "auditor_path": "scripts/audit-target-userspace.py",
+  "auditor_sha256": "d2f97723a7762ffeb9550177e0e75f98a22cb9f8c399b7aeab80b5c97959edd9",
+  "auditor_unmodified": true,
+  "input_volume": {
+    "component": "OS",
+    "member": "044-76040-038.dmg",
+    "version": "17.7.11",
+    "build": "21H461",
+    "product": "iPad7,1",
+    "bytes": 5157406069,
+    "compressed_bytes": 5157406069,
+    "zip_crc32": 1883347208,
+    "zip_crc_verified": true,
+    "sha256": "3f99b859c9728379110b66657c7b15285bcb1925ad8b5726542e2cdcf8b1028d",
+    "sha384": "d41b9ea8cbe5220f77ff0cfa24d3267aba9ee74a4487551d8c7f1dcc753fcc750e085aedac6fb0f71d875a97f87eb73f",
+    "build_manifest_digest_matches": true,
+    "apple_signature_trust_chain_verified": false,
+    "source_url": "https://updates.cdn-apple.com/2025SpringFCS/fullrestores/122-77166/DCA6CFE8-90E9-4B92-880D-3DE171798E40/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw",
+    "whole_ipsw_downloaded": false,
+    "elapsed_seconds": 114.31729063799139,
+    "phone_accessed": false
+  },
+  "extraction": {
+    "volume": "DawnUpdate21H461.J120J121J207J208OS",
+    "files": [
+      {
+        "path": "sbin/launchd",
+        "bytes": 561856,
+        "sha256": "8cec9a3c44a443b08e977ccc5d577850316ad428c575dc01f09b018dbd5b6a25"
+      },
+      {
+        "path": "usr/lib/dyld",
+        "bytes": 937056,
+        "sha256": "f8df3c58fae6e409db740df22c98aa699aee110b73523541a63f1bd5e23cf705"
+      }
+    ],
+    "phone_accessed": false
+  },
+  "negative_controls": [
+    {
+      "control": "changed-launchd-code",
+      "rejected": true,
+      "reason": "sbin/launchd: original code page 5 hash mismatch"
+    },
+    {
+      "control": "absent-trustcache-entry",
+      "rejected": true,
+      "reason": "Target CodeDirectory is absent or ambiguous in its original trustcache"
+    }
+  ],
+  "phone_accessed": false,
+  "note": "Original Apple files remain private. Static consistency checks do not authenticate the Apple trust chain or demonstrate execution."
+}

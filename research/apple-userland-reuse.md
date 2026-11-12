@@ -1,6 +1,6 @@
 # Apple 用户态启动：现有适配复用盘点
 
-更新时间：2026-11-11。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，当前已验证内核源码为 `1d38b03539ec26b146ceda717c6cf831ab572cec`。本文是源码与计划盘点，不表示 Apple 用户态已通过真机验证。
+更新时间：2026-11-12。目标仍为 iPadOS 17.7.11 / 21H461 / iPad7,1，当前已验证内核源码为 `abc75cfb6a7f3a209af4865f575a9b70387c916e`。本文记录复用盘点与静态输入检查，不表示 Apple 用户态已执行或通过真机验证。
 
 ## 结论与基线
 
@@ -39,14 +39,38 @@
 
 新增 `scripts/check-apple-signature-gate.py`，复用已有检查思路，在 Linux/macOS 编译实际 `ubc_subr.c` 中的 CodeDirectory 页粒度判断。已先对保存的 Darwin 23 补丁源执行，随后对本次 macOS CI 实际组装的源码执行，8 个组合均通过；[结果](apple-signature-gate.json)记录完整输入与提取代码哈希。4K 内核配默认 integrity-cache=0 时，4K 签名页通过、16K 签名页被拒；已有 cache=1 路径允许后者进入下一步。这只测试一道实际检查，不证明完整签名完整性、entitlement、dyld 或原版程序执行。
 
-查询内核 `9feeaca` 的完整 CI 已通过；发布的报告来自这次实际编译输入，提取 gate 的哈希和 8 个结果与先前本地检查一致。目标 Apple 二进制的实际签名页粒度尚未读取；在取得样本前，不将上述条件性结果当作该二进制的实际失败原因，也不直接改变当前成功内核配置。
+查询内核 `9feeaca` 的完整 CI 已通过；发布的报告来自这次实际编译输入，提取 gate 的哈希和 8 个结果与先前本地检查一致。当时尚未取得目标 Apple 二进制，未将条件性结果当作实际失败原因，也未直接改变成功内核配置；2026-11-12 的样本检查见下文。
 
 ## 已取得的目标输入与预链接计划
 
-已通过 Apple CDN 的 ZIP 范围读取取得同一 `17.7.11 / 21H461 / iPad7,1 / j120ap` 镜像的 BuildManifest、KernelCache、DeviceTree 和两份 trust cache；四个组件均与 Erase identity 中的 SHA-384 Digest 相符。未下载整个 IPSW 或系统根 DMG；manifest 内的摘要核对也不等于 Apple 签名信任链验证。必要元数据见 [apple-target-inputs.json](apple-target-inputs.json)，Apple 二进制只保留在本地。
+已通过 Apple CDN 的 ZIP 范围读取取得同一 `17.7.11 / 21H461 / iPad7,1 / j120ap` 镜像的 BuildManifest、KernelCache、DeviceTree 和两份 trust cache；四个组件均与 Erase identity 中的 SHA-384 Digest 相符。该阶段未下载整个 IPSW 或系统根 DMG；后续已取得 OS DMG，见下文。manifest 内的摘要核对不等于 Apple 签名信任链验证。必要元数据见 [apple-target-inputs.json](apple-target-inputs.json)，Apple 二进制只保留在本地。
 
 解压后的 ARM64 原版内核 SHA256 为 `f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7`，与固定 UniXNU 的目标 pin 完全一致。板配置所选的 10 个预链接根组件均存在。原版版本是 `10063.142.1.703.8`，自编源码是 `10063.141.1`，仍须验证 ABI 与运行行为。
 
 复用了固定 NativePrelink `3380d3006068cdaab69454b37668e6b532ed2584` 的只读 `plan`，输入为该原版内核与本次 CI 通过的查询源码 `9feeaca` 对应打包内核。依赖闭包为 18 个可执行组件、7 个 kernel interface；13,156 个组件指针和 24,460 个内核符号指针均完成计划解析。该结果只覆盖工具枚举的绝对指针，工具仍明确返回 `instruction_relocation_complete=false`、`abi_qualified=false`、`loadable=false`。没有生成或加载组件，也没有运行 Apple 用户态程序。
 
 下一步直接沿用已有用户态审计及预链接生成工具，对实际 launchd/dyld 样本核对代码页、trust cache 与加载器依赖，再选择最小执行实验。不能把静态指针计划或缓存内存在组件，记为 G2 的运行验收通过。
+
+
+## 已完成：原版 launchd / dyld 静态检查
+
+2026-11-12 从同一 Apple CDN 镜像范围下载 `044-76040-038.dmg`（5,157,406,069 字节），ZIP CRC32 与所选 BuildManifest 的 SHA-384 Digest 均相符。未下载整个 IPSW。Linux 以只读 UDIF/APFS 解析提取原样 `/sbin/launchd` 和 `/usr/lib/dyld`，复用固定 UniXNU 的未修改 `audit-target-userspace.py`；Apple 文件只保留在私有工作区。
+
+[审计记录](apple-userspace-audit.json)确认两者为普通 ARM64 subtype 0，最低版本 17.7；所有实际 segment 布局可直接表示为 4 KiB 映射。原 CodeDirectory 的签名页均为 4 KiB：launchd 核对 131 个代码槽，dyld 核对 223 个。二者 CDHash 均各自唯一出现在同镜像的原 static trust cache 中。修改 launchd 的一个代码字节、移除 trust-cache 条目两个负向对照均被审计器拒绝。这些结果没有验证完整 CMS/Apple 信任链、entitlement 传播、SIMD、动态链接、系统调用或原版程序执行；G1 只能标记静态部分通过。
+
+实际文件摘要与固定 UniXNU 的目标样本一致：
+
+| 文件 | 字节 | SHA-256 | CDHash |
+| --- | --- | --- | --- |
+| `/sbin/launchd` | 561856 | `8cec9a3c44a443b08e977ccc5d577850316ad428c575dc01f09b018dbd5b6a25` | `1d52c69747dffc4b1937d241bdbc9cee3b22df18` |
+| `/usr/lib/dyld` | 937056 | `f8df3c58fae6e409db740df22c98aa699aee110b73523541a63f1bd5e23cf705` | `b479f90e05545314cb843410c3d98ef84d926710` |
+
+共享缓存所在的独立 SystemOS DMG 尚未下载或审计。下一项是复用上游 dyld fixture/probe，核对原签名授权、entitlement、加载器和最早 EL0 入口依赖，准备独立 Apple 执行配置；当前成功镜像保留。
+
+## 已验证：自制用户态可复用内核
+
+[复用记录](userspace-kernel-reuse.json)：在 Linux 编译并签名另一份自制 PID 1/子程序，沿用 `abc75cf` 的同一原始内核运行 QEMU，进程、I/O、`/tmp`、1,000 子进程压力和常驻检查通过。随后制作离线文件树预览，只替换 RAM 根 `root.img` 与配置中的两个 CDHash，并移除不适用于该程序的 `polaris-ufs-node=1`；其余文件均按原 manifest 校验。已经打包的手机内核逐字节保持 SHA-256 `4b3126eb76b27b0113696951b47a39174f6eef6d7b5340e012674982f64bb4bc`，EFI 也未变化，无需 macOS 或重新编译内核。此预览没有安装、没有重启、没有新增真机验收。
+
+适用边界：自制程序和 RAM 文件变更可在 Linux 重做程序包与配置；实际应用仍需一次 Mass Storage 文件更新和普通重启。原生 CDC 当前只有固定诊断命令，没有程序上传、交互 shell 或热执行能力。内核驱动、系统调用、加载器和安全策略改变仍需重编内核。当前策略要求自制程序具有 `CS_ADHOC|CS_HARD|CS_KILL`，按 PID 1/直接子进程及精确 CDHash 授权，并拒绝平台标记和 entitlement；实际 Apple 样本的 CodeDirectory flags 是 `0x2`，不能沿用该自测策略直接执行。RAM 树另有限制：16 个条目、32 MiB 镜像，不足以放入完整系统和共享缓存。
+
+本轮手机保持运行，无需提前进入 Mass Storage。下次确有已验收的候选文件时再请求更新；完成整卷回读与同步后，仍停下等待用户手动重启。

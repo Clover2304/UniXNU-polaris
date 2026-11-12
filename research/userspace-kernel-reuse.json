@@ -1,0 +1,67 @@
+{
+  "passed": true,
+  "scope": "offline userspace-only preview, not hardware acceptance",
+  "kernel_source_commit": "abc75cfb6a7f3a209af4865f575a9b70387c916e",
+  "source_kernel_sha256": "556f27b4f061293c61e33ede558acacdcb1aa6f7d18030145a7d723beb3f2e1b",
+  "packaged_kernel_sha256": "4b3126eb76b27b0113696951b47a39174f6eef6d7b5340e012674982f64bb4bc",
+  "kernel_recompiled": false,
+  "efi_recompiled": false,
+  "packaged_kernel_unchanged": true,
+  "qemu_runtime_passed": true,
+  "qemu_report_sha256": "e574bd0943e262e83dcd5cb7398140ade4eef38dc9f8844eb113a391df45c7c5",
+  "qemu_cpu": "max",
+  "phone_updated": false,
+  "phone_rebooted": false,
+  "hot_reload_available": false,
+  "apple_userland_executed": false,
+  "note": "QEMU ran the unchanged raw source kernel with new own programs; the packaged phone kernel was byte-preserved in the preview, not booted.",
+  "changed_files": [
+    "EFI/UniXNU/Payloads/root.img",
+    "EFI/UniXNU/unixnu.toml"
+  ],
+  "files": {
+    "EFI/BOOT/BOOTAA64.EFI": {
+      "bytes": 94208,
+      "sha256": "aad20205a434770b515722dea25343e08e9ad1b39a9bac4c663226c14b639cf6"
+    },
+    "EFI/UniXNU/Payloads/DarwinBoot.efi": {
+      "bytes": 36864,
+      "sha256": "8dbcbd3e535c8013b82b1cf25b43ba2e3a3e221b718dc0a9698e9b9742a45a72"
+    },
+    "EFI/UniXNU/Payloads/kernel.macho": {
+      "bytes": 19419904,
+      "sha256": "4b3126eb76b27b0113696951b47a39174f6eef6d7b5340e012674982f64bb4bc"
+    },
+    "EFI/UniXNU/Payloads/kernel.macho.adt": {
+      "bytes": 10580,
+      "sha256": "7bd0972944eeef5886d5599c641aa575191f3cb8f07566603f2a7455a2c5a5b0"
+    },
+    "EFI/UniXNU/Payloads/kernel.macho.crypto-hmac.json": {
+      "bytes": 307,
+      "sha256": "1928ce2565d6b64925b55d2d2c9bb57b4d31ac7b79056ee001b6367ad829016e"
+    },
+    "EFI/UniXNU/Payloads/root.img": {
+      "bytes": 172032,
+      "sha256": "5cc88d4d49ea5eb7d61348b7e5d068bda9fc12bfa950f7308fce53d8befefb9a"
+    },
+    "EFI/UniXNU/READTEST.BIN": {
+      "bytes": 8193,
+      "sha256": "6f8f27897d728e935435ada86bf393b8751de163396edcd4c9bf24df56d9da6f"
+    },
+    "EFI/UniXNU/unixnu.toml": {
+      "bytes": 646,
+      "sha256": "a131e12a5454d56021623edf17a953ab61c0d5b42732baa9cb7c8d7ad3ebc1b8"
+    }
+  },
+  "init_cdhash": "85e02d00e3e981dca2bd6b2b26a1bd5f23bf3b6d",
+  "child_cdhash": "269ea79ca5c80d3a7f1dd0e50c6726dce34f9dff",
+  "proof_script_sha256": "7db924c7735f0cb11b80cef9cabf15ec2e7b4ce5499232b8f4e4c352eb5beeb5",
+  "runtime_summary": {
+    "process_verified": true,
+    "child_el0_observed": true,
+    "io_verified": true,
+    "resident_verified": true,
+    "tmp_verified": true,
+    "stress_verified": true
+  }
+}
