@@ -1,6 +1,35 @@
 # UniXNU-polaris handoff notes
 
 
+## 2026-11-12: bounded FAT32 ESP file candidate
+
+Candidate source `27919074b4705074b3d89f1ad4669717e5483cf0` adds
+`polaris-ufs-esp=1` and cached `ufs-esp` diagnostics after native GPT validation.
+Only the existing userdata ESP window (LUN 0, LBA 393216..425983) is readable.
+The fixed path is `EFI/UniXNU/READTEST.BIN`, 8193 bytes, SHA256
+`6f8f27897d728e935435ada86bf393b8751de163396edcd4c9bf24df56d9da6f`.
+BPB, mirrored FAT, short-name directories, loops and bounds are checked;
+128 READ(10) commands and a command-boundary 10-second deadline limit the stage.
+This is a standalone reader, not a VFS mount or a replacement for the RAM root.
+
+82 local tests and ASan/UBSan checks pass. A clone of the previous real ESP,
+with the test file added offline, also passes (9 clusters, 30 physical-block
+reads). [Complete exact-source CI](https://github.com/Clover2304/UniXNU-polaris/actions/runs/43126540937)
+and all 15 runtime reports passed. Final local QEMU screen checks pass with
+CPU=max and heartbeat 3 to 6; the final staged FAT32 layout model also passes.
+The artifact ZIP SHA256 is
+`196a51cf123c5e24083a16d64579f649fce6e86565e223328109ecd6efc14568`.
+Do not qualify native FAT file reads until the user's normal restart and the
+host's independent mtools/image comparison have passed.
+
+Working directories: `../artifacts/ufs-fat-ready/`,
+`../private/ufs-fat-deploy/update/`, `../artifacts/ufs-fat-remote-state.json`.
+The user requested stopping after file update/readback to restart manually.
+Keep that boundary; no automatic phone reboot or post-update hardware test.
+After restart, use `tools/check-ufs-phone.py` with all prior UFS flags plus
+`--ufs-esp --ufs-esp-reference private/ufs-fat-deploy/update/updated-esp.img`;
+the GPT reference remains `private/ufs-read-reference/gpt-first-six-blocks.bin`.
+
 ## 2026-11-11: native six-sector READ(10) and primary GPT verified
 
 Current verified source is `996fb95a382530b8d2389e2da2df7588cfe64489`.
