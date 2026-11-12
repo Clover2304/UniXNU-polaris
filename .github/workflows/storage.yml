@@ -1,19 +1,19 @@
-name: Read-only storage component inputs
+name: Read-only storage and security inputs
 on:
   push:
     branches: ['work/polaris-ramdisk']
-    paths: ['.github/workflows/storage.yml', 'configs/polaris_storage_defconfig', 'configs/polaris_storage_io_defconfig', 'scripts/build-storage-reference.py', 'scripts/build-storage-drivers.py', 'research/apple-storage-bindings.json', 'kernel-overrides/**', 'scripts/build-platform-kernel.py', 'drivers/**', 'board.toml', 'upstream.json']
+    paths: ['.github/workflows/storage.yml', 'configs/polaris_storage_defconfig', 'configs/polaris_storage_io_defconfig', 'configs/polaris_security_io_defconfig', 'scripts/build-storage-reference.py', 'scripts/build-storage-drivers.py', 'research/apple-storage-bindings.json', 'kernel-overrides/**', 'scripts/build-platform-kernel.py', 'drivers/**', 'board.toml', 'upstream.json']
   workflow_dispatch:
     inputs:
       defconfig:
-        description: 'Isolated server-only storage input'
+        description: 'Isolated server-only component input'
         type: choice
-        default: polaris_storage_io_defconfig
-        options: [polaris_storage_defconfig, polaris_storage_io_defconfig]
+        default: polaris_security_io_defconfig
+        options: [polaris_storage_defconfig, polaris_storage_io_defconfig, polaris_security_io_defconfig]
 permissions:
   contents: read
 env:
-  STORAGE_DEFCONFIG: ${{ inputs.defconfig || 'polaris_storage_io_defconfig' }}
+  STORAGE_DEFCONFIG: ${{ inputs.defconfig || 'polaris_security_io_defconfig' }}
 jobs:
   source-and-reference:
     runs-on: macos-15-intel
@@ -48,12 +48,36 @@ jobs:
       - name: Build deferred original-bootstrap source kernel
         run: |
           EXTRA_ARGS=()
-          if [ "$STORAGE_DEFCONFIG" = polaris_storage_io_defconfig ]; then
+          if [ "$STORAGE_DEFCONFIG" = polaris_storage_io_defconfig ] || [ "$STORAGE_DEFCONFIG" = polaris_security_io_defconfig ]; then
             EXTRA_ARGS+=(--storage-source out/storage-source --storage-bindings research/apple-storage-bindings.json)
           fi
           python3 scripts/build-platform-kernel.py --base out/upstream -j 4 --defconfig "$STORAGE_DEFCONFIG" --defer-prelink "${EXTRA_ARGS[@]}"
       - name: Compile public storage annotation with actual XNU record
         run: python3 scripts/build-storage-reference.py --tree out/native/polaris/tree --source out/storage-source --out out/storage-annotation
+      - name: Verify actual trust-cache bootstrap compilation
+        if: env.STORAGE_DEFCONFIG == 'polaris_security_io_defconfig'
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import hashlib,json,re,subprocess
+          root=Path('out/native/polaris/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837')
+          record=root/'osfmk/DEVELOPMENT/startup.o.json'
+          obj=root/'osfmk/DEVELOPMENT/startup.o'
+          j=json.loads(record.read_text().strip().rstrip(','));args=j['arguments']
+          assert '-DXNU_NATIVE_TRUST_CACHE=1' in args
+          llvm=Path(subprocess.check_output(['brew','--prefix','llvm'],text=True).strip())/'bin'
+          reloc=subprocess.check_output([llvm/'llvm-objdump','-r',obj],text=True)
+          calls=[line.strip() for line in reloc.splitlines() if re.search(r'ARM64_RELOC_BRANCH26\s+_trust_cache_init(?:\s|$)',line)]
+          assert len(calls)==1,'The actual startup object must call trust_cache_init'
+          out=Path('out/storage-annotation')
+          (out/'startup-compile-record.json').write_text(json.dumps(j,indent=2)+'\n')
+          report=dict(compiled=True,actual_startup_trust_cache_mode=1,branch_relocations=calls,
+              object_sha256=hashlib.sha256(obj.read_bytes()).hexdigest(),
+              compile_record_sha256=hashlib.sha256(record.read_bytes()).hexdigest(),
+              runtime_initialized=False,original_security_modules_loaded=False,phone_accessed=False)
+          (out/'security-bootstrap.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('PASS: actual source startup.o contains one trust_cache_init call; runtime still unqualified')
+          PYCODE
       - uses: actions/upload-artifact@v4
         if: always()
         with:
